@@ -28,7 +28,8 @@ from matplotlib.lines import Line2D
 
 def load_model(name_model):
 
-    model_dir = "/local/home/cravoux/Documents/Python/Data/p1d_models"
+    # model_dir = "/local/home/cravoux/Documents/Python/Data/p1d_models"
+    model_dir = "/global/homes/r/ravouxco/1_Documents/Pk1d/models"
     if name_model == "eBOSSmodel_stack" :
         eBOSSmodel_lowz=read_in_model(os.path.join(model_dir,'models_eBOSS_lowz.fits'))
         eBOSSmodel_highz=read_in_model(os.path.join(model_dir,'models_eBOSS_highz.fits'))
@@ -90,6 +91,8 @@ def convert_data_to_kms(data):
     return(data)
 
 
+
+# CR - to reformat or update with Michael plotting routines
 
 
 def plot_data(args,zbins,colors,mark_size=6,data=None,truth=None,outdir=None,fname=None,reslabel='',reslabel2='',comparemodel=None,kmin=4e-2,kmax=2.5,diffrange=0.4,noerrors=False,velunits=False,fontt=None,fontlab=None,fontl=None):
@@ -388,7 +391,7 @@ def plot_mean_z_noise_power(dict_noise_diff,zbins,outdir="./",fname="noise"):
     ax[2].set_ylabel('$mean_{k}((P_{diff}-P_{pipeline})/P_{pipeline})$')
     ax[2].text(zbins[0],0,'mean value = ${} \pm {}$%'.format(np.round(np.mean(dict_noise_diff["diff_over_pipeline"])*100,2),np.round(np.mean(dict_noise_diff["error_diff_over_pipeline"])*100/len(dict_noise_diff["error_diff_over_pipeline"]),2)))
     ax[2].set_xlabel('z')
-    fig.savefig("{}_mean_ratio_diff_noise_power.pdf".format(figure_file),format="pdf")
+    fig.savefig("{}_mean_ratio_diff_pipeline_power.pdf".format(figure_file),format="pdf")
 
 
 
@@ -415,12 +418,58 @@ def plot_several_mean_z_noise_power(list_dict,nameout,legend,colors,dreshift = 0
     ax[0].set_ylabel('$mean_{k}(P_{pipeline}) [\AA]$')
     ax[1].set_ylabel('$mean_{k}(P_{diff}) [\AA]$')
     ax[2].set_ylabel('$mean_{k}((P_{diff}-P_{pipeline})/P_{pipeline})$')
-    fig.savefig("{}_mean_ratio_diff_noise_power.pdf".format(nameout),format="pdf")
+    fig.savefig("{}_mean_ratio_diff_pipeline_power.pdf".format(nameout),format="pdf")
 
 
 
+# CR - rewrite with scipy func
 
-def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",kmin=None,kmax=None,noisediff=False,side_band=False,side_band_comp=None,side_band_legend=["SB1","SB2"],fontt=None,k_units="A"):
+def return_mean_z_dict(zbins,data):
+    mean_dict = {"meanPk_diff" : [],"meanPk_noise" : [],"meanPk_raw" : [], "error_diffovernoise":[], "error_meanPk_diffoverraw":[], "error_meanPk_noiseoverraw":[],"error_meanPk_raw":[],"k_array":[],"error_meanPk_noise" : [],"errorPk" : [],"meanPk" : []}
+    for z,d in zip(zbins,data):
+        mean_dict["meanPk"].append(d['meanPk'])
+        mean_dict["errorPk"].append(d['errorPk'])
+        mean_dict["meanPk_noise"].append(d['meanPk_noise'])
+        mean_dict["meanPk_raw"].append(d['meanPk_raw'])
+        yerr = (d['errorPk_noise'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_noise'] / d['meanPk_noise'])**2)
+        mean_dict["error_meanPk_noiseoverraw"].append(yerr)
+        mean_dict["k_array"] = d['meank']
+        mean_dict["error_meanPk_raw"].append(d['errorPk_raw'])
+        mean_dict["error_meanPk_noise"].append(d['errorPk_noise'])
+
+        mean_dict["meanPk_diff"].append(d['meanPk_diff'])
+        mean_dict["error_diffovernoise"].append(yerr)
+        yerr = (d['errorPk_diff'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_diff'] / d['meanPk_diff'])**2)
+        mean_dict["error_meanPk_diffoverraw"].append(yerr)
+
+    mean_dict["meanPk_noise"] = np.mean(mean_dict["meanPk_noise"],axis=0)
+    mean_dict["error_meanPk_noiseoverraw"] =np.mean(mean_dict["error_meanPk_noiseoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noiseoverraw"]))
+    mean_dict["meanPk_raw"] = np.mean(mean_dict["meanPk_raw"],axis=0)
+    mean_dict["error_meanPk_raw"] = np.mean(mean_dict['error_meanPk_raw'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_raw"]))
+    mean_dict["meanPk"] = np.mean(mean_dict["meanPk"],axis=0)
+    mean_dict["errorPk"] = np.mean(mean_dict['errorPk'],axis=0)/np.sqrt(len(mean_dict["errorPk"]))
+
+
+    mean_dict["error_meanPk_noise"] = np.mean(mean_dict['error_meanPk_noise'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noise"]))
+    mean_dict["meanPk_diff"] = np.mean(mean_dict["meanPk_diff"],axis=0)
+    mean_dict["error_meanPk_diffoverraw"] = np.mean(mean_dict["error_meanPk_diffoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_diffoverraw"]))
+
+    mean_dict["error_diffovernoise"] = np.mean(mean_dict["error_diffovernoise"],axis=0)/np.sqrt(len(mean_dict["error_diffovernoise"]))
+
+    return(mean_dict)
+
+
+
+# CR - reformat function into 3 func
+
+def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",
+                           kmin=None,kmax=None,noisediff=False,
+                           noise_comparison=False,
+                           side_band=False,
+                           side_band_comp=None,
+                           side_band_legend=["SB1","SB2"],
+                           fontt=None,
+                           k_units="A"):
     if(k_units == "A"):
         True
     elif(k_units == "kms"):
@@ -429,11 +478,14 @@ def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",kmin=None,kmax=
         raise ValueError("choose units between A and kms")
 
 
-    if(noisediff):
+    mean_dict = return_mean_z_dict(zbins,data)
+
+    if(noise_comparison):
         fig2,ax2=plt.subplots(4,1,figsize=(8,10),sharex=True)
     if(side_band):
         fig3,ax3=plt.subplots(4,1,figsize=(8,10),sharex=True)
-    mean_dict = {"meanPk_diff" : [],"meanPk_noise" : [],"meanPk_raw" : [], "error_diffovernoise":[], "error_meanPk_diffoverraw":[], "error_meanPk_noiseoverraw":[],"error_meanPk_raw":[],"k_array":[],"error_meanPk_noise" : [],"errorPk" : [],"meanPk" : []}
+
+
     fig,ax=plt.subplots(4,1,figsize=(8,10),sharex=True)
     if(noisediff):
         noise_to_plot,labelnoise = 'meanPk_diff','diff'
@@ -470,16 +522,7 @@ def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",kmin=None,kmax=
             ax[1].set_ylabel('$P_{' + labelnoise +'} [km/s]$')
         ax[2].plot(d['meank'],d[noise_to_plot]/d['meanPk_raw'],label=f'{z:.1f}')
         ax[2].set_ylabel('$P_{' + labelnoise +'}/P_{raw}$')
-        mean_dict["meanPk"].append(d['meanPk'])
-        mean_dict["errorPk"].append(d['errorPk'])
-        mean_dict["meanPk_noise"].append(d['meanPk_noise'])
-        mean_dict["meanPk_raw"].append(d['meanPk_raw'])
-        yerr = (d['errorPk_noise'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_noise'] / d['meanPk_noise'])**2)
-        mean_dict["error_meanPk_noiseoverraw"].append(yerr)
-        mean_dict["k_array"] = d['meank']
-        mean_dict["error_meanPk_raw"].append(d['errorPk_raw'])
-        mean_dict["error_meanPk_noise"].append(d['errorPk_noise'])
-        if(noisediff):
+        if(noise_comparison):
             ax2[0].plot(d['meank'],d["meanPk_noise"],label=f'{z:.1f}')
             if(k_units == "A"):
                 ax2[0].set_ylabel("$P_{pipeline} [\AA]$")
@@ -493,24 +536,15 @@ def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",kmin=None,kmax=
             yerr = (d['errorPk_diff'] / d['meanPk_noise']) *  np.sqrt((d['errorPk_noise'] / d['meanPk_noise'])**2 + (d['errorPk_diff'] / d['meanPk_diff'])**2)
             ax2[2].errorbar(d['meank'],(d['meanPk_diff'] -d['meanPk_noise']) / d['meanPk_noise'], yerr = yerr , fmt = 'o')#,marker_size=6)
             ax2[2].set_ylabel('$(P_{diff} - P_{pipeline})/P_{pipeline}$')
-            mean_dict["meanPk_diff"].append(d['meanPk_diff'])
-            mean_dict["error_diffovernoise"].append(yerr)
-            yerr = (d['errorPk_diff'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_diff'] / d['meanPk_diff'])**2)
-            mean_dict["error_meanPk_diffoverraw"].append(yerr)
             ax2[0].legend()
 
-    mean_dict["meanPk_noise"] = np.mean(mean_dict["meanPk_noise"],axis=0)
-    mean_dict["error_meanPk_noiseoverraw"] =np.mean(mean_dict["error_meanPk_noiseoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noiseoverraw"]))
-    mean_dict["meanPk_raw"] = np.mean(mean_dict["meanPk_raw"],axis=0)
-    mean_dict["error_meanPk_raw"] = np.mean(mean_dict['error_meanPk_raw'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_raw"]))
-    mean_dict["error_meanPk_noise"] = np.mean(mean_dict['error_meanPk_noise'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noise"]))
-    mean_dict["meanPk"] = np.mean(mean_dict["meanPk"],axis=0)
-    mean_dict["errorPk"] = np.mean(mean_dict['errorPk'],axis=0)/np.sqrt(len(mean_dict["errorPk"]))
 
-    if(noisediff):
-        mean_dict["meanPk_diff"] = np.mean(mean_dict["meanPk_diff"],axis=0)
-        mean_dict["error_diffovernoise"] = np.mean(mean_dict["error_diffovernoise"],axis=0)/np.sqrt(len(mean_dict["error_diffovernoise"]))
-        mean_dict["error_meanPk_diffoverraw"] = np.mean(mean_dict["error_meanPk_diffoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_diffoverraw"]))
+
+
+
+
+
+    if(noise_comparison):
         ax2[3].errorbar(mean_dict["k_array"],(mean_dict["meanPk_diff"] - mean_dict["meanPk_noise"]) / mean_dict["meanPk_noise"], yerr =mean_dict["error_diffovernoise"], fmt = 'o')#,marker_size=6)
         ax2[3].set_ylabel('$mean_{z}((P_{diff} - P_{pipeline})/P_{pipeline})$')
         if(k_units == "A"):
@@ -520,7 +554,7 @@ def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",kmin=None,kmax=
             ax2[3].set_xlabel('k[$s/km$]')
         if(kmin is not None): ax2[0].set_xlim(kmin,kmax)
         fig2.tight_layout()
-        fig2.savefig(os.path.join(outdir,"{}_unit{}_ratio_noise_diff_power.pdf".format(out_name,k_units)),format="pdf")
+        fig2.savefig(os.path.join(outdir,"{}_ratio_diff_pipeline_power_unit{}.pdf".format(out_name,k_units)),format="pdf")
 
 
 
@@ -550,7 +584,7 @@ def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",kmin=None,kmax=
         if(kmin is not None): ax3[0].set_xlim(kmin,kmax)
         ax3[3].set_ylim(0,10)
         fig3.tight_layout()
-        fig3.savefig(os.path.join(outdir,"{}_unit{}_side_band.pdf".format(out_name,k_units)),format="pdf")
+        fig3.savefig(os.path.join(outdir,"{}_side_band_unit{}.pdf".format(out_name,k_units)),format="pdf")
 
     ax[3].errorbar(mean_dict["k_array"],mean_dict[noise_to_plot]/mean_dict["meanPk_raw"], yerr =mean_dict["error_{}overraw".format(noise_to_plot)], fmt = 'o')#,marker_size=6)
     ax[3].set_ylabel('$mean_{z}(P_{' + labelnoise +'}/P_{raw})$')
@@ -575,11 +609,11 @@ def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",kmin=None,kmax=
     elif(k_units == "kms"):
         ax[3].set_xlabel('k[$s/km$]')
     if(kmin is not None): ax[0].set_xlim(kmin,kmax)
-    ax[0].set_ylim((0,1.25))
-    ax[1].set_ylim((0.05,0.2))
-    ax[2].set_ylim((0,1.3))
-    ax[3].set_ylim((0,1.3))
+    # ax[0].set_ylim((0,1.25))
+    # ax[1].set_ylim((0.05,0.2))
+    # ax[2].set_ylim((0,1.3))
+    # ax[3].set_ylim((0,1.3))
     for i in [0,1,2,3]:
         ax[i].grid()
     fig.tight_layout()
-    fig.savefig(os.path.join(outdir,"{}_unit{}_ratio_{}_raw_power.pdf".format(out_name,k_units,labelnoise)),format="pdf")
+    fig.savefig(os.path.join(outdir,f"{out_name}_ratio_{labelnoise}_raw_power_unit{k_units}.pdf"),format="pdf")
