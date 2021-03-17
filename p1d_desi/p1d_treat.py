@@ -34,8 +34,7 @@ def compute_Pk_means(data_dir,
                      k_bin_lin = 0.2,
                      k_inf_vel=0.00001,
                      k_sup_vel=0.1,
-                     k_bin_vel=0.002,
-                     noisediff=False):
+                     k_bin_vel=0.002):
     files = glob.glob(os.path.join(data_dir,"*.fits.gz"))
     # files = glob.glob("{}/*.fits.gz".format(data_dir))
     #generate arrays
