@@ -21,7 +21,7 @@ from matplotlib.ticker import FuncFormatter
 from functools import partial
 import scipy
 from matplotlib.lines import Line2D
-
+import matplotlib.markers as mmark
 
 
 
@@ -370,28 +370,34 @@ def compute_mean_z_noise_power(data,zbins,kmin=4e-2,kmax=2.5,velunits=False):
 
 
 
-def plot_mean_z_noise_power(dict_noise_diff,zbins,outdir="./",fname="noise"):
+def plot_mean_z_noise_power(dict_noise_diff,zbins,dreshift = 0.02,outdir="./",fname="noise"):
     figure_file = os.path.join(outdir,fname)
-
-    fig,ax=plt.subplots(3,1,figsize=(8,8),sharex=True)
-    ax[2].set_xticks(zbins)
+    fig,ax=plt.subplots(2,1,figsize=(8,6),sharex=True)
+    ax[1].set_xticks(zbins)
     for i in range(len(dict_noise_diff["pipeline"])):
-        pipeline = dict_noise_diff["pipeline"][i]
-        error_pipeline = dict_noise_diff["error_pipeline"][i]
-        diff = dict_noise_diff["diff"][i]
-        error_diff = dict_noise_diff["error_diff"][i]
-        diff_over_pipeline = dict_noise_diff["diff_over_pipeline"][i]
-        error_diff_over_pipeline = dict_noise_diff["error_diff_over_pipeline"][i]
-        ax[0].errorbar(zbins[i],pipeline,error_pipeline,marker='.')
-        ax[1].errorbar(zbins[i],diff,error_diff,marker='.')
-        ax[2].errorbar(zbins[i],diff_over_pipeline,error_diff_over_pipeline,marker='.')
-
-    ax[0].set_ylabel('$mean_{k}(P_{pipeline}) [\AA]$')
-    ax[1].set_ylabel('$mean_{k}(P_{diff}) [\AA]$')
-    ax[2].set_ylabel('$mean_{k}((P_{diff}-P_{pipeline})/P_{pipeline})$')
-    ax[2].text(zbins[0],0,'mean value = ${} \pm {}$%'.format(np.round(np.mean(dict_noise_diff["diff_over_pipeline"])*100,2),np.round(np.mean(dict_noise_diff["error_diff_over_pipeline"])*100/len(dict_noise_diff["error_diff_over_pipeline"]),2)))
-    ax[2].set_xlabel('z')
+        scale_fac = 3e5/((1+zbins[i])*1216)
+        pipeline = dict_noise_diff["pipeline"][i] * scale_fac
+        error_pipeline = dict_noise_diff["error_pipeline"][i] * scale_fac
+        diff = dict_noise_diff["diff"][i] * scale_fac
+        error_diff = dict_noise_diff["error_diff"][i] * scale_fac
+        # diff_over_pipeline = dict_noise_diff["diff_over_pipeline"][i]
+        # error_diff_over_pipeline = dict_noise_diff["error_diff_over_pipeline"][i]
+        diff_over_pipeline = ( dict_noise_diff["diff"][i] - dict_noise_diff["pipeline"][i] ) * scale_fac
+        error_diff_over_pipeline = diff_over_pipeline * np.sqrt((error_pipeline/pipeline)**2 + (error_diff/diff)**2)
+        ax[0].errorbar(zbins[i],pipeline,error_pipeline,marker='*',color =f"C{i}")
+        ax[0].errorbar(zbins[i] + dreshift,diff,error_diff,marker='o',color =f"C{i}")
+        ax[1].errorbar(zbins[i],diff_over_pipeline,error_diff_over_pipeline,marker='.')
+    legend_elements = [Line2D([], [], color='k', marker='*', linestyle='None', label='$P_{pipeline}$'),
+                       Line2D([], [], color='k', marker='o', linestyle='None', label='$P_{diff}$')]
+    ax[0].legend(handles=legend_elements)
+    ax[0].set_ylabel('$<P> [km/s]$')
+    # ax[0].set_ylabel('$mean_{k}(P_{diff}) [\AA]$')
+    ax[1].set_ylabel('$\delta<P> [km/s]$')
+    ax[1].set_xlabel('z')
+    ax[1].legend(handles = [Line2D([], [], color='k', marker='None', linestyle='None',
+                                  label='Average for all redshift = ${}$%'.format(np.round(np.mean(dict_noise_diff["diff_over_pipeline"])*100,2)))],frameon=False)
     fig.savefig("{}_mean_ratio_diff_pipeline_power.pdf".format(figure_file),format="pdf")
+    fig.savefig("{}_mean_ratio_diff_pipeline_power.png".format(figure_file),format="png",dpi=300)
 
 
 
@@ -505,12 +511,12 @@ def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",
             elif(k_units == "kms"):
                 ax3[0].set_ylabel('$P_{raw} [km/s]$')
             ax3[0].legend()
-            ax3[1].plot(d['meank'],d['meanPk_noise'],label=f'{z:.1f}')
+            ax3[1].plot(d['meank'],d[noise_to_plot],label=f'{z:.1f}')
             if(k_units == "A"):
-                ax3[1].set_ylabel('$P_{pipeline} [\AA]$')
+                ax3[1].set_ylabel('$P_{' + labelnoise +'} [\AA]$')
             elif(k_units == "kms"):
-                ax3[1].set_ylabel('$P_{pipeline} [km/s]$')
-            ax3[2].plot(d['meank'],d['meanPk_raw'] - d['meanPk_noise'],label=f'{z:.1f}')
+                ax3[1].set_ylabel('$P_{' + labelnoise +'} [km/s]$')
+            ax3[2].plot(d['meank'],d['meanPk_raw'] - d[noise_to_plot],label=f'{z:.1f}')
             if(k_units == "A"):
                 ax3[2].set_ylabel('$ (P_{raw} - P_{pipeline}) [\AA]$')
             elif(k_units == "kms"):
@@ -570,19 +576,18 @@ def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",
         polynome = Poly(cont_k_array)
         mean_dict["poly"]= polynome
         mean_dict["k_cont"]=cont_k_array
-#        ax3[3].plot(cont_k_array,polynome)
-        if(side_band_comp is not None):
-            yerr =np.sqrt( side_band_comp["error_meanPk_noise"]**2 + side_band_comp["error_meanPk_raw"]**2)
-            ax3[3].errorbar(side_band_comp["k_array"],side_band_comp["meanPk_raw"] - side_band_comp["meanPk_noise"],yerr, fmt = 'o',label=side_band_legend[1])
-#            ax3[3].plot(side_band_comp["k_cont"],side_band_comp["poly"])
-            ax3[3].legend()
+#       # ax3[3].plot(cont_k_array,polynome)
+#         if(side_band_comp is not None):
+#             yerr =np.sqrt( side_band_comp["error_meanPk_noise"]**2 + side_band_comp["error_meanPk_raw"]**2)
+#             ax3[3].errorbar(side_band_comp["k_array"],side_band_comp["meanPk_raw"] - side_band_comp["meanPk_noise"],yerr, fmt = 'o',label=side_band_legend[1])
+# #            ax3[3].plot(side_band_comp["k_cont"],side_band_comp["poly"])
+#             ax3[3].legend()
         if(k_units == "A"):
             ax3[3].set_xlabel('k[1/$\AA$]')
             place_k_speed_unit_axis(fig3,ax3[0])
         elif(k_units == "kms"):
             ax3[3].set_xlabel('k[$s/km$]')
         if(kmin is not None): ax3[0].set_xlim(kmin,kmax)
-        ax3[3].set_ylim(0,10)
         fig3.tight_layout()
         fig3.savefig(os.path.join(outdir,"{}_side_band_unit{}.pdf".format(out_name,k_units)),format="pdf")
 
