@@ -60,9 +60,9 @@ def compute_Pk_means_parallel(data_dir,
     outdir=t.Table()
     if ncpu>1:
         with Pool(ncpu) as pool:
-            dataarr_all=pool.starmap(compute_single_means,[[f,zbinedges,kbinedges,debug,nomedians,logsample] for f in files])
+            dataarr_all=pool.starmap(compute_single_means,[[f,args,zbinedges,kbinedges,debug,nomedians,logsample] for f in files])
     else:
-        dataarr_all=[compute_single_means(f,zbinedges,kbinedges,debug=debug,nomedians=nomedians,logsample=logsample) for f in files]
+        dataarr_all=[compute_single_means(f,args,zbinedges,kbinedges,debug=debug,nomedians=nomedians,logsample=logsample) for f in files]
     dataarr_all=[d for d in dataarr_all if d is not None] #filter for files where S/N criterion is never fulfilled
     outdir['N']=np.sum([d['N'] for d in dataarr_all],axis=0)
     outdir['N_chunks']=np.sum([d['N_chunks'] for d in dataarr_all],axis=0)
