@@ -32,9 +32,25 @@ def compute_Pk_means_parallel(data_dir,
                               velunits=False,
                               debug=False,
                               nomedians=False,
-                              logsample=False,
-                              velunits=False
+                              logsample=False
                               ):
+    """Computes the power spectrum from picca_pk1d outputs
+
+    Args:
+        data_dir ([type]): where the outputs are living
+        args ([type]): a dictionary including k range limits and SNR cut
+        zbins ([type]): which redshifts to use
+        searchstr (str, optional): [description]. Defaults to '*'.
+        ncpu (int, optional): Should we multiprocess? Defaults to 1.
+        overwrite (bool, optional): Overwrite files if existing. Defaults to False.
+        velunits (bool, optional): Compute the power in velocity space (input is still assumed to be in angstrom units) Defaults to False.
+        debug (bool, optional): generates intermediate files. Defaults to False.
+        nomedians (bool, optional): should we skip computation of medians (faster). Defaults to False.
+        logsample (bool, optional): Should the k-bins be sampled in log instead of linearly. Defaults to False.
+
+    Returns:
+        [type]: [description]
+    """                
     outfilename=data_dir+f'mean_Pk1d_snrcut{args["SNR_min"]}_par{"_log" if logsample else ""}{"_vel" if velunits else ""}.fits.gz'
     if os.path.exists(outfilename) and not overwrite:
         print(f"found existing power, loading from file {outfilename}")
