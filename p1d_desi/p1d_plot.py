@@ -40,6 +40,22 @@ def load_model(name_model):
         DR9model_highz=read_in_model(os.path.join(model_dir,'models_DR9_highz.fits'))
         DR9model_stack=[np.vstack([m,m2]) for m,m2 in zip(DR9model_lowz, DR9model_highz)]
         return(DR9model_stack)
+    elif name_model == "Naimmodel_stack":
+        def naim_function4(k,z,k0=0.009,k1=0.053,z0=3,A=0.066,B=3.59,n=-2.685,alpha=-0.22,beta=-0.16):
+            knorm0=k/k0
+            knorm1=k/k1
+            exp1=3+n+alpha*np.log(knorm0)
+            exp2=B+beta*np.log(knorm0)
+            nom=knorm0**exp1
+            denom=1+knorm1**2
+            zfac=(1+z)/(1+z0)
+            return A*nom/denom*zfac**exp2
+
+        Naimmodel={}
+        Naimmodel['z']=np.arange(2.2,4.7,0.2)
+        Naimmodel['k']=np.arange(0.001,0.1,0.001)[np.newaxis,:]
+        Naimmodel['kpk']=naim_function4(Naimmodel['k'],Naimmodel['z'][:,np.newaxis],A=0.084,B=3.64,alpha=-0.155,beta=0.32,k1=0.048,n=-2.655)
+        Naimmodel_stack=(np.array(Naimmodel['z'][:,np.newaxis]),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
     else :
         raise ValueError("Incorrect model")
 
