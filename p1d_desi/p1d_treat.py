@@ -90,7 +90,7 @@ def compute_Pk_means_parallel(data_dir,
             outdir[c]=np.sqrt(
                 (np.nansum(
                 #the following computes mean(d^2), then subtracts mean(d)^2 which was precomputed, the last division is for getting the error on the mean
-                [d['N']*(d['N']*d[c]**2+d[c.replace('error','mean')]**2) for d in dataarr_all],
+                [d['N']*(d[c]**2+d[c.replace('error','mean')]**2) for d in dataarr_all],
                 axis=0)/outdir['N']
                                -outdir[c.replace('error','mean')]**2)
                 /(outdir['N']))
@@ -169,7 +169,6 @@ def compute_single_means(f,
         for c in cols:
             for stats in statsarr:
                 outdir[stats+c],_,_,_=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr[c],statistic=stats if stats!='error' else 'std',bins=[zedges, kedges])
-            outdir['error'+c]/=np.sqrt(N) #to get the error on the mean instead of standard deviation in the data
         outdir['N']=N
         outdir['N_chunks']=np.array(N_chunks,dtype=int)
     else:
@@ -198,7 +197,6 @@ def compute_single_means(f,
                     for stats in statsarr:
                         st,_,_=binned_statistic(dataarr['k'][select],dataarr[c][select],statistic=stats if stats!='error' else 'std',bins=kedges)
                         coldir[stats+c]=st[np.newaxis,:]
-                    coldir['error'+c]/=np.sqrt(N) #to get the error on the mean instead of standard deviation in the data
             outdir=t.vstack([outdir,coldir])
     if debug:
         outdir.write(f"{f[:-8]+'_mean'}{'_log' if logsample else ''}{'_vel' if velunits else ''}.fits.gz",overwrite=True)   #this will be slow because it writes the data for each file
