@@ -33,6 +33,7 @@ def compute_Pk_means_parallel(data_dir,
                               debug=False,
                               nomedians=False,
                               logsample=False,
+                              velunits=False
                               ):
     outfilename=data_dir+f'mean_Pk1d_snrcut{args["SNR_min"]}_par{"_log" if logsample else ""}.fits.gz'
     if os.path.exists(outfilename) and not overwrite:
@@ -114,7 +115,8 @@ def compute_single_means(f,
                          kbinedges=None,
                          debug=False,
                          nomedians=False,
-                         logsample=False):
+                         logsample=False,
+                         velunits=False):
     dataarr=[]
     outdir=t.Table()
     zarr=[]
@@ -141,18 +143,47 @@ def compute_single_means(f,
     dataarr['Pk_norescor']=dataarr['Pk_raw']-dataarr['Pk_noise']
     dataarr['Pk/Pnoise']=dataarr['Pk_raw']/dataarr['Pk_noise']  #take the ratio this way as the noise power will fluctuate less even in the tails (i.e. less divisions by 0)
     cols=dataarr.colnames
-    N,zedges,kedges,numbers=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr['k'],statistic='count',bins=[zbinedges,kbinedges])
     N_chunks,zedges_chunks,numbers_chunks=binned_statistic(zarr,zarr,statistic='count',bins=zbinedges)
-    for c in cols:
-        outdir['mean'+c],_,_,_=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr[c],statistic='mean',bins=[zedges, kedges])
-        if not nomedians:
-            outdir['median'+c],_,_,_=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr[c],statistic='median',bins=[zedges, kedges])
-        outdir['error'+c],_,_,_=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr[c],statistic='std',bins=[zedges, kedges])
-        outdir['min'+c],_,_,_=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr[c],statistic='min',bins=[zedges, kedges])
-        outdir['max'+c],_,_,_=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr[c],statistic='max',bins=[zedges, kedges])
-        outdir['error'+c]/=np.sqrt(N) #to get the error on the mean instead of standard deviation in the data
-    outdir['N']=N
-    outdir['N_chunks']=np.array(N_chunks,dtype=int)
+
+    statsarr=['mean','error','min','max']
+    if not nomedians:
+        statsarr+=['median']
+    if not velunits:
+        N,zedges,kedges,numbers=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr['k'],statistic='count',bins=[zbinedges,kbinedges])
+        for c in cols:
+            for stats in statsarr:
+                outdir[stats+c],_,_,_=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr[c],statistic=stats if stats!='error' else 'std',bins=[zedges, kedges])
+            outdir['error'+c]/=np.sqrt(N) #to get the error on the mean instead of standard deviation in the data
+        outdir['N']=N
+        outdir['N_chunks']=np.array(N_chunks,dtype=int)
+    else:
+        outdir=t.Table()
+        for izbin,zbin in enumerate(zbinedges[:-1]):
+            select=(dataarr['z'][:]<zbinedges[izbin+1])&(dataarr['z'][:]>zbinedges[izbin])
+            coldir=t.Table()
+            coldir['N_chunks']=np.array([N_chunks[izbin]],dtype=int)
+            if N_chunks[izbin]==0:
+                coldir['N']=np.zeros((1,len(kbinedges)-1))
+                for c in cols:
+                    for stats in statsarr:
+                        coldir[stats+c]=np.ones((1,len(kbinedges)-1))*np.nan
+            else:
+                convfactor=(1215.67*(1+np.mean(dataarr['z'][select])))/3e5
+                dataarr['k'][select]*=convfactor
+                for c in cols:
+                    if 'Pk' in c:
+                        dataarr[c][select]/=convfactor
+
+
+                N,kedges,numbers=binned_statistic(dataarr['k'][select],dataarr['k'][select],statistic='count',bins=kbinedges)
+                coldir['N']=N[np.newaxis,:]
+                
+                for c in cols:
+                    for stats in statsarr:
+                        st,_,_=binned_statistic(dataarr['k'][select],dataarr[c][select],statistic=stats if stats!='error' else 'std',bins=kedges)
+                        coldir[stats+c]=st[np.newaxis,:]
+                    coldir['error'+c]/=np.sqrt(N) #to get the error on the mean instead of standard deviation in the data
+            outdir=t.vstack([outdir,coldir])
     if debug:
         outdir.write(f"{f[:-8]+'_mean'}{'_log' if logsample else ''}.fits.gz",overwrite=True)   #this will be slow because it writes the data for each file
     return outdir
