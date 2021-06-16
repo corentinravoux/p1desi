@@ -35,7 +35,7 @@ def compute_Pk_means_parallel(data_dir,
                               logsample=False,
                               velunits=False
                               ):
-    outfilename=data_dir+f'mean_Pk1d_snrcut{args["SNR_min"]}_par{"_log" if logsample else ""}.fits.gz'
+    outfilename=data_dir+f'mean_Pk1d_snrcut{args["SNR_min"]}_par{"_log" if logsample else ""}{"_vel" if velunits else ""}.fits.gz'
     if os.path.exists(outfilename) and not overwrite:
         print(f"found existing power, loading from file {outfilename}")
         outdir=t.Table.read(outfilename)
@@ -61,9 +61,9 @@ def compute_Pk_means_parallel(data_dir,
     outdir=t.Table()
     if ncpu>1:
         with Pool(ncpu) as pool:
-            dataarr_all=pool.starmap(compute_single_means,[[f,args,zbinedges,kbinedges,debug,nomedians,logsample] for f in files])
+            dataarr_all=pool.starmap(compute_single_means,[[f,args,zbinedges,kbinedges,debug,nomedians,logsample,velunits] for f in files])
     else:
-        dataarr_all=[compute_single_means(f,args,zbinedges,kbinedges,debug=debug,nomedians=nomedians,logsample=logsample) for f in files]
+        dataarr_all=[compute_single_means(f,args,zbinedges,kbinedges,debug=debug,nomedians=nomedians,logsample=logsample,velunits=velunits) for f in files]
     dataarr_all=[d for d in dataarr_all if d is not None] #filter for files where S/N criterion is never fulfilled
     outdir['N']=np.sum([d['N'] for d in dataarr_all],axis=0)
     outdir['N_chunks']=np.sum([d['N_chunks'] for d in dataarr_all],axis=0)
@@ -185,7 +185,7 @@ def compute_single_means(f,
                     coldir['error'+c]/=np.sqrt(N) #to get the error on the mean instead of standard deviation in the data
             outdir=t.vstack([outdir,coldir])
     if debug:
-        outdir.write(f"{f[:-8]+'_mean'}{'_log' if logsample else ''}.fits.gz",overwrite=True)   #this will be slow because it writes the data for each file
+        outdir.write(f"{f[:-8]+'_mean'}{'_log' if logsample else ''}{'_vel' if velunits else ''}.fits.gz",overwrite=True)   #this will be slow because it writes the data for each file
     return outdir
 
 
