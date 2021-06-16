@@ -88,12 +88,12 @@ def compute_Pk_means_parallel(data_dir,
             outdir[c]=np.nansum([d[c]*d['N'] for d in dataarr_all],axis=0)/outdir['N']
         elif c.startswith('error'):
             outdir[c]=np.sqrt(
-                (np.nansum(
-                #the following computes mean(d^2), then subtracts mean(d)^2 which was precomputed, the last division is for getting the error on the mean
-                [d['N']*(d[c]**2+d[c.replace('error','mean')]**2) for d in dataarr_all],
-                axis=0)/outdir['N']
-                               -outdir[c.replace('error','mean')]**2)
-                /(outdir['N']))
+                (
+                    np.nansum(
+                    #the following computes mean(d^2), then subtracts mean(d)^2 which was precomputed, the last division is for getting the error on the mean
+                        [d['N']*(d[c]**2+d[c.replace('error','mean')]**2) for d in dataarr_all], axis=0)/
+                        outdir['N']-outdir[c.replace('error','mean')]**2)
+                /outdir['N'])
         elif c.startswith('median'):
             #this is only approximate, should be ok if the number of files processed is very large, it's also mem inefficient if that will ever be important (could be improved by doing a smart sorting instead...)
             #dall=[d for d1 in dataarr_all for d in (d1['N']*[d1[c]])]
@@ -167,7 +167,7 @@ def compute_single_means(f,
     if not velunits:
         N,zedges,kedges,numbers=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr['k'],statistic='count',bins=[zbinedges,kbinedges])
         for c in cols:
-            for stats in statsarr:
+            for stats in statsarr:  #TODO: double check if error becomes 0 or nan if N=1
                 outdir[stats+c],_,_,_=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr[c],statistic=stats if stats!='error' else 'std',bins=[zedges, kedges])
         outdir['N']=N
         outdir['N_chunks']=np.array(N_chunks,dtype=int)
