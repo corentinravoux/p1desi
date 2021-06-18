@@ -4,7 +4,9 @@ import glob, os
 import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic
 from desitarget.sv1.sv1_targetmask import desi_mask as sv1_desi_mask
-
+from desitarget.sv3.sv3_targetmask import desi_mask as sv3_desi_mask
+from desispec.io import read_spectra
+from desispec.coaddition import coadd_cameras
 
 
 def hist_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
@@ -187,6 +189,97 @@ def plot_ra_dec_diagram(name_out,ra,dec,cut_objects):
     plt.savefig(f"radec_diagram_{name_out}.pdf",format="pdf")
     plt.close()
 
+
+
+def get_spectra_desi(spectra_path,
+                     spectro,
+                     cut_objects,
+                     survey,
+                     diff=False):
+    """
+    Get the spectra and the best fit model from a given spectra and zbest file.
+
+    Args:
+        spectra_name (list str): The name of the spectra file.
+
+    Returns:
+        target_id (numpy array): Array containing target id of the the object
+                                 to fit
+        redshift_redrock (numpy array): Array containing the redshift of the the
+                                        object to fit
+        flux (numpy array): Array containing the full flux arrays of every
+                            object to fit
+        ivar_flux (numpy array): Array containing the inverse variance arrays
+                                 of every object to fit
+        model_flux (numpy array): Array containing the best fit redrock model
+                                  for every object to fit
+        wavelength (numpy array): Array containing the wavelength
+        index_with_fit (boolean numpy array): boolean array of index_to_fit size
+                                              masking index where mgII fitter is
+                                              not apply
+    """
+
+    if(survey.upper() == "SV1"):
+        desi_mask_used = sv1_desi_mask
+        target_key = "SV1_DESI_TARGET"
+    if(survey.upper() == "SV3"):
+        desi_mask_used = sv3_desi_mask
+        target_key = "SV3_DESI_TARGET"
+
+    for path in spectra_path :
+        flux,pixel_mask,var,target_class,target_id,ra,dec = [],[],[],[],[],[],[]
+        if(diff):
+            diff_flux=[]
+
+        if(spectro == "all"):
+            spectra_names = np.sort(glob.glob(os.path.join(path,"*/coadd-*.fits")))
+        else:
+            spectra_names = np.sort(glob.glob(os.path.join(path,"*/coadd-{}-*.fits".format(spectro))))
+
+
+        for i in range(len(spectra_names)):
+            spectra = read_spectra(spectra_names[i])
+            if 'brz' not in spectra.bands:
+                spectra = coadd_cameras(spectra)
+            mask_target = np.full(spectra.fibermap[target_key].shape,False)
+            for j in range(len(cut_objects)):
+                mask_target |= ((spectra.fibermap[target_key] & desi_mask_used[cut_objects[j]])!=0)
+            mask_target = mask_target & (spectra.fibermap["FIBERSTATUS"]==0)
+
+            flux.append(spectra.flux['brz'][mask_target])
+            pixel_mask.append(spectra.mask['brz'][mask_target])
+            ivar=spectra.ivar['brz'][mask_target]
+            mask_ivar = (ivar == np.inf) | (ivar <= 10**-8)
+            ivar[~mask_ivar] = 1/ivar[~mask_ivar]
+            var.append(ivar)
+            target_id.append(spectra.fibermap["TARGETID"][mask_target])
+            target_class.append(spectra.fibermap[target_key][mask_target])
+            ra.append(spectra.fibermap["TARGET_RA"][mask_target])
+            dec.append(spectra.fibermap["TARGET_DEC"][mask_target])
+            if(diff):
+                diff_flux.append(spectra.extra['brz']["DIFF_FLUX"][mask_target])
+
+
+    wavelength = spectra.wave['brz']
+    flux = np.concatenate(flux,axis=0)
+    pixel_mask = np.concatenate(pixel_mask,axis=0)
+    var = np.concatenate(var,axis=0)
+    target_class = np.concatenate(target_class,axis=0)
+    target_id = np.concatenate(target_id,axis=0)
+    ra = np.concatenate(ra,axis=0)
+    dec = np.concatenate(dec,axis=0)
+
+    mask_pixel = pixel_mask !=0
+
+    flux[mask_pixel] == np.nan
+    var[mask_pixel] == np.nan
+
+    if(diff):
+        diff_flux=np.concatenate(diff_flux,axis=0)
+        diff_flux[mask_pixel] == np.nan
+
+
+    return wavelength, flux, var, target_class, target_id, ra, dec
 
 
 def get_spectra(spectra_path,spectro,cut_objects,target_key):
