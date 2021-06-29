@@ -7,6 +7,8 @@ from desitarget.sv1.sv1_targetmask import desi_mask as sv1_desi_mask
 from desitarget.sv3.sv3_targetmask import desi_mask as sv3_desi_mask
 from desispec.io import read_spectra
 from desispec.coaddition import coadd_cameras
+from scipy.ndimage.filters import gaussian_filter
+
 
 
 def hist_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
@@ -32,6 +34,21 @@ def hist_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
     bin_edges = means_result.bin_edges
     bin_centers = (bin_edges[:-1] + bin_edges[1:])/2.
     return(bin_centers, means, errors)
+
+def var_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
+    w = (y>range_y[0]) & (y<range_y[1])
+    if(outlier_insensitive):
+        outlier_insensitive_std = lambda x : (np.nanpercentile(x,84.135,axis=0)-np.nanpercentile(x,15.865,axis=0))/2
+        std_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic=outlier_insensitive_std)
+    else:
+        std_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic='std')
+
+    std = std_result.statistic
+
+    bin_edges = std_result.bin_edges
+    bin_centers = (bin_edges[:-1] + bin_edges[1:])/2.
+    return(bin_centers, std)
+
 
 
 def hist_profile_2d_bins(x, y, bins,statistic="mean",outlier_insensitive=False):
@@ -190,34 +207,90 @@ def plot_ra_dec_diagram(name_out,ra,dec,cut_objects):
     plt.close()
 
 
+def plot_skyline_analysis(name_out,
+                          flux,
+                          wavelength,
+                          nb_bins,
+                          lines_eBOSS,
+                          out_line,
+                          outlier_insensitive=False,
+                          gaussian_smoothing=2):
+    if(outlier_insensitive):
+        mean_spectra = np.nanmedian(flux,axis=0)
+    else:
+        mean_spectra = np.nanmean(flux,axis=0)
+
+    fig,ax=plt.subplots(4,1,figsize=(8,8),sharex=True)
+    ax[0].plot(wavelength,mean_spectra)
+    ax[0].set_ylabel("Mean spectra")
+
+
+    smoothed_mean = gaussian_filter(mean_spectra,gaussian_smoothing)
+
+
+    ax[1].plot(wavelength,smoothed_mean,color="b")
+    ax[1].set_ylabel("Mean spectra smoothed")
+
+    lines_old = np.loadtxt(lines_eBOSS, usecols=range(1,3))
+
+    ratio = np.abs((smoothed_mean - mean_spectra)/smoothed_mean)
+    ax[2].plot(wavelength,ratio,color="b")
+    ax[2].set_ylabel("ratio smoothed not smoothed")
+
+    for i in range(len(lines_old)):
+        ax[2].fill_between(wavelength,
+                           np.min(ratio),
+                           np.max(ratio),
+                           where= ((wavelength> lines_old[i][0])&(wavelength < lines_old[i][1])),
+                           color='red',
+                           alpha=0.2)
+
+    ax[3].plot(wavelength,np.gradient(ratio),color="b")
+
+    fig.savefig(f"{name_out}_mean_spectra.pdf",format="pdf")
+
+
+
+def plot_spectra_noise_comparison(name_out,spectra_array,noise_array,wavelength,nb_bins,outlier_insensitive=False):
+    mean_noise = []
+    var_flux = []
+    for i in range(len(spectra_array)):
+        bin_centers, means, errors = hist_profile(wavelength,
+                                                  noise_array[i],
+                                                  nb_bins,
+                                                  (np.min(wavelength),np.max(wavelength)),
+                                                  (np.min(noise_array[i]),np.max(noise_array[i])),
+                                                  outlier_insensitive=outlier_insensitive)
+        mean_noise.append(means)
+        bin_centers, std = var_profile(wavelength,
+                                       spectra_array[i],
+                                       nb_bins,
+                                       (np.min(wavelength),np.max(wavelength)),
+                                       (np.min(spectra_array[i]),np.max(spectra_array[i])),
+                                       outlier_insensitive=outlier_insensitive)
+        var_flux.append(std)
+
+    V_coadd = np.nanmean(var_flux,axis=0)
+    V_pipeline = np.nanmean(mean_noise,axis=0)
+    fig,ax=plt.subplots(2,1,figsize=(8,5),sharex=True)
+    ax[0].plot(bin_centers,V_coadd, label="diff",color="b", linestyle='none', marker='.',)
+    ax[0].plot(bin_centers,V_pipeline, label="pipeline",color="r", linestyle='none', marker='.',)
+    ax[0].set_ylabel("$Var_i$")
+    ax[0].legend(["coadd","pipeline"])
+
+    ax[1].set_ylabel("$(Var(flux) - Mean(var)) / Mean(var)$")
+
+    ax[1].plot(bin_centers,(V_coadd-V_pipeline)/V_pipeline, label="diff",color="k", linestyle='none', marker='.',)
+
+    fig.savefig(f"{name_out}_spectra_noise_ratio.pdf",format="pdf")
+
 
 def get_spectra_desi(spectra_path,
                      spectro,
                      cut_objects,
                      survey,
                      diff=False):
-    """
-    Get the spectra and the best fit model from a given spectra and zbest file.
 
-    Args:
-        spectra_name (list str): The name of the spectra file.
-
-    Returns:
-        target_id (numpy array): Array containing target id of the the object
-                                 to fit
-        redshift_redrock (numpy array): Array containing the redshift of the the
-                                        object to fit
-        flux (numpy array): Array containing the full flux arrays of every
-                            object to fit
-        ivar_flux (numpy array): Array containing the inverse variance arrays
-                                 of every object to fit
-        model_flux (numpy array): Array containing the best fit redrock model
-                                  for every object to fit
-        wavelength (numpy array): Array containing the wavelength
-        index_with_fit (boolean numpy array): boolean array of index_to_fit size
-                                              masking index where mgII fitter is
-                                              not apply
-    """
 
     if(survey.upper() == "SV1"):
         desi_mask_used = sv1_desi_mask
@@ -226,8 +299,10 @@ def get_spectra_desi(spectra_path,
         desi_mask_used = sv3_desi_mask
         target_key = "SV3_DESI_TARGET"
 
+
+
+    flux,pixel_mask,var,target_class,target_id,ra,dec = [],[],[],[],[],[],[]
     for path in spectra_path :
-        flux,pixel_mask,var,target_class,target_id,ra,dec = [],[],[],[],[],[],[]
         if(diff):
             diff_flux=[]
 
@@ -280,54 +355,3 @@ def get_spectra_desi(spectra_path,
 
 
     return wavelength, flux, var, target_class, target_id, ra, dec
-
-
-def get_spectra(spectra_path,spectro,cut_objects,target_key):
-        if(spectro == "all"):
-            spectra_names = np.sort(glob.glob(os.path.join(spectra_path,"coadd-*.fits")))
-        else:
-            spectra_names = np.sort(glob.glob(os.path.join(spectra_path,"coadd-{}-*.fits".format(spectro))))
-
-        spectra,diff_spectra,target_id,var,wavelength = [],[],[],[],[]
-        pixel_mask = []
-        ra,dec = [[]for i in range(len(cut_objects))],[[]for i in range(len(cut_objects))]
-        masktarget = []
-        for i in range(len(spectra_names)):
-            h = fitsio.FITS(spectra_names[i])
-            target = h["FIBERMAP"][target_key][:]
-            mask = np.full(target.shape,False)
-            fiberstatus_sp = h["FIBERMAP"]["FIBERSTATUS"][:]
-            for i in range(len(cut_objects)):
-                mask |= ((target & sv1_desi_mask[cut_objects[i]])!=0)
-                masktarget.append(((target & sv1_desi_mask[cut_objects[i]])!=0))
-            mask = mask & (fiberstatus_sp==0)
-            for i in range(len(cut_objects)):
-                masktarget[i] &= (fiberstatus_sp==0)
-            spectra.append(h["BRZ_FLUX"][:,:][mask])
-            diff_spectra.append(h["BRZ_DIFF_FLUX"][:,:][mask])
-            pixel_mask.append(h["BRZ_MASK"][:,:][mask])
-            wavelength.append(h["BRZ_WAVELENGTH"][:])
-            ivar_to_append = h["BRZ_IVAR"][:,:]
-            mask_ivar = (ivar_to_append == np.inf) | (ivar_to_append <= 10**-8)
-            ivar_to_append[~mask_ivar] = 1/ivar_to_append[~mask_ivar]
-            ivar_to_append[mask_ivar] = np.nan
-            var.append(ivar_to_append[mask])
-            target_id.append(h["FIBERMAP"]["TARGETID"][:][mask])
-            for i in range(len(cut_objects)):
-                ra[i].append(h["FIBERMAP"]["TARGET_RA"][:][masktarget[i]])
-                dec[i].append(h["FIBERMAP"]["TARGET_DEC"][:][masktarget[i]])
-
-
-        wavelength = np.nanmean(wavelength,axis=0)
-        spectra = np.concatenate(spectra,axis=0)
-        diff = np.concatenate(diff_spectra,axis=0)
-        var = np.concatenate(var,axis=0)
-        target_id = np.concatenate(target_id,axis=0)
-        pixel_mask = np.concatenate(pixel_mask,axis=0)
-        mask_pixel = pixel_mask !=0
-
-        diff[mask_pixel] == np.nan
-        var[mask_pixel] == np.nan
-        spectra[mask_pixel] == np.nan
-
-        return(wavelength,spectra,diff,var,target_id,pixel_mask)
