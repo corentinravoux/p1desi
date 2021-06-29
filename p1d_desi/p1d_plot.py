@@ -22,11 +22,12 @@ from functools import partial
 import scipy
 from matplotlib.lines import Line2D
 import matplotlib.markers as mmark
+import struct
 
 
 
 
-def load_model(name_model):
+def load_model(name_model,model_file=None):
 
     # model_dir = "/local/home/cravoux/Documents/Python/Data/p1d_models"
     model_dir = "/global/homes/r/ravouxco/1_Documents/Pk1d/models"
@@ -56,6 +57,39 @@ def load_model(name_model):
         Naimmodel['k']=np.arange(0.001,0.1,0.001)[np.newaxis,:]
         Naimmodel['kpk']=naim_function4(Naimmodel['k'],Naimmodel['z'][:,np.newaxis],A=0.084,B=3.64,alpha=-0.155,beta=0.32,k1=0.048,n=-2.655)
         Naimmodel_stack=(np.array(Naimmodel['z'][:,np.newaxis]),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
+        return(Naimmodel_stack)
+    elif name_model == "Naimmodel_truth_mocks":
+
+        def readTrueP1D(fname):
+            file = open(fname, 'rb')
+
+            nk, nz = struct.unpack('ii', file.read(struct.calcsize('ii')))
+
+            fmt = 'd' * nz
+            data = file.read(struct.calcsize(fmt))
+            z = np.array(struct.unpack(fmt, data), dtype=np.double)
+
+            fmt =  'd' * nk
+            data = file.read(struct.calcsize(fmt))
+            k = np.array(struct.unpack(fmt, data), dtype=np.double)
+
+            fmt =  'd' * nk * nz
+            data = file.read(struct.calcsize(fmt))
+            p1d = np.array(struct.unpack(fmt, data), dtype=np.double).reshape((nz, nk))
+
+            return z, k, p1d
+
+
+        z, k, p = readTrueP1D(model_file)
+        Naimmodel={}
+        Naimmodel['z']=np.array([[z[i] for j in range(len(k))] for i in range(len(z))])
+        Naimmodel['k']=np.array([k for i in range(len(z))])
+        Naimmodel['kpk']=p * k / np.pi
+        Naimmodel_mock=(np.array(Naimmodel['z']),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
+        return(Naimmodel_mock)
+
+
+
     else :
         raise ValueError("Incorrect model")
 
@@ -111,7 +145,7 @@ def convert_data_to_kms(data):
 # CR - to reformat or update with Michael plotting routines
 
 
-def plot_data(args,zbins,colors,mark_size=6,data=None,truth=None,outdir=None,fname=None,reslabel='',reslabel2='',comparemodel=None,kmin=4e-2,kmax=2.5,diffrange=0.4,noerrors=False,velunits=False,fontt=None,fontlab=None,fontl=None):
+def plot_data(args,zbins,colors,mark_size=6,data=None,truth=None,outdir=None,fname=None,reslabel='',reslabel2='',comparemodel=None,kmin=4e-2,kmax=2.5,diffrange=0.4,noerrors=False,velunits=False,fontt=None,fontlab=None,fontl=None,model_file=None):
     ### Michael P1D plotting routine
     if outdir is not None:
         args['out_fig']=os.path.join(outdir,fname)
@@ -122,7 +156,7 @@ def plot_data(args,zbins,colors,mark_size=6,data=None,truth=None,outdir=None,fna
         kmin=8e-4
     if comparemodel is not None:
         comparemodel_name = comparemodel
-        comparemodel = load_model(comparemodel_name)
+        comparemodel = load_model(comparemodel_name,model_file=model_file)
         zmodel,kmodel,kpkmodel=comparemodel
 
 
