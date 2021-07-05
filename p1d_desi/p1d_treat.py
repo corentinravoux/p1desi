@@ -81,8 +81,7 @@ def compute_Pk_means_parallel(data_dir,
     else:
         dataarr_all=[compute_single_means(f,args,zbinedges,kbinedges,debug=debug,nomedians=nomedians,logsample=logsample,velunits=velunits) for f in files]
     dataarr_all=[d for d in dataarr_all if d is not None] #filter for files where S/N criterion is never fulfilled
-    if len(dataarr_all)==0:
-        return None
+   
     outdir['N']=np.sum([d['N'] for d in dataarr_all],axis=0)
     outdir['N_chunks']=np.sum([d['N_chunks'] for d in dataarr_all],axis=0)
     for c in dataarr_all[0].colnames:
