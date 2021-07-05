@@ -60,7 +60,7 @@ def compute_Pk_means_parallel(data_dir,
         from multiprocessing import Pool
     files = glob.glob("{}/Pk1D{}.fits.gz".format(data_dir,searchstr))
     #generate arrays
-    zbinedges=zbins-0.1
+    zbinedges=zbins-args['z_binsize']/2
     zbinedges=np.concatenate([zbinedges,zbinedges[[-1]]+args['z_binsize']])
     if velunits:
         k_inf=args["k_inf_vel"]
