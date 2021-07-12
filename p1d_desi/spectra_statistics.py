@@ -1,5 +1,4 @@
 import numpy as np
-import fitsio
 import glob, os
 import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic
@@ -7,7 +6,6 @@ from desitarget.sv1.sv1_targetmask import desi_mask as sv1_desi_mask
 from desitarget.sv3.sv3_targetmask import desi_mask as sv3_desi_mask
 from desispec.io import read_spectra
 from desispec.coaddition import coadd_cameras
-from scipy.ndimage.filters import gaussian_filter
 
 
 
@@ -205,49 +203,6 @@ def plot_ra_dec_diagram(name_out,ra,dec,cut_objects):
     plt.ylabel("DEC(J2000) [deg]")
     plt.savefig(f"radec_diagram_{name_out}.pdf",format="pdf")
     plt.close()
-
-
-def plot_skyline_analysis(name_out,
-                          flux,
-                          wavelength,
-                          nb_bins,
-                          lines_eBOSS,
-                          out_line,
-                          outlier_insensitive=False,
-                          gaussian_smoothing=2):
-    if(outlier_insensitive):
-        mean_spectra = np.nanmedian(flux,axis=0)
-    else:
-        mean_spectra = np.nanmean(flux,axis=0)
-
-    fig,ax=plt.subplots(4,1,figsize=(8,8),sharex=True)
-    ax[0].plot(wavelength,mean_spectra)
-    ax[0].set_ylabel("Mean spectra")
-
-
-    smoothed_mean = gaussian_filter(mean_spectra,gaussian_smoothing)
-
-
-    ax[1].plot(wavelength,smoothed_mean,color="b")
-    ax[1].set_ylabel("Mean spectra smoothed")
-
-    lines_old = np.loadtxt(lines_eBOSS, usecols=range(1,3))
-
-    ratio = np.abs((smoothed_mean - mean_spectra)/smoothed_mean)
-    ax[2].plot(wavelength,ratio,color="b")
-    ax[2].set_ylabel("ratio smoothed not smoothed")
-
-    for i in range(len(lines_old)):
-        ax[2].fill_between(wavelength,
-                           np.min(ratio),
-                           np.max(ratio),
-                           where= ((wavelength> lines_old[i][0])&(wavelength < lines_old[i][1])),
-                           color='red',
-                           alpha=0.2)
-
-    ax[3].plot(wavelength,np.gradient(ratio),color="b")
-
-    fig.savefig(f"{name_out}_mean_spectra.pdf",format="pdf")
 
 
 
