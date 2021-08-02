@@ -21,7 +21,6 @@ from matplotlib.ticker import FuncFormatter
 from functools import partial
 import scipy
 from matplotlib.lines import Line2D
-import matplotlib.markers as mmark
 import struct
 
 

@@ -48,19 +48,21 @@ def compute_line_width(line,
                        mean_flux=None,
                        median_sky=None,
                        wave=None):
+
     if(method_width.lower() == "constant"):
         line[0] = line[0] - width_angstrom
         line[1] = line[1] + width_angstrom
+
     elif(method_width.lower() == "threshold"):
         mask_width = mean_flux < threshold_width*median_sky
         if(len(wave[mask_width&(wave<=line[0])]) == 0):
             line[0] = line[0] - width_angstrom
         else:
-            line[0] = np.max(wave[mask_width&(wave<=line[0])])
+            line[0] = np.max(wave[mask_width&(wave<=line[0])]) - 0.1
         if(len(wave[mask_width&(wave>=line[1])]) == 0):
             line[1] = line[1] + width_angstrom
         else:
-            line[1] = np.min(wave[mask_width&(wave>=line[1])])
+            line[1] = np.min(wave[mask_width&(wave>=line[1])]) + 0.1
     return(line)
 
 
@@ -68,14 +70,14 @@ def get_lines_from_sky_file(file_name,
                             threshold,
                             method_width,
                             median_size,
-                            threshold_width=0.5,
+                            threshold_width=[1.2,1.2,1.2],
                             width_angstrom=1):
     lines = []
-    for file in file_name:
-        sky=read_sky(file)
+    for j in range(len(file_name)):
+        sky=read_sky(file_name[j])
         median_sky = np.mean(np.array([median_filter(sky.flux[j],median_size) for j in range(len(sky.flux))]),axis=0)
         mean_flux = np.mean(sky.flux,axis=0)
-        mask = mean_flux > threshold*median_sky
+        mask = mean_flux > threshold[j]*median_sky
         wavelength = sky.wave[mask]
         diff = wavelength[1:] - wavelength[:-1]
         arg_peak = np.argwhere(diff > 1)
@@ -84,7 +86,7 @@ def get_lines_from_sky_file(file_name,
                 line = compute_line_width([np.min(wavelength),np.max(wavelength)],
                                           method_width,
                                           width_angstrom=width_angstrom,
-                                          threshold_width=threshold_width,
+                                          threshold_width=threshold_width[j],
                                           mean_flux=mean_flux,
                                           median_sky=median_sky,
                                           wave=sky.wave)
@@ -95,7 +97,7 @@ def get_lines_from_sky_file(file_name,
                 line = compute_line_width([wavelength[arg_init_peak],wavelength[arg_peak[i][0]]],
                                           method_width,
                                           width_angstrom=width_angstrom,
-                                          threshold_width=threshold_width,
+                                          threshold_width=threshold_width[j],
                                           mean_flux=mean_flux,
                                           median_sky=median_sky,
                                           wave=sky.wave)
@@ -104,7 +106,7 @@ def get_lines_from_sky_file(file_name,
             line = compute_line_width([wavelength[arg_peak[-1][0]+1],wavelength[-1]],
                                       method_width,
                                       width_angstrom=width_angstrom,
-                                      threshold_width=threshold_width,
+                                      threshold_width=threshold_width[j],
                                       mean_flux=mean_flux,
                                       median_sky=median_sky,
                                       wave=sky.wave)
@@ -112,7 +114,26 @@ def get_lines_from_sky_file(file_name,
     return(np.array(lines))
 
 
+def add_custom_line(lines,custom_lines,names,types):
+    list_type = []
+    list_name = []
+    lines_out = []
+    custom_lines_mask = np.full(len(custom_lines),True)
+    for i in range(len(lines)):
+        custom_lines_left = np.argwhere(custom_lines_mask)
+        for arg in custom_lines_left:
+            if(custom_lines[arg[0]][1] < lines[i][0]):
+                list_type.append(custom_lines[arg[0]][3])
+                list_name.append(custom_lines[arg[0]][0])
+                lines_out.append([custom_lines[arg[0]][1],custom_lines[arg[0]][2]])
+                custom_lines_mask[arg[0]] = False
+        list_type.append(types)
+        list_name.append(names)
+        lines_out.append(lines[i])
+    return(lines_out,list_name,list_type)
+
 def merge_overlaping_line(lines):
+    lines = np.array(sorted(lines, key=lambda a : a[0], reverse=False))
     starts = lines[:,0]
     ends = np.maximum.accumulate(lines[:,1])
     valid = np.zeros(len(lines) + 1, dtype=np.bool)
@@ -123,6 +144,17 @@ def merge_overlaping_line(lines):
 
 
 
+def delete_line_number(i,names,lines,types):
+    del names[i]
+    del lines[i]
+    del types[i]
+
+
+def replace_name(center_line,new_name,names,lines,types):
+    for i in range(len(lines)):
+        if((lines[i][0] < center_line)&(lines[i][1] > center_line)):
+            names[i] = new_name
+    return(names,lines,types)
 
 def write_skyline_file(name_out,names,lines,types):
     if type(names)!=list:
@@ -249,7 +281,7 @@ def plot_centered_lines(name_out,
         plt.close()
 
 
-def compute_length_masked(lines,wavelength,redshift_bins):
+def compute_length_masked(lines,redshift_bins):
     percentage_mask = []
     line_to_plot = np.loadtxt(lines, usecols=range(1,3))
     for i in range(len(redshift_bins)):
@@ -261,3 +293,11 @@ def compute_length_masked(lines,wavelength,redshift_bins):
                 sum =sum +  line_to_plot[j][1] - line_to_plot[j][0]
         percentage_mask.append(100* sum / (lambda_max - lambda_min))
     return(percentage_mask)
+
+def plot_percentage_mask(redshift_bins,percentage_mask,legend,nameout):
+    plt.figure()
+    plt.ylabel("Percentage masked")
+    for i in range(len(percentage_mask)):
+        plt.plot(redshift_bins,percentage_mask[i])
+    plt.legend(legend)
+    plt.savefig(f"{nameout}.pdf",format ="pdf")

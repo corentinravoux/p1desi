@@ -50,7 +50,7 @@ def compute_Pk_means_parallel(data_dir,
 
     Returns:
         [type]: [description]
-    """                
+    """
     outfilename=data_dir+f'mean_Pk1d_snrcut{args["SNR_min"]}_par{"_log" if logsample else ""}{"_vel" if velunits else ""}.fits.gz'
     if os.path.exists(outfilename) and not overwrite:
         print(f"found existing power, loading from file {outfilename}")
@@ -106,7 +106,7 @@ def compute_Pk_means_parallel(data_dir,
             Nsort=np.take_along_axis(Nall, dargsort, axis=0)
             cumsums=np.cumsum(dsort*Nsort,axis=0)
             totsums=np.nansum(dsort*Nsort,axis=0)
-            Nsums=np.cumsum(Nsort,axis=0)
+            # Nsums=np.cumsum(Nsort,axis=0)
             fracs=cumsums/totsums[np.newaxis,...]
             ind50s=np.argmax(fracs>0.5,axis=0)
             #this takes the 2 values closest to the median and does some interpolation
@@ -192,7 +192,7 @@ def compute_single_means(f,
 
                 N,kedges,numbers=binned_statistic(dataarr['k'][select],dataarr['k'][select],statistic='count',bins=kbinedges)
                 coldir['N']=N[np.newaxis,:]
-                
+
                 for c in cols:
                     for stats in statsarr:
                         st,_,_=binned_statistic(dataarr['k'][select],dataarr[c][select],statistic=stats if stats!='error' else 'std',bins=kedges)
