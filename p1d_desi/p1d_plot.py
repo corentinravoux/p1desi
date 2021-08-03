@@ -22,14 +22,22 @@ from functools import partial
 import scipy
 from matplotlib.lines import Line2D
 import struct
+import astropy.table as t
+
+from p1d_desi import utils
+
+
+def read_pk_means(pk_means_name):
+    pkmeans = t.Table.read(pk_means_name)
+    return(pkmeans)
 
 
 
-
-def load_model(name_model,model_file=None):
+def load_model(name_model,model_dir,model_file=None):
 
     # model_dir = "/local/home/cravoux/Documents/Python/Data/p1d_models"
     model_dir = "/global/homes/r/ravouxco/1_Documents/Pk1d/models"
+
     if name_model == "eBOSSmodel_stack" :
         eBOSSmodel_lowz=read_in_model(os.path.join(model_dir,'models_eBOSS_lowz.fits'))
         eBOSSmodel_highz=read_in_model(os.path.join(model_dir,'models_eBOSS_highz.fits'))
@@ -57,11 +65,10 @@ def load_model(name_model,model_file=None):
         Naimmodel['kpk']=naim_function4(Naimmodel['k'],Naimmodel['z'][:,np.newaxis],A=0.084,B=3.64,alpha=-0.155,beta=0.32,k1=0.048,n=-2.655)
         Naimmodel_stack=(np.array(Naimmodel['z'][:,np.newaxis]),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
         return(Naimmodel_stack)
-    elif name_model == "Naimmodel_truth_mocks":
 
+    elif name_model == "Naimmodel_truth_mocks":
         def readTrueP1D(fname):
             file = open(fname, 'rb')
-
             nk, nz = struct.unpack('ii', file.read(struct.calcsize('ii')))
 
             fmt = 'd' * nz
@@ -78,7 +85,6 @@ def load_model(name_model,model_file=None):
 
             return z, k, p1d
 
-
         z, k, p = readTrueP1D(model_file)
         Naimmodel={}
         Naimmodel['z']=np.array([[z[i] for j in range(len(k))] for i in range(len(z))])
@@ -86,11 +92,12 @@ def load_model(name_model,model_file=None):
         Naimmodel['kpk']=p * k / np.pi
         Naimmodel_mock=(np.array(Naimmodel['z']),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
         return(Naimmodel_mock)
-
-
-
     else :
         raise ValueError("Incorrect model")
+
+
+
+
 
 def read_in_model(filename):
     tab=fitsio.FITS(filename)[1]
@@ -140,15 +147,124 @@ def convert_data_to_kms(data):
     return(data)
 
 
+def adjust_fig(fig,ax,ax2,fontt):
+    #this createss more x-axes to compare things in k[s/km]
+    fig.subplots_adjust(top=0.75)
+    par1 = ax.twiny()
+    par2 = ax.twiny()
+    par3 = ax.twiny()
+    # Offset the right spine of par2.  The ticks and label have already been
+    # placed on the right by twinx above.
+    par2.spines["top"].set_position(("axes", 1.2))
+    par3.spines["top"].set_position(("axes", 1.4))
+    # Having been created by twinx, par2 has its frame off, so the line of its
+    # detached spine is invisible.  First, activate the frame but make the patch
+    # and spines invisible.
+    make_patch_spines_invisible(par2)
+    # Second, show the right spine.
+    par2.spines["top"].set_visible(True)
+    par1.set_xlabel(r' k [s/km] @ z=2.2', fontsize = fontt)
+    par2.set_xlabel(r' k [s/km] @ z=2.8', fontsize = fontt)
+    par3.set_xlabel(r' k [s/km] @ z=3.4', fontsize = fontt)
 
-# CR - to reformat or update with Michael plotting routines
+    par1.set_xlim(*ax2.get_xlim())
+    par2.set_xlim(*ax2.get_xlim())
+    par3.set_xlim(*ax2.get_xlim())
+
+    par1.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=2.2)))
+    par2.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=2.8)))
+    par3.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=3.4)))
 
 
-def plot_data(args,zbins,colors,mark_size=6,data=None,truth=None,outdir=None,fname=None,reslabel='',reslabel2='',comparemodel=None,kmin=4e-2,kmax=2.5,diffrange=0.4,noerrors=False,velunits=False,fontt=None,fontlab=None,fontl=None,model_file=None):
-    ### Michael P1D plotting routine
-    if outdir is not None:
-        args['out_fig']=os.path.join(outdir,fname)
-        figure_file = args['out_fig']
+
+
+def prepare_plot_values():
+    minrescor=np.inf
+    maxrescor=0
+    diff_data_model=[]
+    chi_data_model=[]
+    for iz,z in enumerate(zbins):
+        if comparemodel is not None:
+            izmodel=np.abs((zmodel-z))<z_binsize/2
+            izmodel=izmodel.nonzero()[0][0]
+
+        if not plot_P:
+            meanvar='meanDelta2'
+            errvar='errorDelta2'
+            if comparemodel is not None:
+                if velunits:
+                    convfactor=1
+                    k_to_plot = kmodel[izmodel,:]
+                    p_to_plot = kpkmodel[izmodel,:]
+                    ax.plot(k_to_plot,p_to_plot, color = colors[iz],ls=':')
+                else:
+                    convfactor=3e5/(1215.67*(1+zmodel[izmodel,0]))
+                    ax.plot(kmodel[izmodel,:]*convfactor,kpkmodel[izmodel,:], color = colors[iz],ls=':')
+        else:
+            meanvar='meanPk'
+            errvar='errorPk'
+            if comparemodel is not None:
+                if velunits:
+                    convfactor=1
+                    ax.plot(kmodel[izmodel,:],kpkmodel[izmodel,:]/kmodel[izmodel,:]*np.pi, color = colors[iz],ls=':')
+                else:
+                    convfactor=3e5/(1215.67*(1+zmodel[izmodel,0]))
+                    ax.plot(kmodel[izmodel,:]*convfactor,1/convfactor*kpkmodel[izmodel,:]/kmodel[izmodel,:]*np.pi, color = colors[iz],ls=':')
+        if data is not None:
+            dat=data[iz]
+            select=dat['N']>0
+            k=dat['meank'][select]
+            P=dat[meanvar][select]
+            err=dat[errvar][select]
+            ax.errorbar(k,P, yerr =err, fmt = 'o', color = colors[iz], markersize = mark_size, label =r' z = {:1.1f}'.format(z))
+
+        if comparison is not None:
+            ax.fill_between(comparison['k'][iz,:],comparison[meanvar][iz,:]-comparison[errvar][iz,:],comparison[meanvar][iz,:]+comparison[errvar][iz,:], alpha=0.5, color = colors[iz], label = (r' z = {:1.1f}'.format(z) if data is None else None))
+            if data is not None:
+                inter=scipy.interpolate.interp1d(comparison['k'][iz,:],comparison[meanvar][iz,:],fill_value='extrapolate')
+            truthint=inter(k)
+            if not noerrors:
+                ax2.errorbar(k,(P-truthint)/truthint,err/truthint,color=colors[iz],label='',ls='',marker='.',zorder=-iz)
+            else:
+                ax2.plot(k,(P-truthint)/truthint,color=colors[iz],label='',marker='.',ls='',zorder=-iz)
+            diff_data_model.append(((P-truthint)/truthint)[k<kmax])
+            chi_data_model.append(((P-truthint)/err)[k<kmax])
+
+        try:
+            if np.max(k)>0:
+                minrescor=np.min([minrescor,np.min(k[(dat['rescor'][select]<0.1)&(dat['rescor'][select]>0)])])
+                maxrescor=np.max([maxrescor,np.min(k[(dat['rescor'][select]<0.1)&(dat['rescor'][select]>0)])])
+        except:
+            print('rescor information not computed skipping')
+
+
+
+
+def plot_data(data,
+              zbins,
+              colors,
+              outname,
+              plot_P,
+              comparison=None,
+              comparison_model=None,
+              comparison_model_file=None,
+              kmin=4e-2,
+              kmax=2.5,
+              z_binsize = 0.2,
+              velunits=False,
+              **kwargs):
+
+
+    reslabel = utils.return_key(kwargs,"reslabel","")
+    reslabel2 = utils.return_key(kwargs,"reslabel2","")
+    diffrange = utils.return_key(kwargs,"diffrange",0.4)
+    noerrors = utils.return_key(kwargs,"noerrors",False)
+    mark_size = utils.return_key(kwargs,"mark_size",6)
+    fontt = utils.return_key(kwargs,"fontt",None)
+    fontlab = utils.return_key(kwargs,"fontlab",None)
+    fontl = utils.return_key(kwargs,"fontl",None)
+    z_binsize = utils.return_key(kwargs,"mark_size",0.2)
+
     if velunits and kmax==2:
         kmax=0.035
     if velunits and kmin==4e-2:
@@ -159,186 +275,98 @@ def plot_data(args,zbins,colors,mark_size=6,data=None,truth=None,outdir=None,fna
         zmodel,kmodel,kpkmodel=comparemodel
 
 
-    for plot_P in [False]:
-
-            fig,(ax,ax2) = plt.subplots(2,figsize = (8, 8),gridspec_kw=dict(height_ratios=[3,1]),sharex=True)
-
-            if not velunits:
-                #this createss more x-axes to compare things in k[s/km]
-                fig.subplots_adjust(top=0.75)
-                par1 = ax.twiny()
-                par2 = ax.twiny()
-                par3 = ax.twiny()
-                # Offset the right spine of par2.  The ticks and label have already been
-                # placed on the right by twinx above.
-                par2.spines["top"].set_position(("axes", 1.2))
-                par3.spines["top"].set_position(("axes", 1.4))
-                # Having been created by twinx, par2 has its frame off, so the line of its
-                # detached spine is invisible.  First, activate the frame but make the patch
-                # and spines invisible.
-                make_patch_spines_invisible(par2)
-                # Second, show the right spine.
-                par2.spines["top"].set_visible(True)
-                par1.set_xlabel(r' k [s/km] @ z=2.2', fontsize = fontt)
-                par2.set_xlabel(r' k [s/km] @ z=2.8', fontsize = fontt)
-                par3.set_xlabel(r' k [s/km] @ z=3.4', fontsize = fontt)
-
-                par1.set_xlim(*ax2.get_xlim())
-                par2.set_xlim(*ax2.get_xlim())
-                par3.set_xlim(*ax2.get_xlim())
-
-                par1.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=2.2)))
-                par2.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=2.8)))
-                par3.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=3.4)))
-
-            #ax = fig.add_subplot(111)
-
-            minrescor=np.inf
-            maxrescor=0
-            diff_data_model=[]
-            chi_data_model=[]
-            for iz,z in enumerate(zbins):
-                #z = 2.2 + iz*0.2
-                if comparemodel is not None:
-                    izmodel=np.abs((zmodel-z))<args['z_binsize']/2
-                    izmodel=izmodel.nonzero()[0][0]
-
-                if not plot_P:
-                    meanvar='meanDelta2'
-                    errvar='errorDelta2'
-                    if comparemodel is not None:
-                        if velunits:
-                            convfactor=1
-                            ax.plot(kmodel[izmodel,:],kpkmodel[izmodel,:], color = colors[iz],ls=':')
-                        else:
-                            convfactor=3e5/(1215.67*(1+zmodel[izmodel,0]))
-                            ax.plot(kmodel[izmodel,:]*convfactor,kpkmodel[izmodel,:], color = colors[iz],ls=':')
-                else:
-                    meanvar='meanPk'
-                    errvar='errorPk'
-                    if comparemodel is not None:
-                        if velunits:
-                            convfactor=1
-                            ax.plot(kmodel[izmodel,:],kpkmodel[izmodel,:]/kmodel[izmodel,:]*np.pi, color = colors[iz],ls=':')
-                        else:
-                            convfactor=3e5/(1215.67*(1+zmodel[izmodel,0]))
-                            ax.plot(kmodel[izmodel,:]*convfactor,1/convfactor*kpkmodel[izmodel,:]/kmodel[izmodel,:]*np.pi, color = colors[iz],ls=':')
-                if data is not None:
-                    dat=data[iz]
-                    select=dat['N']>0
-                    k=dat['meank'][select]
-                    P=dat[meanvar][select]
-                    err=dat[errvar][select]
-                    ax.errorbar(k,P, yerr =err, fmt = 'o', color = colors[iz], markersize = mark_size, label =r' z = {:1.1f}'.format(z))
-                if truth is not None:
-                    ax.fill_between(truth['k'][iz,:],truth[meanvar][iz,:]-truth[errvar][iz,:],truth[meanvar][iz,:]+truth[errvar][iz,:], alpha=0.5, color = colors[iz], label = (r' z = {:1.1f}'.format(z) if data is None else None))
-                    if data is not None:
-                        inter=scipy.interpolate.interp1d(truth['k'][iz,:],truth[meanvar][iz,:],fill_value='extrapolate')
-                    truthint=inter(k)
-                    if not noerrors:
-                        ax2.errorbar(k,(P-truthint)/truthint,err/truthint,color=colors[iz],label='',ls='',marker='.',zorder=-iz)
-                    else:
-                        ax2.plot(k,(P-truthint)/truthint,color=colors[iz],label='',marker='.',ls='',zorder=-iz)
-                    diff_data_model.append(((P-truthint)/truthint)[k<kmax])
-                    chi_data_model.append(((P-truthint)/err)[k<kmax])
-                elif comparemodel is not None:
-                    if not plot_P:
-                        inter=scipy.interpolate.interp1d(kmodel[izmodel,:]*convfactor,kpkmodel[izmodel,:],fill_value='extrapolate')
-                    else:
-                        inter=scipy.interpolate.interp1d(kmodel[izmodel,:]*convfactor,1/convfactor*kpkmodel[izmodel,:]/kmodel[izmodel,:]*np.pi,fill_value='extrapolate')
-                    truthint=inter(k)
-                    if not noerrors:
-                        ax2.errorbar(k,(P-truthint)/truthint,err/truthint,color=colors[iz],label='',marker='.',ls='',zorder=-iz)
-                    else:
-                        ax2.plot(k,(P-truthint)/truthint,color=colors[iz],label='',marker='.',ls='',zorder=-iz)
-                    diff_data_model.append(((P-truthint)/truthint)[k<kmax])
-                    chi_data_model.append(((P-truthint)/err)[k<kmax])
-                try:
-                    if np.max(k)>0:
-                        minrescor=np.min([minrescor,np.min(k[(dat['rescor'][select]<0.1)&(dat['rescor'][select]>0)])])
-                        maxrescor=np.max([maxrescor,np.min(k[(dat['rescor'][select]<0.1)&(dat['rescor'][select]>0)])])
-                except:
-                    print('rescor information not computed skipping')
-            try:
-                ax.fill_betweenx([-1000,1000],[minrescor,minrescor],[maxrescor,maxrescor],color='0.7',zorder=-30)
-                ax2.fill_betweenx([-1000,1000],[minrescor,minrescor],[maxrescor,maxrescor],color='0.7',zorder=-30,label='')
-            except:
-                pass
+    fig,(ax,ax2) = plt.subplots(2,figsize = (8, 8),gridspec_kw=dict(height_ratios=[3,1]),sharex=True)
+    if not velunits:
+        adjust_fig(fig)
 
 
-            if not velunits:
-                ax2.set_xlabel(r' k [1/$\AA$]', fontsize = fontt)
-            else:
-                ax2.set_xlabel(r' k [s/km]', fontsize = fontt)
-
-            if not plot_P:
-                ax.set_ylabel(r'$\Delta^2_{1d}$ ', fontsize=fontt, labelpad=-1)
-                ax2.set_ylabel(r'$\Delta^2_{1d,data}-\Delta^2_{1d,DR14fit})/\Delta^2_{1d,DR14fit}$')
-            else:
-                ax.set_ylabel(r'$P_{1d}$ ', fontsize=fontt, labelpad=-1)
-                ax2.set_ylabel(r'$(P_{1d,data}-P_{1d,DR14fit})/P_{1d,DR14fit}$')
-            ax.set_yscale('log')
-            for a in ax,ax2:
-                a.xaxis.set_ticks_position('both')
-                a.xaxis.set_tick_params(direction='in')
-                a.yaxis.set_ticks_position('both')
-                a.yaxis.set_tick_params(direction='in')
-                a.xaxis.set_tick_params(labelsize=fontlab)
-                a.yaxis.set_tick_params(labelsize=fontlab)
-                a.set_xlim(kmin,kmax)
-            if not plot_P:
-                ax.set_ylim(4e-3,2)
-            else:
-                if not velunits:
-                    ax.set_ylim(0.01,0.5)
-                else:
-                    ax.set_ylim(1,300)
-            ax2.set_ylim(-diffrange/2,diffrange/2)
-            handles, labels = ax.get_legend_handles_labels()
-
-            legend1 = ax.legend(handles, labels, loc=2, bbox_to_anchor=(1.03, 0.98), borderaxespad=0.,fontsize = fontl)
-            if data is not None:
-                ax.errorbar([0],[0], yerr =[0], fmt = 'o',color='k', markersize = mark_size, label ='{}'.format(reslabel))
-            if truth is not None:
-                ax.fill_between([0],[0],[0],color='k',label=reslabel2)
-            if comparemodel is not None:
-                if comparemodel_name == "eBOSSmodel_stack" :
-                    ax.plot([0],[0],label='eBOSS DR14 fits',color='k',ls=':')
-                if comparemodel_name == "DR9model_stack":
-                    ax.plot([0],[0],label='BOSS DR9 fits',color='k',ls=':')
-            handles, labels = ax.get_legend_handles_labels()
-            handles,labels=zip(*[(h,l) for (h,l) in zip(handles,labels) if not 'z =' in l])
-            ax2.legend(handles, labels, loc=3, bbox_to_anchor=(1.03, 0.02), borderaxespad=0.,fontsize = fontl)
-            if not velunits:
-                par1.set_xlim(*ax2.get_xlim())
-                par2.set_xlim(*ax2.get_xlim())
-                par3.set_xlim(*ax2.get_xlim())
+    try:
+        ax.fill_betweenx([-1000,1000],[minrescor,minrescor],[maxrescor,maxrescor],color='0.7',zorder=-30)
+        ax2.fill_betweenx([-1000,1000],[minrescor,minrescor],[maxrescor,maxrescor],color='0.7',zorder=-30,label='')
+    except:
+        pass
 
 
-            ax.add_artist(legend1)
-            fig.subplots_adjust(top=0.95,bottom=0.114,left=0.078,right=0.758,hspace=0.2,wspace=0.2)
-            fig.tight_layout()
-            reslabel=reslabel.replace('\n','')
-            reslabel2=reslabel2.replace('\n','')
-            if outdir is not None:
-                fig.savefig(figure_file+f"{'' if not plot_P else '_powernotDelta'}_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}.pdf")
+    if not velunits:
+        ax2.set_xlabel(r' k [1/$\AA$]', fontsize = fontt)
+    else:
+        ax2.set_xlabel(r' k [s/km]', fontsize = fontt)
+
+    if not plot_P:
+        ax.set_ylabel(r'$\Delta^2_{1d}$ ', fontsize=fontt, labelpad=-1)
+        ax2.set_ylabel(r'$\Delta^2_{1d,data}-\Delta^2_{1d,DR14fit})/\Delta^2_{1d,DR14fit}$')
+    else:
+        ax.set_ylabel(r'$P_{1d}$ ', fontsize=fontt, labelpad=-1)
+        ax2.set_ylabel(r'$(P_{1d,data}-P_{1d,DR14fit})/P_{1d,DR14fit}$')
+    ax.set_yscale('log')
+
+    for a in ax,ax2:
+        a.xaxis.set_ticks_position('both')
+        a.xaxis.set_tick_params(direction='in')
+        a.yaxis.set_ticks_position('both')
+        a.yaxis.set_tick_params(direction='in')
+        a.xaxis.set_tick_params(labelsize=fontlab)
+        a.yaxis.set_tick_params(labelsize=fontlab)
+        a.set_xlim(kmin,kmax)
+
+    if not plot_P:
+        ax.set_ylim(4e-3,2)
+    else:
+        if not velunits:
+            ax.set_ylim(0.01,0.5)
+        else:
+            ax.set_ylim(1,300)
+    ax2.set_ylim(-diffrange/2,diffrange/2)
+    handles, labels = ax.get_legend_handles_labels()
+
+    legend1 = ax.legend(handles, labels, loc=2, bbox_to_anchor=(1.03, 0.98), borderaxespad=0.,fontsize = fontl)
+
+    if data is not None:
+        ax.errorbar([0],[0], yerr =[0], fmt = 'o',color='k', markersize = mark_size, label ='{}'.format(reslabel))
+
+    if comparison is not None:
+        ax.fill_between([0],[0],[0],color='k',label=reslabel2)
+
+    if comparemodel is not None:
+        if comparemodel_name == "eBOSSmodel_stack" :
+            ax.plot([0],[0],label='eBOSS DR14 fits',color='k',ls=':')
+        if comparemodel_name == "DR9model_stack":
+            ax.plot([0],[0],label='BOSS DR9 fits',color='k',ls=':')
+
+    handles, labels = ax.get_legend_handles_labels()
+    handles,labels=zip(*[(h,l) for (h,l) in zip(handles,labels) if not 'z =' in l])
+    ax2.legend(handles, labels, loc=3, bbox_to_anchor=(1.03, 0.02), borderaxespad=0.,fontsize = fontl)
 
 
-            if np.any(diff_data_model):
-                plt.figure()
-                sns.violinplot(data=pandas.DataFrame(np.array(diff_data_model).T,None,zbins),inner=None,orient='v',palette=colors,scale='width')
-                for i,d in enumerate(diff_data_model):
-                    plt.errorbar(i,np.mean(d),scipy.stats.sem(d,ddof=0), color='0.3',marker='.')
-                plt.xlabel('z')
-                plt.ylabel('$(P-P_{model})/P$')
-                plt.savefig(figure_file+f"_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}_diff.pdf")
-                plt.figure()
-                sns.violinplot(data=pandas.DataFrame(np.array(chi_data_model).T,None,zbins),inner=None,orient='v',palette=colors,scale='width')
-                for i,d in enumerate(chi_data_model):
-                    plt.errorbar(i,np.mean(d),scipy.stats.sem(d,ddof=0), color='0.3',marker='.')
-                plt.xlabel('z')
-                plt.ylabel('$(P-P_{model})/\sigma_P}$')
-                plt.savefig(figure_file+f"_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}_chi.pdf")
+    if not velunits:
+        par1.set_xlim(*ax2.get_xlim())
+        par2.set_xlim(*ax2.get_xlim())
+        par3.set_xlim(*ax2.get_xlim())
+
+
+    ax.add_artist(legend1)
+    fig.subplots_adjust(top=0.95,bottom=0.114,left=0.078,right=0.758,hspace=0.2,wspace=0.2)
+    fig.tight_layout()
+    reslabel=reslabel.replace('\n','')
+    reslabel2=reslabel2.replace('\n','')
+    fig.savefig(outname+f"{'' if not plot_P else '_powernotDelta'}_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}.pdf")
+
+
+    if np.any(diff_data_model):
+        plt.figure()
+        sns.violinplot(data=pandas.DataFrame(np.array(diff_data_model).T,None,zbins),inner=None,orient='v',palette=colors,scale='width')
+        for i,d in enumerate(diff_data_model):
+            plt.errorbar(i,np.mean(d),scipy.stats.sem(d,ddof=0), color='0.3',marker='.')
+        plt.xlabel('z')
+        plt.ylabel('$(P-P_{model})/P$')
+        plt.savefig(outname+f"_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}_diff.pdf")
+        plt.figure()
+        sns.violinplot(data=pandas.DataFrame(np.array(chi_data_model).T,None,zbins),inner=None,orient='v',palette=colors,scale='width')
+        for i,d in enumerate(chi_data_model):
+            plt.errorbar(i,np.mean(d),scipy.stats.sem(d,ddof=0), color='0.3',marker='.')
+        plt.xlabel('z')
+        plt.ylabel('$(P-P_{model})/\sigma_P}$')
+        plt.savefig(outname+f"_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}_chi.pdf")
 
 
 
@@ -517,8 +545,13 @@ def return_mean_z_dict(zbins,data):
 
 # CR - reformat function into 3 func
 
-def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",
-                           kmin=None,kmax=None,noisediff=False,
+def plot_noise_power_ratio(data,
+                           zbins,
+                           outdir="./",
+                           out_name="P1d",
+                           kmin=None,
+                           kmax=None,
+                           noisediff=False,
                            noise_comparison=False,
                            side_band=False,
                            side_band_comp=None,
@@ -595,10 +628,6 @@ def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",
 
 
 
-
-
-
-
     if(noise_comparison):
         ax2[3].errorbar(mean_dict["k_array"],(mean_dict["meanPk_diff"] - mean_dict["meanPk_noise"]) / mean_dict["meanPk_noise"], yerr =mean_dict["error_diffovernoise"], fmt = 'o')#,marker_size=6)
         ax2[3].set_ylabel('$mean_{z}((P_{diff} - P_{pipeline})/P_{pipeline})$')
@@ -644,10 +673,10 @@ def plot_noise_power_ratio(data,zbins,outdir="./",out_name="P1d",
     ax[3].set_ylabel('$mean_{z}(P_{' + labelnoise +'}/P_{raw})$')
     if(side_band is False):
         try :
-            f_exp = lambda x,a,b,c : a - b*np.exp(-c * x)
-            arg_exp = scipy.optimize.curve_fit(f_exp,mean_dict["k_array"],mean_dict[noise_to_plot]/mean_dict["meanPk_raw"],p0=[1,1,1])
-            if(np.min(mean_dict["k_array"])> 2.0) : kmin_fit = np.min(mean_dict["k_array"])
-            else : kmin_fit = 2.0
+            f_exp = lambda x,a,b,c : a
+            arg_func = scipy.optimize.curve_fit(f_exp,mean_dict["k_array"],mean_dict[noise_to_plot]/mean_dict["meanPk_raw"],p0=[1,1,1])
+            if(np.min(mean_dict["k_array"])> 3.0) : kmin_fit = np.min(mean_dict["k_array"])
+            else : kmin_fit = 3.0
             cont_k_array = np.linspace(kmin_fit,np.max(mean_dict["k_array"]),500)
             fit_exp = f_exp(cont_k_array,*arg_exp[0])
             fit_exp_min = f_exp(cont_k_array,*(arg_exp[0]-np.diag(arg_exp[1])))
