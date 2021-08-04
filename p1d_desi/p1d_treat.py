@@ -118,6 +118,7 @@ def compute_Pk_means_parallel(data_dir,
         outdir.meta['LOGBINS']=1
     else:
         outdir.meta['LOGBINS']=0
+    outdir.meta['velunits']=velunits
     outdir.write(outfilename,overwrite=overwrite)
     return outdir
 
@@ -198,6 +199,7 @@ def compute_single_means(f,
                         coldir[stats+c]=st[np.newaxis,:]
             outdir=t.vstack([outdir,coldir])
     if debug:
+        outdir.meta['velunits']=velunits
         outdir.write(f"{f[:-8]+'_mean'}{'_log' if logsample else ''}{'_vel' if velunits else ''}.fits.gz",overwrite=True)   #this will be slow because it writes the data for each file
     return outdir
 
