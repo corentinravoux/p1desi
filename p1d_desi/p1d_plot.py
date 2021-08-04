@@ -11,7 +11,6 @@ Created on Thu Apr 30 09:50:01 2020
 #%load_ext line_profiler
 #%load_ext memory_profiler
 
-import os
 import numpy as np
 import matplotlib.pyplot as plt
 import fitsio
