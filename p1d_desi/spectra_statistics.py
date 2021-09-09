@@ -3,11 +3,109 @@ import glob, os
 import matplotlib.pyplot as plt
 from scipy.stats import binned_statistic
 from desitarget.sv1.sv1_targetmask import desi_mask as sv1_desi_mask
+from desitarget.sv2.sv2_targetmask import desi_mask as sv2_desi_mask
 from desitarget.sv3.sv3_targetmask import desi_mask as sv3_desi_mask
+from desitarget.targetmask import desi_mask
 from desispec.io import read_spectra
 from desispec.coaddition import coadd_cameras
 
 
+
+
+### DESI spectra extraction
+
+
+
+def get_spectra_desi(spectra_path,
+                     spectro,
+                     cut_objects,
+                     survey,
+                     compute_diff=False):
+
+    mask_desi_target_names = ["SV1_DESI_TARGET","SV2_DESI_TARGET","SV3_DESI_TARGET","DESI_TARGET"]
+    mask_desi_target = [sv1_desi_mask,sv2_desi_mask,sv3_desi_mask,desi_mask]
+
+
+    flux,pixel_mask,var,target_id,ra,dec = [],[],[],[],[],[]
+    if(compute_diff):
+        diff_flux=[]
+    for path in spectra_path :
+        if(spectro == "all"):
+            if(compute_diff):
+                exp_names = np.sort(glob.glob(os.path.join(path,"*/spectra-*.fits")))
+            spectra_names = np.sort(glob.glob(os.path.join(path,"*/coadd-*.fits")))
+        else:
+            if(compute_diff):
+                exp_names = np.sort(glob.glob(os.path.join(path,"*/spectra-{}-*.fits".format(spectro))))
+            spectra_names = np.sort(glob.glob(os.path.join(path,"*/coadd-{}-*.fits".format(spectro))))
+
+        for i in range(len(spectra_names)):
+            spectra = read_spectra(spectra_names[i])
+            if 'brz' not in spectra.bands:
+                spectra = coadd_cameras(spectra)
+            mask_target = np.full(spectra.fibermap["TARGETID"].shape,False)
+            for k in range(len(mask_desi_target_names)):
+                if(mask_desi_target_names[k] in spectra.fibermap.colnames):
+                    for j in range(len(cut_objects)):
+                        mask_target |= ((spectra.fibermap[mask_desi_target_names[k]] & mask_desi_target[k][cut_objects[j]])!=0)
+            if("COADD_FIBERSTATUS" in spectra.fibermap.colnames):
+                mask_target = mask_target & (spectra.fibermap["COADD_FIBERSTATUS"]==0)
+            elif("FIBERSTATUS" in spectra.fibermap.colnames):
+                mask_target = mask_target & (spectra.fibermap["FIBERSTATUS"]==0)
+            flux.append(spectra.flux['brz'][mask_target])
+            pixel_mask.append(spectra.mask['brz'][mask_target])
+            ivar=spectra.ivar['brz'][mask_target]
+            mask_ivar = (ivar == np.inf) | (ivar <= 10**-8)
+            ivar[~mask_ivar] = 1/ivar[~mask_ivar]
+            var.append(ivar)
+            target_id_to_append = spectra.fibermap["TARGETID"][mask_target]
+            target_id.append(target_id_to_append)
+            ra.append(spectra.fibermap["TARGET_RA"][mask_target])
+            dec.append(spectra.fibermap["TARGET_DEC"][mask_target])
+            if(compute_diff):
+                exp = read_spectra(exp_names[i])
+                for band in ["b","r","z"]:
+                    for j in range(len(target_id_to_append)):
+                        mask_targetid = exp.fibermap["TARGETID"] == target_id_to_append[j]
+                        spectra_exp = exp.flux[band][mask_targetid]
+                        ivar_exp = exp.ivar[band][mask_targetid]
+                        for k in range(len(spectra_exp)):
+                            spectra_exp[k,:] = (-1)**k * spectra_exp[k,:]
+                        if(len(spectra_exp)%2 == 1):
+                            ivar_exp[-1,:] = np.zeros(ivar_exp[-1,:].shape)
+                            spectra_exp[-1,:] = np.zeros(spectra_exp[-1,:].shape)
+                        exp.flux[band][mask_targetid] = spectra_exp
+                        exp.ivar[band][mask_targetid] = ivar_exp
+                exp = coadd_cameras(exp)
+                diff_flux.append(exp.flux['brz'][mask_target])
+
+
+    wavelength = spectra.wave['brz']
+    flux = np.concatenate(flux,axis=0)
+    pixel_mask = np.concatenate(pixel_mask,axis=0)
+    var = np.concatenate(var,axis=0)
+    target_id = np.concatenate(target_id,axis=0)
+    ra = np.concatenate(ra,axis=0)
+    dec = np.concatenate(dec,axis=0)
+
+    mask_pixel = pixel_mask !=0
+
+    flux[mask_pixel] == np.nan
+    var[mask_pixel] == np.nan
+
+    if(compute_diff):
+        diff_flux=np.concatenate(diff_flux,axis=0)
+        diff_flux[mask_pixel] == np.nan
+    else:
+        diff_flux = None
+
+    return wavelength, flux, diff_flux, var, target_id, ra, dec
+
+
+
+
+
+### Histo functions
 
 def hist_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
     w = (y>range_y[0]) & (y<range_y[1])
@@ -32,6 +130,8 @@ def hist_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
     bin_edges = means_result.bin_edges
     bin_centers = (bin_edges[:-1] + bin_edges[1:])/2.
     return(bin_centers, means, errors)
+
+
 
 def var_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
     w = (y>range_y[0]) & (y<range_y[1])
@@ -75,8 +175,19 @@ def hist_profile_2d_bins(x, y, bins,statistic="mean",outlier_insensitive=False):
 
 
 
+### Variance vs Diff fucntions
 
-def plot_variance_histogram(name_out,V_diff,V_pipeline,wavelength,overlap_regions=None,nb_bins=40,outlier_insensitive=False):
+
+
+def plot_variance_histogram(name_out,
+                            V_diff,
+                            V_pipeline,
+                            wavelength,
+                            overlap_regions=None,
+                            nb_bins=40,
+                            outlier_insensitive=False):
+
+
     fig,ax=plt.subplots(2,1,figsize=(8,5),sharex=True)
     bin_centers, means, disp = hist_profile(wavelength,V_diff,nb_bins,
                                             (np.min(wavelength),np.max(wavelength)),
@@ -176,37 +287,39 @@ def plot_variance(name_out,V_diff,V_pipeline,wavelength,overlap_regions=None,poi
 
 
 
-def plot_spectra_ratio(V_coadd,V_pipeline,wavelength,name_out,nb_bins=40):
+### Flux Variance vs Noise functions
+
+
+def plot_noise_fluxvariance_comparison(V_coadd,V_pipeline,wavelength,name_out,nb_bins=40):
     fig,ax=plt.subplots(2,1,figsize=(8,5),sharex=True)
     ax[0].plot(wavelength,V_coadd, label="diff",color="b")
     ax[0].plot(wavelength,V_pipeline, label="pipeline",color="r")
     ax[0].set_ylabel("$Var_i$")
     ax[0].legend(["coadd","pipeline"])
-    bin_centers, means, disp = hist_profile(wavelength,V_coadd,nb_bins,(np.min(wavelength),np.max(wavelength)),(np.min(V_coadd),np.max(V_coadd)))
+
+
+    bin_centers, means, disp = hist_profile(wavelength,
+                                            V_coadd,
+                                            nb_bins,
+                                            (np.min(wavelength),np.max(wavelength)),
+                                            (np.min(V_coadd),np.max(V_coadd)))
     ax[1].errorbar(x=bin_centers, y=means, yerr=disp, linestyle='none', marker='.', label="coadd",color="b")
-    bin_centers, means, disp = hist_profile(wavelength,V_pipeline,nb_bins,(np.min(wavelength),np.max(wavelength)),(np.min(V_pipeline),np.max(V_pipeline)))
+    bin_centers, means, disp = hist_profile(wavelength,
+                                            V_pipeline,
+                                            nb_bins,
+                                            (np.min(wavelength),np.max(wavelength)),
+                                            (np.min(V_pipeline),np.max(V_pipeline)))
     ax[1].errorbar(x=bin_centers, y=means, yerr=disp, linestyle='none', marker='.', label="pipeline",color="r")
+    ax[1].set_ylabel("$Var_i$ rebin")
 
 
-    fig.savefig(f"{name_out}_spectra_ratio.pdf",format="pdf")
-
-
-def plot_ra_dec_diagram(name_out,ra,dec,cut_objects):
-    plt.figure()
-    for i in range(len(cut_objects)):
-        ra[i] = np.concatenate(ra[i],axis=0)
-        dec[i] = np.concatenate(dec[i],axis=0)
-        plt.plot(ra[i],dec[i],"+")
-    plt.grid()
-    plt.legend(["Target {}".format(obj)for obj in cut_objects])
-    plt.xlabel("RA(J2000) [deg]")
-    plt.ylabel("DEC(J2000) [deg]")
-    plt.savefig(f"radec_diagram_{name_out}.pdf",format="pdf")
-    plt.close()
+    fig.savefig(f"{name_out}_noise_fluxvariance_comparison.pdf",format="pdf")
 
 
 
-def plot_spectra_noise_comparison(name_out,spectra_array,noise_array,wavelength,nb_bins,outlier_insensitive=False):
+
+
+def plot_noise_fluxvariance_ratio(name_out,spectra_array,noise_array,wavelength,nb_bins,outlier_insensitive=False):
     mean_noise = []
     var_flux = []
     for i in range(len(spectra_array)):
@@ -237,76 +350,23 @@ def plot_spectra_noise_comparison(name_out,spectra_array,noise_array,wavelength,
 
     ax[1].plot(bin_centers,(V_coadd-V_pipeline)/V_pipeline, label="diff",color="k", linestyle='none', marker='.',)
 
-    fig.savefig(f"{name_out}_spectra_noise_ratio.pdf",format="pdf")
-
-
-def get_spectra_desi(spectra_path,
-                     spectro,
-                     cut_objects,
-                     survey,
-                     diff=False):
-
-
-    if(survey.upper() == "SV1"):
-        desi_mask_used = sv1_desi_mask
-        target_key = "SV1_DESI_TARGET"
-    if(survey.upper() == "SV3"):
-        desi_mask_used = sv3_desi_mask
-        target_key = "SV3_DESI_TARGET"
+    fig.savefig(f"{name_out}_noise_fluxvariance_ratio.pdf",format="pdf")
 
 
 
-    flux,pixel_mask,var,target_class,target_id,ra,dec = [],[],[],[],[],[],[]
-    for path in spectra_path :
-        if(diff):
-            diff_flux=[]
-
-        if(spectro == "all"):
-            spectra_names = np.sort(glob.glob(os.path.join(path,"*/coadd-*.fits")))
-        else:
-            spectra_names = np.sort(glob.glob(os.path.join(path,"*/coadd-{}-*.fits".format(spectro))))
 
 
-        for i in range(len(spectra_names)):
-            spectra = read_spectra(spectra_names[i])
-            if 'brz' not in spectra.bands:
-                spectra = coadd_cameras(spectra)
-            mask_target = np.full(spectra.fibermap[target_key].shape,False)
-            for j in range(len(cut_objects)):
-                mask_target |= ((spectra.fibermap[target_key] & desi_mask_used[cut_objects[j]])!=0)
-            mask_target = mask_target & (spectra.fibermap["FIBERSTATUS"]==0)
+#### Other plot functions
 
-            flux.append(spectra.flux['brz'][mask_target])
-            pixel_mask.append(spectra.mask['brz'][mask_target])
-            ivar=spectra.ivar['brz'][mask_target]
-            mask_ivar = (ivar == np.inf) | (ivar <= 10**-8)
-            ivar[~mask_ivar] = 1/ivar[~mask_ivar]
-            var.append(ivar)
-            target_id.append(spectra.fibermap["TARGETID"][mask_target])
-            target_class.append(spectra.fibermap[target_key][mask_target])
-            ra.append(spectra.fibermap["TARGET_RA"][mask_target])
-            dec.append(spectra.fibermap["TARGET_DEC"][mask_target])
-            if(diff):
-                diff_flux.append(spectra.extra['brz']["DIFF_FLUX"][mask_target])
-
-
-    wavelength = spectra.wave['brz']
-    flux = np.concatenate(flux,axis=0)
-    pixel_mask = np.concatenate(pixel_mask,axis=0)
-    var = np.concatenate(var,axis=0)
-    target_class = np.concatenate(target_class,axis=0)
-    target_id = np.concatenate(target_id,axis=0)
-    ra = np.concatenate(ra,axis=0)
-    dec = np.concatenate(dec,axis=0)
-
-    mask_pixel = pixel_mask !=0
-
-    flux[mask_pixel] == np.nan
-    var[mask_pixel] == np.nan
-
-    if(diff):
-        diff_flux=np.concatenate(diff_flux,axis=0)
-        diff_flux[mask_pixel] == np.nan
-
-
-    return wavelength, flux, var, target_class, target_id, ra, dec
+def plot_ra_dec_diagram(name_out,ra,dec,cut_objects):
+    plt.figure()
+    for i in range(len(cut_objects)):
+        ra[i] = np.concatenate(ra[i],axis=0)
+        dec[i] = np.concatenate(dec[i],axis=0)
+        plt.plot(ra[i],dec[i],"+")
+    plt.grid()
+    plt.legend(["Target {}".format(obj)for obj in cut_objects])
+    plt.xlabel("RA(J2000) [deg]")
+    plt.ylabel("DEC(J2000) [deg]")
+    plt.savefig(f"radec_diagram_{name_out}.pdf",format="pdf")
+    plt.close()
