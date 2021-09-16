@@ -49,10 +49,14 @@ def load_model(model,model_file):
             return A*nom/denom*zfac**exp2
 
         Naimmodel={}
-        Naimmodel['z']=np.arange(2.2,4.7,0.2)
-        Naimmodel['k']=np.arange(0.001,0.1,0.001)[np.newaxis,:]
-        Naimmodel['kpk']=naim_function4(Naimmodel['k'],Naimmodel['z'][:,np.newaxis],A=0.084,B=3.64,alpha=-0.155,beta=0.32,k1=0.048,n=-2.655)
-        Naimmodel_stack=(np.array(Naimmodel['z'][:,np.newaxis]),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
+        z_array=np.arange(2.2,4.7,0.2)
+        k_array=np.arange(0.001,0.1,0.0001)
+        Naimmodel['kpk']=naim_function4(k_array[np.newaxis,:],z_array[:,np.newaxis],A=0.084,B=3.64,alpha=-0.155,beta=0.32,k1=0.048,n=-2.655)
+        kk , zz = np.meshgrid(k_array,z_array)
+        Naimmodel['k'] = kk
+        Naimmodel['z'] = zz
+
+        Naimmodel_stack=(np.array(Naimmodel['z']),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
         return(Naimmodel_stack)
 
     elif model == "Naimmodel_truth_mocks":
@@ -173,7 +177,8 @@ def prepare_plot_values(data,
                         comparison_model_file=None,
                         plot_P=False,
                         z_binsize=0.2,
-                        velunits=False):
+                        velunits=False,
+                        substract_sb=None):
 
     dict_plot = {}
 
@@ -186,17 +191,20 @@ def prepare_plot_values(data,
 
     if comparison_model is not None:
         zmodel,kmodel,kpkmodel = load_model(comparison_model,comparison_model_file)
-
     minrescor=np.inf
     maxrescor=0.0
 
     for iz,z in enumerate(zbins):
         dict_plot[z] = {}
-
         dat=data[iz]
         select=dat['N']>0
+        if(substract_sb is not None):
+            dat_sb=substract_sb[iz]
+            p_sb = dat_sb[meanvar][select]
         k_to_plot=dat['meank'][select]
         p_to_plot=dat[meanvar][select]
+        if(substract_sb is not None):
+            p_to_plot = p_to_plot - p_sb
         err_to_plot=dat[errvar][select]
 
 
@@ -222,6 +230,8 @@ def prepare_plot_values(data,
         if comparison is not None:
             k_to_plot_comparison = comparison['k'][iz,:]
             p_to_plot_comparison = comparison[meanvar][iz,:]
+            if(substract_sb is not None):
+                p_to_plot_comparison = p_to_plot_comparison - p_sb
             err_to_plot_comparison = comparison[errvar][iz,:]
 
         ## Comparison
@@ -285,6 +295,7 @@ def plot_data(data,
               comparison_model=None,
               comparison_model_file=None,
               plot_diff=False,
+              substract_sb=None,
               **kwargs):
 
     velunits = data.meta["VELUNITS"]
@@ -326,7 +337,8 @@ def plot_data(data,
                                     comparison_model_file=comparison_model_file,
                                     plot_P=plot_P,
                                     z_binsize=z_binsize,
-                                    velunits=velunits)
+                                    velunits=velunits,
+                                    substract_sb=substract_sb)
 
 
     for iz,z in enumerate(zbins):
@@ -433,7 +445,7 @@ def plot_data(data,
     fig.tight_layout()
     reslabel=res_label.replace('\n','')
     reslabel2=res_label2.replace('\n','')
-    fig.savefig(outname+f"{'' if not plot_P else '_powernotDelta'}_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}.pdf")
+    fig.savefig(outname+f"{'' if not plot_P else '_powernotDelta'}_kmax_{kmax}.pdf")
 
 
     if plot_diff:
