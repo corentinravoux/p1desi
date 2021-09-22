@@ -235,17 +235,6 @@ def prepare_plot_values(data,
             err_to_plot_comparison = comparison[errvar][iz,:]
 
         ## Comparison
-        inter=scipy.interpolate.interp1d(k_to_plot_comparison,p_to_plot_comparison,fill_value='extrapolate')
-        p_comparison_interp=inter(k_to_plot)
-        diff_k_to_plot = k_to_plot
-        diff_p_to_plot = (p_to_plot-p_comparison_interp)/p_comparison_interp
-        chi_p_to_plot = (p_to_plot-p_comparison_interp)/err_to_plot
-        if(err_to_plot_comparison is None):
-            diff_err_to_plot = err_to_plot/p_comparison_interp
-        else:
-            inter_err=scipy.interpolate.interp1d(k_to_plot_comparison,err_to_plot_comparison,fill_value='extrapolate')
-            err_comparison_interp=inter_err(k_to_plot)
-            diff_err_to_plot = (p_to_plot/p_comparison_interp)*np.sqrt((err_to_plot/p_to_plot)**2 + (err_comparison_interp/p_comparison_interp)**2)
 
         if (comparison_model is None) & (comparison is None):
             k_to_plot_comparison = None
@@ -255,6 +244,21 @@ def prepare_plot_values(data,
             diff_p_to_plot = None
             chi_p_to_plot = None
             diff_err_to_plot = None
+        else:
+
+            inter=scipy.interpolate.interp1d(k_to_plot_comparison,p_to_plot_comparison,fill_value='extrapolate')
+            p_comparison_interp=inter(k_to_plot)
+            diff_k_to_plot = k_to_plot
+            diff_p_to_plot = (p_to_plot-p_comparison_interp)/p_comparison_interp
+            chi_p_to_plot = (p_to_plot-p_comparison_interp)/err_to_plot
+            if(err_to_plot_comparison is None):
+                diff_err_to_plot = err_to_plot/p_comparison_interp
+            else:
+                inter_err=scipy.interpolate.interp1d(k_to_plot_comparison,err_to_plot_comparison,fill_value='extrapolate')
+                err_comparison_interp=inter_err(k_to_plot)
+                diff_err_to_plot = (p_to_plot/p_comparison_interp)*np.sqrt((err_to_plot/p_to_plot)**2 + (err_comparison_interp/p_comparison_interp)**2)
+
+
 
         if('rescor' in dat.colnames):
             try:
@@ -318,11 +322,6 @@ def plot_data(data,
 
 
     comparison_plot_style = utils.return_key(kwargs,"comparison_plot_style",None)
-
-    if velunits and kmax==2:
-        kmax=0.035
-    if velunits and kmin==4e-2:
-        kmin=8e-4
 
 
     fig,(ax,ax2) = plt.subplots(2,figsize = (8, 8),gridspec_kw=dict(height_ratios=[3,1]),sharex=True)
@@ -443,8 +442,6 @@ def plot_data(data,
     ax.add_artist(legend1)
     fig.subplots_adjust(top=0.95,bottom=0.114,left=0.078,right=0.758,hspace=0.2,wspace=0.2)
     fig.tight_layout()
-    reslabel=res_label.replace('\n','')
-    reslabel2=res_label2.replace('\n','')
     fig.savefig(outname+f"{'' if not plot_P else '_powernotDelta'}_kmax_{kmax}.pdf")
 
 
@@ -454,8 +451,8 @@ def plot_data(data,
                          dict_plot,
                          kmax,
                          colors,
-                         reslabel,
-                         reslabel2)
+                         res_label,
+                         res_label2)
 
 
 
@@ -633,12 +630,12 @@ def plot_several_mean_z_noise_power(list_dict,nameout,legend,colors,dreshift = 0
 # Noise power ratio
 
 
-def plot_noise_comparison(zbins,
-                          data,
-                          out_name,
-                          mean_dict,
-                          k_units,
-                          **kwargs):
+def plot_noise_comparison_function(zbins,
+                                   data,
+                                   out_name,
+                                   mean_dict,
+                                   k_units,
+                                   **kwargs):
 
     kmin = utils.return_key(kwargs,"kmin",None)
     kmax = utils.return_key(kwargs,"kmax",None)
@@ -868,12 +865,12 @@ def plot_noise_study(data,
                                fit_asymptote= fit_asymptote_ratio,
                                **kwargs)
     if(plot_noise_comparison):
-        plot_noise_comparison(zbins,
-                              data,
-                              out_name,
-                              mean_dict,
-                              k_units,
-                              **kwargs)
+        plot_noise_comparison_function(zbins,
+                                       data,
+                                       out_name,
+                                       mean_dict,
+                                       k_units,
+                                       **kwargs)
 
     if(plot_side_band):
         plot_side_band(zbins,
