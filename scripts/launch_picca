@@ -2,7 +2,6 @@
 
 path_in=${1}
 path_out=${2}
-path_log=${3}
 lrestmin=${4}
 lrestmax=${5}
 SNR_cut=${6}
@@ -13,7 +12,7 @@ mode=${10}
 
 
 mkdir -p ${path_out}/deltas
-mkdir -p ${path_log}
+mkdir -p ${path_out}/log
 
 
 picca_deltas.py \
@@ -36,8 +35,8 @@ picca_deltas.py \
 --mc-rebin-fac 4 \
 --min-SNR ${SNR_cut} \
 --mask-file ${lines} \
---log ${path_log}/log_deltas_lrestmin${lrestmin}_lrestmax${lrestmax}_SNR${SNR_cut} \
---iter ${path_log}/iter_deltas_lrestmin${lrestmin}_lrestmax${lrestmax}_SNR${SNR_cut}
+--log ${path_out}/log/log_deltas_lrestmin${lrestmin}_lrestmax${lrestmax}_SNR${SNR_cut} \
+--iter ${path_out}/log/iter_deltas_lrestmin${lrestmin}_lrestmax${lrestmax}_SNR${SNR_cut}
 
 mkdir -p ${path_out}/pk1d
 
