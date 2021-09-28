@@ -1,0 +1,56 @@
+SNR=${1}
+spectra=${2}
+path_out=${3}
+lrestmin=${4}
+lrestmax=${5}
+noise=${6}
+cat=${7}
+lines=${8}
+mode=${9}
+lines_name=${10}
+cat_name=${11}
+
+
+mkdir -p ${path}/deltas
+mkdir -p ./log
+
+
+picca_deltas.py \
+--in-dir "${spectra}" \
+--drq ${cat} \
+--out-dir ${path}/deltas \
+--mode ${mode} \
+--delta-format Pk1D \
+--rebin 1 \
+--lambda-min 3500. \
+--lambda-max 7200.0 \
+--lambda-rest-min ${lrestmin} \
+--lambda-rest-max ${lrestmax} \
+--nproc 16 \
+--order 0 \
+--use-constant-weight \
+--coadd-by-picca \
+--compute-diff-flux \
+--use-desi-P1d-changes \
+--mc-rebin-fac 4 \
+--min-SNR ${SNR} \
+--mask-file ${lines} \
+--log ./log/log_deltas_lrestmin${lrestmin}_lrestmax${lrestmax}_SNR${SNR}_lines${lines_name}_cat${cat_name} \
+--iter ./log/iter_deltas_lrestmin${lrestmin}_lrestmax${lrestmax}_SNR${SNR}_lines${lines_name}_cat${cat_name}
+
+mkdir -p ${path}/pk1d_${noise}
+
+picca_Pk1D.py \
+--in-dir ${path}/deltas \
+--in-format fits \
+--out-dir ${path}/pk1d_${noise} \
+--lambda-obs-min 3750. \
+--noise-estimate ${noise} \
+--pixel-correction inverse \
+--nproc 16 \
+--use-desi-new-defaults \
+--nb-pixel-masked-max 120 \
+--nb-part 3 \
+
+--SNR-min ${SNR} \
+--nb-noise-exp 2500
