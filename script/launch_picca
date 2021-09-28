@@ -1,11 +1,11 @@
 #!/bin/bash -l
 
-SNR_cut=${1}
-path_in=${2}
-path_out=${3}
-path_log=${4}
-lrestmin=${5}
-lrestmax=${6}
+path_in=${1}
+path_out=${2}
+path_log=${3}
+lrestmin=${4}
+lrestmax=${5}
+SNR_cut=${6}
 noise=${7}
 cat=${8}
 lines=${9}
