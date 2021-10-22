@@ -1,22 +1,109 @@
 #!/bin/bash -l
 
-path_in=${1}
+path_in="${1}"
 path_out=${2}
-lrestmin=${4}
-lrestmax=${5}
-SNR_cut=${6}
-noise=${7}
-cat=${8}
-lines=${9}
-mode=${10}
+path_log=${3}
+region=${4}
+suffix=${5}
+snr_cut=${6}
+lines=${7}
+lines_name=${8}
+cat=${9}
+catalog_name=${10}
+noise_estimate=${11}
+mode=${12}
+use_constant_weight=${13}
+coadd_picca=${14}
+compute_diff_flux=${15}
+
+echo "input path for computation:"
+echo $path_in
+echo "output path for computation:"
+echo $path_out
+echo "log path for computation:"
+echo $path_log
+echo "p1d region name:"
+echo $region
+echo "specific suffix:"
+echo $suffix
+echo "SNR cut:"
+echo $snr_cut
+echo "sky line file:"
+echo $lines
+echo "sky line name:"
+echo $lines_name
+echo "QSO catalog file:"
+echo $cat
+echo "QSO catalog name:"
+echo $catalog_name
+echo "noise estimate for p1d:"
+echo $noise_estimate
+echo "mode:"
+echo $mode
+echo "constant weight option:"
+echo $use_constant_weight
+echo "picca coadding option:"
+echo $coadd_picca
+echo "diff computation option:"
+echo $compute_diff_flux
+
+if [[ ${region} == "lya" ]]
+then
+lrestmin=1040.0
+lrestmax=1200.0
+elif [[ ${region} == "SB1" ]]
+then
+lrestmin=1270.0
+lrestmax=1380.0
+elif [[ ${region} == "SB2" ]]
+then
+lrestmin=1410.0
+lrestmax=1520.0
+fi
+
+if [[ ${suffix} == "None" ]]
+then
+suffix_flag=""
+else
+suffix_flag=${suffix}
+fi
+
+
+if [[ ${use_constant_weight} == "True" ]]
+then
+use_constant_weight_flag="--use-constant-weight"
+else
+use_constant_weight_flag=""
+fi
+
+
+if [[ ${coadd_picca} == "True" ]]
+then
+coadd_picca_flag="--coadd-by-picca"
+else
+coadd_picca_flag=""
+fi
+
+
+if [[ ${compute_diff_flux} == "True" ]]
+then
+compute_diff_flux_flag="--compute-diff-flux"
+else
+compute_diff_flux_flag=""
+fi
+
+
+folder_name=${region}_SNRcut${snr_cut}_lines${lines_name}_cat${catalog_name}${suffix_flag}
+
+path_out=${path_out}/p1d_${folder_name}
 
 
 mkdir -p ${path_out}/deltas
-mkdir -p ${path_out}/log
+mkdir -p ${path_log}
 
 
 picca_deltas.py \
---in-dir ${path_in} \
+--in-dir "$path_in" \
 --drq ${cat} \
 --out-dir ${path_out}/deltas \
 --mode ${mode} \
@@ -28,28 +115,28 @@ picca_deltas.py \
 --lambda-rest-max ${lrestmax} \
 --nproc 16 \
 --order 0 \
---use-constant-weight \
---coadd-by-picca \
---compute-diff-flux \
+${use_constant_weight_flag} \
+${coadd_picca_flag} \
+${compute_diff_flux_flag} \
 --use-desi-P1d-changes \
 --mc-rebin-fac 4 \
---min-SNR ${SNR_cut} \
+--min-SNR ${snr_cut} \
 --mask-file ${lines} \
---log ${path_out}/log/log_deltas_lrestmin${lrestmin}_lrestmax${lrestmax}_SNR${SNR_cut} \
---iter ${path_out}/log/iter_deltas_lrestmin${lrestmin}_lrestmax${lrestmax}_SNR${SNR_cut}
+--log ${path_log}/log_deltas_${folder_name} \
+--iter ${path_log}/iter_deltas_${folder_name}
 
-mkdir -p ${path_out}/pk1d
+mkdir -p ${path_out}/pk1d_${noise_estimate}_noise_estimate
 
 picca_Pk1D.py \
 --in-dir ${path_out}/deltas \
 --in-format fits \
---out-dir ${path_out}/pk1d \
+--out-dir ${path_out}/pk1d_${noise_estimate}_noise_estimate \
 --lambda-obs-min 3750. \
---noise-estimate ${noise} \
+--noise-estimate ${noise_estimate} \
 --pixel-correction inverse \
 --nproc 16 \
 --use-desi-new-defaults \
 --nb-pixel-masked-max 120 \
 --nb-part 3 \
---SNR-min ${SNR_cut} \
+--SNR-min ${snr_cut} \
 --nb-noise-exp 2500
