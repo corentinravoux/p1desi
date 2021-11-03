@@ -1,0 +1,68 @@
+#!/bin/bash -l
+
+path_in=${1}
+path_plot=${2}
+region=${3}
+suffix=${4}
+snr_cut=${5}
+lines_name=${6}
+catalog_name=${7}
+noise_estimate=${8}
+velunits=${9}
+model_compare=${10}
+region_sb=${11}
+zmax=${12}
+
+
+echo "input path for computation:"
+echo $path_in
+echo "output path for computation:"
+echo $path_plot
+echo "p1d region name:"
+echo $region
+echo "specific suffix:"
+echo $suffix
+echo "SNR cut:"
+echo $snr_cut
+echo "sky line name:"
+echo $lines_name
+echo "QSO catalog name:"
+echo $catalog_name
+echo "noise estimate for p1d:"
+echo $noise_estimate
+echo "Velocity units:"
+echo $velunits
+echo "Model to compare:"
+echo $model_compare
+echo "Region SB to substract:"
+echo $region_sb
+
+if [[ ${suffix} == "None" ]]
+then
+suffix_flag=""
+else
+suffix_flag=${suffix}
+fi
+
+mkdir -p ${path_plot}
+
+folder_name=${region}_SNRcut${snr_cut}_lines${lines_name}_cat${catalog_name}${suffix_flag}
+path_to_pk=${path_in}/p1d_${folder_name}/pk1d_${noise_estimate}_noise_estimate
+path_plot=${path_plot}/p1d_${folder_name}_${noise_estimate}_noise_estimate
+
+folder_name_sb=${region_sb}_SNRcut${snr_cut}_lines${lines_name}_cat${catalog_name}${suffix_flag}
+path_to_pk_sb=${path_in}/p1d_${folder_name}/pk1d_${noise_estimate}_noise_estimate
+
+
+python3 /global/homes/r/ravouxco/2_Software/Python/Packages/p1d_desi/launchers/p1d_desi_compute_mean_p1d.py \
+${path_to_pk} \
+${velunits} \
+
+python3 /global/homes/r/ravouxco/2_Software/Python/Packages/p1d_desi/launchers/p1d_desi_plot.py \
+${path_to_pk} \
+${path_plot} \
+${region_sb} \
+${path_to_pk_sb} \
+${velunits} \
+${model_compare} \
+${zmax} \

@@ -8,22 +8,65 @@ Created on Thu Apr 30 09:50:01 2020
 
 import numpy as np
 from p1d_desi import p1d_plot
+import sys,os
+
+### Input
+
+
+path_to_pk = str(sys.argv[1])
+path_plot = str(sys.argv[2])
+region_sb = str(sys.argv[3])
+path_sb_substract = str(sys.argv[4])
+substract_sb = False
+if(region_sb != "None"):
+    substract_sb = True
+velunits = bool(str(sys.argv[5]) == "True")
+model_compare = str(sys.argv[6])
+zmax = float(sys.argv[7])
+
 
 
 ### P1D
 
-pk_means_name = "/local/home/cravoux/Documents/desi_p1d_development/example_data/everest_sv1only_snr4/mean_Pk1d_snrcut1_par.fits.gz"
-zbins = np.array([ 2.2, 2.4, 2.6 , 2.8, 3.0,3.2,3.4, 3.6, 3.8, 4.0])#, 4.2, 4.4, 4.6])
-outname = "test"
+pk_means_name = os.path.join(path_to_pk,
+                             f"mean_Pk1d_snrcut1_par{'_vel' if velunits else ''}.fits.gz")
+if(substract_sb):
+    pk_means_name_sb = os.path.join(path_sb_substract,
+                                    f"mean_Pk1d_snrcut1_par{'_vel' if velunits else ''}.fits.gz")
+
+
+outname = os.path.join(f"{path_plot}_model{model_compare}_zmax{zmax}_unit{'kms' if velunits else 'A'}")
 comparison = None
-comparison_model = "eBOSSmodel_stack"
-comparison_model_file = ["/local/home/cravoux/Documents/Python/Data/p1d_models/models_eBOSS_lowz.fits",
-                         "/local/home/cravoux/Documents/Python/Data/p1d_models/models_eBOSS_highz.fits"]
+if model_compare == "None":
+    model_compare = None
+comparison_model = model_compare
+comparison_model_file = ["/global/homes/r/ravouxco/2_Software/Python/Data/p1d_models/models_eBOSS_lowz.fits",
+                         "/global/homes/r/ravouxco/2_Software/Python/Data/p1d_models/models_eBOSS_highz.fits"]
 plot_P = False
 plot_diff = False
 
-kwargs = {"res_label" :  'DESI everest SV1 SNR>4',
-          "res_label2" : 'eBOSS DR14 fit',
+k_inf_lin = 4e-2
+k_sup_lin = 2.5
+k_inf_vel = 0.000813
+k_sup_vel = 0.056
+
+zbins = []
+z = 2.2
+while(z <zmax):
+    zbins.append(z)
+    z = z + 0.2
+zbins = np.array(zbins)
+
+if(velunits):
+    kmax = k_sup_vel
+    kmin = k_inf_vel
+else:
+    kmax = k_sup_lin
+    kmin = k_inf_lin
+
+
+kwargs = {"res_label" :  'DESI',
+          "res_label2" : model_compare,
           "diff_range" : 1.0,
           "no_errors_diff" : True,
           "marker_size" : 5,
@@ -32,8 +75,8 @@ kwargs = {"res_label" :  'DESI everest SV1 SNR>4',
           "fontlab" : 11,
           "fontlegend" : 11,
           "z_binsize" : 0.2,
-          "kmin" : 4e-2,
-          "kmax" : 2.5,
+          "kmin" : kmin,
+          "kmax" : kmax,
           "grid" : True}
 
 
@@ -47,18 +90,21 @@ plot_side_band = False
 k_units = "A"
 fit_asymptote_ratio = True
 
-kwargs_noise1 = {"kmin" : None,
+kwargs_noise1 = {"ncol_legend" : 2,
+                 "kmin" : None,
                  "kmax" : None}
 
 
 ### Noise study mean k
 
 plot_noise_comparison_mean_z = False
-kwargs_noise2 = {"kmin" : 4e-2,
-                 "kmax" : 2.5}
+kwargs_noise2 = {"kmin" : kmin,
+                 "kmax" : kmax}
+
 
 
 if __name__ == "__main__":
+    print("Plotting path: ",pk_means_name)
     data = p1d_plot.read_pk_means(pk_means_name)
     p1d_plot.plot_data(data,
                        zbins,
@@ -69,6 +115,20 @@ if __name__ == "__main__":
                        comparison_model_file=comparison_model_file,
                        plot_diff=plot_diff,
                        **kwargs)
+
+    if(substract_sb):
+        pk_means_sb = p1d_plot.read_pk_means(pk_means_name_sb)
+        p1d_plot.plot_data(data,
+                           zbins,
+                           f"{outname}_{region_sb}_substracted",
+                           plot_P=plot_P,
+                           comparison=comparison,
+                           comparison_model=comparison_model,
+                           comparison_model_file=comparison_model_file,
+                           plot_diff=plot_diff,
+                           substract_sb=pk_means_sb,
+                           **kwargs)
+
 
 
     p1d_plot.plot_noise_study(data,
