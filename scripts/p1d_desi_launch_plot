@@ -12,6 +12,7 @@ velunits=${9}
 model_compare=${10}
 region_sb=${11}
 zmax=${12}
+diff_study=${13}
 
 
 echo "input path for computation:"
@@ -36,6 +37,10 @@ echo "Model to compare:"
 echo $model_compare
 echo "Region SB to substract:"
 echo $region_sb
+echo "Max redshift:"
+echo $zmax
+echo "Diff noise study:"
+echo $diff_study
 
 if [[ ${suffix} == "None" ]]
 then
@@ -51,7 +56,7 @@ path_to_pk=${path_in}/p1d_${folder_name}/pk1d_${noise_estimate}_noise_estimate
 path_plot=${path_plot}/p1d_${folder_name}_${noise_estimate}_noise_estimate
 
 folder_name_sb=${region_sb}_SNRcut${snr_cut}_lines${lines_name}_cat${catalog_name}${suffix_flag}
-path_to_pk_sb=${path_in}/p1d_${folder_name}/pk1d_${noise_estimate}_noise_estimate
+path_to_pk_sb=${path_in}/p1d_${folder_name_sb}/pk1d_${noise_estimate}_noise_estimate
 
 
 python3 /global/homes/r/ravouxco/2_Software/Python/Packages/p1d_desi/launchers/p1d_desi_compute_mean_p1d.py \
@@ -66,3 +71,4 @@ ${path_to_pk_sb} \
 ${velunits} \
 ${model_compare} \
 ${zmax} \
+${diff_study} \

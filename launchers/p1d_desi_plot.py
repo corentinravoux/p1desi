@@ -23,6 +23,7 @@ if(region_sb != "None"):
 velunits = bool(str(sys.argv[5]) == "True")
 model_compare = str(sys.argv[6])
 zmax = float(sys.argv[7])
+diff_study = bool(str(sys.argv[8]) == "True")
 
 
 
@@ -37,13 +38,14 @@ if(substract_sb):
 
 outname = os.path.join(f"{path_plot}_model{model_compare}_zmax{zmax}_unit{'kms' if velunits else 'A'}")
 comparison = None
+plot_diff_model = False
 if model_compare == "None":
     model_compare = None
+    plot_diff_model = False
 comparison_model = model_compare
 comparison_model_file = ["/global/homes/r/ravouxco/2_Software/Python/Data/p1d_models/models_eBOSS_lowz.fits",
                          "/global/homes/r/ravouxco/2_Software/Python/Data/p1d_models/models_eBOSS_highz.fits"]
 plot_P = False
-plot_diff = False
 
 k_inf_lin = 4e-2
 k_sup_lin = 2.5
@@ -52,7 +54,7 @@ k_sup_vel = 0.056
 
 zbins = []
 z = 2.2
-while(z <zmax):
+while(z <= zmax):
     zbins.append(z)
     z = z + 0.2
 zbins = np.array(zbins)
@@ -82,12 +84,16 @@ kwargs = {"res_label" :  'DESI',
 
 ### Noise study mean z
 
+plot_noise_ratio = True
 
 use_diff_noise = False
-plot_noise_ratio = True
 plot_noise_comparison_mean_k = False
+if(diff_study):
+    use_diff_noise = True
+    plot_noise_comparison_mean_k = True
+
 plot_side_band = False
-k_units = "A"
+k_units_noise_study = "A"
 fit_asymptote_ratio = True
 
 kwargs_noise1 = {"ncol_legend" : 2,
@@ -98,6 +104,8 @@ kwargs_noise1 = {"ncol_legend" : 2,
 ### Noise study mean k
 
 plot_noise_comparison_mean_z = False
+if(diff_study):
+    plot_noise_comparison_mean_z = True
 kwargs_noise2 = {"kmin" : kmin,
                  "kmax" : kmax}
 
@@ -113,7 +121,7 @@ if __name__ == "__main__":
                        comparison=comparison,
                        comparison_model=comparison_model,
                        comparison_model_file=comparison_model_file,
-                       plot_diff=plot_diff,
+                       plot_diff=plot_diff_model,
                        **kwargs)
 
     if(substract_sb):
@@ -125,7 +133,7 @@ if __name__ == "__main__":
                            comparison=comparison,
                            comparison_model=comparison_model,
                            comparison_model_file=comparison_model_file,
-                           plot_diff=plot_diff,
+                           plot_diff=plot_diff_model,
                            substract_sb=pk_means_sb,
                            **kwargs)
 
@@ -134,7 +142,7 @@ if __name__ == "__main__":
     p1d_plot.plot_noise_study(data,
                               zbins,
                               outname,
-                              k_units,
+                              k_units_noise_study,
                               use_diff_noise,
                               plot_noise_ratio,
                               plot_noise_comparison_mean_k,
