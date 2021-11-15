@@ -7,6 +7,9 @@ from scipy.ndimage.filters import gaussian_filter
 
 lambdaLy = 1215.673123130217
 
+
+
+
 def plot_skylines_on_sky_fiber(file_name,
                               line_file,
                               name_out,
@@ -23,7 +26,7 @@ def plot_skylines_on_sky_fiber(file_name,
 
     ax[0].legend(["B","R","Z"])
 
-    line_to_plot = np.loadtxt(line_file, usecols=range(1,3))
+    (line_to_plot, names, types) = read_lines(line_file)
     for i in range(len(line_to_plot)):
         x = np.linspace(line_to_plot[i][0],line_to_plot[i][1],100)
         for j in [0,1]:
@@ -156,6 +159,21 @@ def replace_name(center_line,new_name,names,lines,types):
             names[i] = new_name
     return(names,lines,types)
 
+def read_lines(lines_file):
+    file = open(lines_file,"r")
+    file_lines = file.readlines()
+    file.close()
+    lines, names, types = [],[],[]
+    for i in range(len(file_lines)):
+        line = file_lines[i].strip()
+        if(line[0] != "#"):
+            line = line.split()
+            lines.append([float(line[1]),float(line[2])])
+            names.append(line[0])
+            types.append(line[3])
+    return(np.array(lines), names, types)
+
+
 def write_skyline_file(name_out,names,lines,types):
     if type(names)!=list:
         names = [names for i in range(len(lines))]
@@ -214,7 +232,7 @@ def plot_skyline_analysis(name_out,
     j = 1
     for line in lines:
         j = j +1
-        line_to_plot = np.loadtxt(line, usecols=range(1,3))
+        (line_to_plot, names, types) = read_lines(line)
         for i in range(len(line_to_plot)):
             ax[j].fill_between(wavelength,
                                np.min(ratio),
@@ -239,8 +257,7 @@ def plot_centered_lines(name_out,
     else:
         mean_spectra = np.nanmean(array_list,axis=0)
 
-
-    line_to_plot = np.loadtxt(lines, usecols=range(1,3))
+    (line_to_plot, names, types) = read_lines(lines)
     for i in range(len(line_to_plot)):
 
         fig,ax=plt.subplots(2,2,figsize=(8,8),gridspec_kw={'height_ratios': [3, 1],'width_ratios': [3, 1]},sharex=False)
@@ -283,7 +300,7 @@ def plot_centered_lines(name_out,
 
 def compute_length_masked(lines,redshift_bins):
     percentage_mask = []
-    line_to_plot = np.loadtxt(lines, usecols=range(1,3))
+    (line_to_plot, names, types) = read_lines(lines)
     for i in range(len(redshift_bins)):
         lambda_min = (1 + redshift_bins[i] - 0.1)* lambdaLy
         lambda_max = (1 + redshift_bins[i] + 0.1)* lambdaLy
