@@ -157,6 +157,7 @@ def compute_single_means(f,
     dataarr=t.vstack(dataarr)
     dataarr['Delta2']=dataarr['k']*dataarr['Pk']/np.pi
     dataarr['Pk_norescor']=dataarr['Pk_raw']-dataarr['Pk_noise']
+    dataarr['Pk_nonoise']=dataarr['Pk_raw']/dataarr['cor_reso']
     dataarr['Pk/Pnoise']=dataarr['Pk_raw']/dataarr['Pk_noise']  #take the ratio this way as the noise power will fluctuate less even in the tails (i.e. less divisions by 0)
     cols=dataarr.colnames
     N_chunks,zedges_chunks,numbers_chunks=binned_statistic(zarr,zarr,statistic='count',bins=zbinedges)
@@ -246,6 +247,10 @@ def compute_Pk_means(data_dir,
     #this part could be done per file for larger datasets and then recombined after
     dataarr=t.vstack(dataarr)
     dataarr['Delta2']=dataarr['k']*dataarr['Pk']/np.pi
+    dataarr['Delta2_nonoise']=dataarr['k']*(dataarr['Pk_raw']/dataarr['cor_reso'])/np.pi
+    dataarr['Pk_norescor']=dataarr['Pk_raw']-dataarr['Pk_noise']
+    dataarr['Pk_nonoise']=dataarr['Pk_raw']/dataarr['cor_reso']
+    dataarr['Pk/Pnoise']=dataarr['Pk_raw']/dataarr['Pk_noise']
     cols=dataarr.colnames
     N,zedges,kedges,numbers=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr['k'],statistic='count',bins=[zbinedges,kbinedges])
     for c in cols:
