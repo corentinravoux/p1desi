@@ -178,7 +178,8 @@ def prepare_plot_values(data,
                         plot_P=False,
                         z_binsize=0.2,
                         velunits=False,
-                        substract_sb=None):
+                        substract_sb=None,
+                        substract_sb_noise=True):
 
     dict_plot = {}
 
@@ -200,7 +201,7 @@ def prepare_plot_values(data,
         select=dat['N']>0
         if(substract_sb is not None):
             dat_sb=substract_sb[iz]
-            p_sb = dat_sb[meanvar][select]
+            p_sb = dat_sb[f"{meanvar}{'' if substract_sb_noise else '_nonoise'}"][select]
         k_to_plot=dat['meank'][select]
         p_to_plot=dat[meanvar][select]
         if(substract_sb is not None):
@@ -300,6 +301,7 @@ def plot_data(data,
               comparison_model_file=None,
               plot_diff=False,
               substract_sb=None,
+              substract_sb_noise=True,
               **kwargs):
 
     velunits = data.meta["VELUNITS"]
@@ -337,7 +339,8 @@ def plot_data(data,
                                     plot_P=plot_P,
                                     z_binsize=z_binsize,
                                     velunits=velunits,
-                                    substract_sb=substract_sb)
+                                    substract_sb=substract_sb,
+                                    substract_sb_noise=substract_sb_noise)
 
 
     for iz,z in enumerate(zbins):
