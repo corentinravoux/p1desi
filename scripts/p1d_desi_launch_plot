@@ -13,8 +13,8 @@ model_compare=${10}
 region_sb=${11}
 zmax=${12}
 diff_study=${13}
-dla_name=${15}
-bal=${16}
+dla_name=${14}
+bal=${15}
 
 echo "input path for computation:"
 echo $path_in
