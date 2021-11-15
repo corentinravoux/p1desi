@@ -15,6 +15,10 @@ mode=${12}
 use_constant_weight=${13}
 coadd_picca=${14}
 compute_diff_flux=${15}
+dla=${16}
+dla_name=${17}
+bal=${18}
+
 
 echo "input path for computation:"
 echo $path_in
@@ -46,6 +50,13 @@ echo "picca coadding option:"
 echo $coadd_picca
 echo "diff computation option:"
 echo $compute_diff_flux
+echo "dla catalog:"
+echo $dla
+echo "dla catalog name:"
+echo $dla_name
+echo "bal parameter cut:"
+echo $bal
+
 
 if [[ ${region} == "lya" ]]
 then
@@ -88,12 +99,28 @@ fi
 if [[ ${compute_diff_flux} == "True" ]]
 then
 compute_diff_flux_flag="--compute-diff-flux"
+diff_suffix="_diff"
 else
 compute_diff_flux_flag=""
+diff_suffix=""
+fi
+
+if [[ ${dla_name} == "None" ]]
+then
+dla_flag=""
+else
+dla_flag="--dla-vac "${dla}
+fi
+
+if [[ ${bal} == "None" ]]
+then
+bal_flag=""
+else
+bal_flag="--bi-max "${bal}
 fi
 
 
-folder_name=${region}_SNRcut${snr_cut}_lines${lines_name}_cat${catalog_name}${suffix_flag}
+folder_name=${region}_SNRcut${snr_cut}_lines${lines_name}_cat${catalog_name}_dla${dla_name}_bal${bal}${diff_suffix}${suffix_flag}
 
 path_out=${path_out}/p1d_${folder_name}
 
@@ -118,6 +145,8 @@ picca_deltas.py \
 ${use_constant_weight_flag} \
 ${coadd_picca_flag} \
 ${compute_diff_flux_flag} \
+${dla_flag} \
+${bal_flag} \
 --use-desi-P1d-changes \
 --mc-rebin-fac 4 \
 --min-SNR ${snr_cut} \
