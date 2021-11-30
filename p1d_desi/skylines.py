@@ -1,47 +1,86 @@
+from matplotlib.lines import Line2D
 import numpy as np
 from scipy.ndimage import median_filter
 import matplotlib.pyplot as plt
 from desispec.io import read_sky
 from scipy.ndimage.filters import gaussian_filter
-
+import fitsio,glob,os
 
 lambdaLy = 1215.673123130217
 
 
+def get_exposure_list(path,
+                      path_exposures,
+                      survey,
+                      program,
+                      exptime_min=None,
+                      diff_time_max=None,
+                      seeing_max=None,
+                      airmass_max=None,
+                      ebv_max=None):
+    mask_survey = fitsio.FITS(path)[1]["FAPRGRM"][:] == program
+    mask_survey &= fitsio.FITS(path)[1]["SURVEY"][:] == survey
+    mask_total = mask_survey
+    if(exptime_min is not None):
+        mask_total &= (fitsio.FITS(path)[1]["EXPTIME"][:] > exptime_min)
+    if(diff_time_max is not None):
+        mask_total &= (fitsio.FITS(path)[1]["EXPTIME"][:] - fitsio.FITS(path)[1]["EFFTIME_SPEC"][:]  < diff_time_max)
+    if(seeing_max is not None):
+        mask_total &= ( fitsio.FITS(path)[1]["SEEING_ETC"][:]  < seeing_max)
+    if(airmass_max is not None):
+        mask_total &= ( fitsio.FITS(path)[1]["AIRMASS"][:]  < airmass_max)
+    if(ebv_max is not None):
+        mask_total &= ( fitsio.FITS(path)[1]["EBV"][:]  < ebv_max)
 
 
-def plot_skylines_on_sky_fiber(file_name,
-                              line_file,
-                              name_out,
-                              ylim=[0,500],
-                              median_size=40):
-    fig,ax=plt.subplots(2,1,figsize=(8,8),sharex=True)
+    print("EXPTIME:")
+    print(fitsio.FITS(path)[1]["EXPTIME"][:][mask_total])
+    print("EFFTIME:")
+    print(fitsio.FITS(path)[1]["EFFTIME_SPEC"][:][mask_total])
+    print("EXPTIME - EFFTIME:")
+    print(fitsio.FITS(path)[1]["EXPTIME"][:][mask_total] - fitsio.FITS(path)[1]["EFFTIME_SPEC"][:][mask_total])
+    print("SEEING:")
+    print(fitsio.FITS(path)[1]["SEEING_ETC"][:][mask_total])
+    print("AIRMASS:")
+    print(fitsio.FITS(path)[1]["AIRMASS"][:][mask_total])
+    print("EBV:")
+    print(fitsio.FITS(path)[1]["EBV"][:][mask_total])
+    exposures = fitsio.FITS(path)[1]["EXPID"][:][mask_total]
+    nights = fitsio.FITS(path)[1]["NIGHT"][:][mask_total]
+    list_path = []
+    for i in range(len(nights)):
+        list_exp = glob.glob(os.path.join(path_exposures,str(nights[i]),f"*{exposures[i]}","sky*.fits"))
+        list_path = list_path + list_exp
 
-    for i in range(len(file_name)):
-        sky=read_sky(file_name[i])
-        median_sky = np.mean(np.array([median_filter(sky.flux[j],median_size) for j in range(len(sky.flux))]),axis=0)
-        mean_flux = np.mean(sky.flux,axis=0)
-        ax[0].plot(sky.wave,mean_flux)
-        ax[1].plot(sky.wave,median_sky)
+    print("EXPID:")
+    print(fitsio.FITS(path)[1]["EXPID"][:][mask_total])
+    print("NIGHT:")
+    print(fitsio.FITS(path)[1]["NIGHT"][:][mask_total])
+    return(list_path)
 
-    ax[0].legend(["B","R","Z"])
 
-    (line_to_plot, names, types) = read_lines(line_file)
-    for i in range(len(line_to_plot)):
-        x = np.linspace(line_to_plot[i][0],line_to_plot[i][1],100)
-        for j in [0,1]:
-            ax[j].fill_between(x,
-                             ylim[0],
-                             ylim[1],
-                             color = f"C{1}",
-                             alpha=0.3)
 
-    ax[0].set_ylabel("Mean Sky fiber flux")
-    ax[1].set_ylabel("Mean of Sky fiber flux median filtered")
+def get_sky_flux(file_name):
+    sky_flux_b, sky_flux_r, sky_flux_z = [],[],[]
+    for j in range(len(file_name)):
+        sky=read_sky(file_name[j])
+        if '-b' in file_name[j]:
+            sky_flux_b.append(sky.flux)
+            sky_wave_b = sky.wave
+        if '-r' in file_name[j]:
+            sky_flux_r.append(sky.flux)
+            sky_wave_r = sky.wave
+        if '-z' in file_name[j]:
+            sky_flux_z.append(sky.flux)
+            sky_wave_z = sky.wave
+    sky_flux_b = np.concatenate(sky_flux_b,axis=0)
+    sky_flux_r = np.concatenate(sky_flux_r,axis=0)
+    sky_flux_z = np.concatenate(sky_flux_z,axis=0)
+    return(sky_flux_b,sky_flux_r,sky_flux_z,
+           sky_wave_b,sky_wave_r,sky_wave_z)
 
-    ax[0].set_ylim([ylim[0],ylim[1]])
-    ax[1].set_ylim([ylim[0],ylim[1]])
-    plt.savefig(f"{name_out}_sky_fiber.pdf",format="pdf")
+
+
 
 
 def compute_line_width(line,
@@ -69,57 +108,116 @@ def compute_line_width(line,
     return(line)
 
 
-def get_lines_from_sky_file(file_name,
+def add_peak_position(line,mean_flux,median_sky,wavelength):
+    mask_peak = (wavelength >= line[0]) & (wavelength <= line[1])
+    arg = np.argmax(mean_flux[mask_peak])
+    wavelength_peak = wavelength[mask_peak][arg]
+    significance_peak = mean_flux[mask_peak][arg] / median_sky[mask_peak][arg]
+    return([line[0],line[1],wavelength_peak,significance_peak])
+
+
+
+
+def get_lines_from_sky_file(sky_flux_b,
+                            sky_flux_r,
+                            sky_flux_z,
+                            sky_wave_b,
+                            sky_wave_r,
+                            sky_wave_z,
                             threshold,
                             method_width,
                             median_size,
-                            threshold_width=[1.2,1.2,1.2],
+                            threshold_width,
                             width_angstrom=1):
     lines = []
-    for j in range(len(file_name)):
-        sky=read_sky(file_name[j])
-        median_sky = np.mean(np.array([median_filter(sky.flux[j],median_size) for j in range(len(sky.flux))]),axis=0)
-        mean_flux = np.mean(sky.flux,axis=0)
-        mask = mean_flux > threshold[j]*median_sky
-        wavelength = sky.wave[mask]
-        diff = wavelength[1:] - wavelength[:-1]
+    for band in ['b','r','z']:
+        thres = threshold[band]
+        thres_width = threshold_width[band]
+        flux = eval(f"sky_flux_{band}")
+        wavelength = eval(f"sky_wave_{band}")
+        mean_flux = np.mean(flux,axis=0)
+        median_sky = median_filter(mean_flux,median_size)
+
+        ### CR - Other methods to compute median flux. Same results without scipy:
+        # median_sky = np.zeros(mean_flux.shape)
+        # size = median_size//2
+        # median_sky[size:-size] = np.array([np.median(mean_flux[i-size:i+size]) for i in range(size,len(mean_flux)-size)])
+        # median_sky[0:size] = np.array([np.median(mean_flux[0:(size+i)]) for i in range(0,size)])
+        # median_sky[-size:] = np.array([np.median(mean_flux[i+1-size:len(mean_flux)]) for i in range(len(mean_flux)-size,len(mean_flux))])
+
+        ### CR - Other methods to compute median flux. Median then mean:
+        # median_sky = np.mean(np.array([median_filter(flux,median_size) for j in range(len(flux))]),axis=0)
+        mask = mean_flux > thres*median_sky
+        wavelength_above = wavelength[mask]
+        diff = wavelength_above[1:] - wavelength_above[:-1]
         arg_peak = np.argwhere(diff > 1)
         if(len(arg_peak) == 0):
-            if(len(wavelength)!=0):
-                line = compute_line_width([np.min(wavelength),np.max(wavelength)],
+            if(len(wavelength_above)!=0):
+                line = compute_line_width([np.min(wavelength_above),np.max(wavelength_above)],
                                           method_width,
                                           width_angstrom=width_angstrom,
-                                          threshold_width=threshold_width[j],
+                                          threshold_width=thres_width,
                                           mean_flux=mean_flux,
                                           median_sky=median_sky,
-                                          wave=sky.wave)
+                                          wave=wavelength)
+                line = add_peak_position(line,mean_flux,median_sky,wavelength)
                 lines.append(line)
         else:
             arg_init_peak = 0
             for i in range(len(arg_peak)):
-                line = compute_line_width([wavelength[arg_init_peak],wavelength[arg_peak[i][0]]],
+                line = compute_line_width([wavelength_above[arg_init_peak],wavelength_above[arg_peak[i][0]]],
                                           method_width,
                                           width_angstrom=width_angstrom,
-                                          threshold_width=threshold_width[j],
+                                          threshold_width=thres_width,
                                           mean_flux=mean_flux,
                                           median_sky=median_sky,
-                                          wave=sky.wave)
+                                          wave=wavelength)
+                line = add_peak_position(line,mean_flux,median_sky,wavelength)
                 lines.append(line)
                 arg_init_peak = arg_peak[i][0] + 1
-            line = compute_line_width([wavelength[arg_peak[-1][0]+1],wavelength[-1]],
+            line = compute_line_width([wavelength_above[arg_peak[-1][0]+1],wavelength_above[-1]],
                                       method_width,
                                       width_angstrom=width_angstrom,
-                                      threshold_width=threshold_width[j],
+                                      threshold_width=thres_width,
                                       mean_flux=mean_flux,
                                       median_sky=median_sky,
-                                      wave=sky.wave)
+                                      wave=wavelength)
+            line = add_peak_position(line,mean_flux,median_sky,wavelength)
             lines.append(line)
     return(np.array(lines))
 
 
+
+def merge_overlaping_line(lines):
+    lines = np.array(sorted(lines, key=lambda a : a[0], reverse=False))
+    starts = lines[:,0]
+    ends = np.maximum.accumulate(lines[:,1])
+    valid = np.zeros(len(lines) + 1, dtype=np.bool)
+    valid[0] = True
+    valid[-1] = True
+    valid[1:-1] = starts[1:] >= ends[:-1]
+    arg_valid = np.argwhere(valid)[:,0]
+    arg_notvalid = np.argwhere(~valid)[:,0]
+    arg_merge = []
+    for i in range(len(arg_valid)):
+        mask_arg_not_valid = arg_notvalid > arg_valid[i]
+        if(i != len(arg_valid) - 1):
+            mask_arg_not_valid &= arg_notvalid < arg_valid[i+1]
+        arg_merge.append([arg_valid[i]] + list(arg_notvalid[mask_arg_not_valid]))
+    wavelength_peak, significance_peak = [], []
+    for i in range(len(arg_merge)-1):
+        arg_max_significance = np.nanargmax(lines[:,3][arg_merge[i]])
+        significance_peak.append(lines[:,3][arg_merge[i][arg_max_significance]])
+        wavelength_peak.append(lines[:,2][arg_merge[i][arg_max_significance]])
+    return np.vstack((starts[:][valid[:-1]],
+                      ends[:][valid[1:]],
+                      wavelength_peak,
+                      significance_peak)).T
+
 def add_custom_line(lines,custom_lines,names,types):
     list_type = []
     list_name = []
+    lines_out = []
     lines_out = []
     custom_lines_mask = np.full(len(custom_lines),True)
     for i in range(len(lines)):
@@ -135,18 +233,6 @@ def add_custom_line(lines,custom_lines,names,types):
         lines_out.append(lines[i])
     return(lines_out,list_name,list_type)
 
-def merge_overlaping_line(lines):
-    lines = np.array(sorted(lines, key=lambda a : a[0], reverse=False))
-    starts = lines[:,0]
-    ends = np.maximum.accumulate(lines[:,1])
-    valid = np.zeros(len(lines) + 1, dtype=np.bool)
-    valid[0] = True
-    valid[-1] = True
-    valid[1:-1] = starts[1:] >= ends[:-1]
-    return np.vstack((starts[:][valid[:-1]], ends[:][valid[1:]])).T
-
-
-
 def delete_line_number(i,names,lines,types):
     del names[i]
     del lines[i]
@@ -159,11 +245,11 @@ def replace_name(center_line,new_name,names,lines,types):
             names[i] = new_name
     return(names,lines,types)
 
-def read_lines(lines_file):
+def read_lines(lines_file,p1d=False):
     file = open(lines_file,"r")
     file_lines = file.readlines()
     file.close()
-    lines, names, types = [],[],[]
+    lines, names, types, wave_peak, significance_peak = [],[],[], [], []
     for i in range(len(file_lines)):
         line = file_lines[i].strip()
         if(line[0] != "#"):
@@ -171,16 +257,19 @@ def read_lines(lines_file):
             lines.append([float(line[1]),float(line[2])])
             names.append(line[0])
             types.append(line[3])
-    return(np.array(lines), names, types)
+            if(p1d == False):
+                wave_peak.append(float(line[4]))
+                significance_peak.append(float(line[5]))
+    return(np.array(lines), names, types, wave_peak, significance_peak)
 
 
-def write_skyline_file(name_out,names,lines,types):
+def write_skyline_file(name_out,names,lines,types,p1d=False):
     if type(names)!=list:
         names = [names for i in range(len(lines))]
     if type(types)!=list:
         types = [types for i in range(len(lines))]
     file = open(name_out,"w")
-    header = """#
+    header = f"""#
 # File to veto lines either in observed or rest frame
 #       or even rest frame of DLA
 #
@@ -188,14 +277,72 @@ def write_skyline_file(name_out,names,lines,types):
 #
 # lambda is given in Angstrom
 #
-# name  lambda_min  lambda_max  ('OBS' or 'RF' or 'RF_DLA')
+# name  lambda_min  lambda_max  ('OBS' or 'RF' or 'RF_DLA') {'' if p1d else 'lambda_peak significance_peak'}
 #\n"""
     file.write(header)
     for i in range(len(lines)):
-        file.write(f"{names[i]}  {np.round(lines[i][0],3)}  {np.round(lines[i][1],3)}  {types[i]}\n")
+        if(p1d):
+            file.write(f"{names[i]}  {np.round(lines[i][0],3)}  {np.round(lines[i][1],3)}  {types[i]}\n")
+        else:
+            file.write(f"{names[i]}  {np.round(lines[i][0],3)}  {np.round(lines[i][1],3)}  {types[i]} {np.round(lines[i][2],3)} {np.round(lines[i][3],3)}\n")
     file.close()
 
 
+
+
+
+def plot_skylines_on_sky_fiber(sky_flux_b,
+                               sky_flux_r,
+                               sky_flux_z,
+                               sky_wave_b,
+                               sky_wave_r,
+                               sky_wave_z,
+                               line_file,
+                               name_out,
+                               threshold=None,
+                               ylim=[0,500],
+                               median_size=40):
+    fig,ax=plt.subplots(2,1,figsize=(9,7),sharex=True)
+
+    for band in ['b','r','z']:
+        flux = eval(f"sky_flux_{band}")
+        wave = eval(f"sky_wave_{band}")
+        mean_flux = np.mean(flux,axis=0)
+        median_sky = median_filter(mean_flux,median_size)
+        ax[0].plot(wave,mean_flux)
+        if(threshold is not None):
+            ax[0].plot(wave,threshold[band] * median_sky,color="r",ls="--")
+        ax[1].plot(wave,median_sky)
+
+    legend_elements = [Line2D([0], [0], color='C0', lw=1, label="B"),
+                       Line2D([0], [0], color='C1', lw=1, label="R"),
+                       Line2D([0], [0], color='C2', lw=1, label="Z")]
+    if(threshold is not None):
+        legend_elements.append(Line2D([0], [0], color='r', lw=1, ls="--" , label="Threshold"))
+    ax[0].legend(handles=legend_elements)
+
+    (line_to_plot, names, types,wave_peak, significance_peak) = read_lines(line_file)
+    for i in range(len(line_to_plot)):
+        x = np.linspace(line_to_plot[i][0],line_to_plot[i][1],100)
+        for j in [0,1]:
+            ax[j].fill_between(x,
+                             ylim[0],
+                             ylim[1],
+                             color = f"C{1}",
+                             alpha=0.3)
+
+    ax[0].set_ylabel("Mean sky fiber flux")
+    ax[1].set_ylabel("Median filtered mean sky fiber flux")
+    ax[1].set_xlabel("Wavelength")
+
+    ax[0].set_ylim([ylim[0],ylim[1]])
+    ax[1].set_ylim([ylim[0],ylim[1]])
+    plt.savefig(f"{name_out}_sky_fiber.pdf",format="pdf")
+
+
+
+
+### Plots on stacked noise
 
 
 def plot_skyline_analysis(name_out,
@@ -232,7 +379,7 @@ def plot_skyline_analysis(name_out,
     j = 1
     for line in lines:
         j = j +1
-        (line_to_plot, names, types) = read_lines(line)
+        (line_to_plot, names, types,wave_peak, significance_peak) = read_lines(line,p1d=True)
         for i in range(len(line_to_plot)):
             ax[j].fill_between(wavelength,
                                np.min(ratio),
@@ -257,7 +404,7 @@ def plot_centered_lines(name_out,
     else:
         mean_spectra = np.nanmean(array_list,axis=0)
 
-    (line_to_plot, names, types) = read_lines(lines)
+    (line_to_plot, names, types,wave_peak, significance_peak) = read_lines(lines,p1d=True)
     for i in range(len(line_to_plot)):
 
         fig,ax=plt.subplots(2,2,figsize=(8,8),gridspec_kw={'height_ratios': [3, 1],'width_ratios': [3, 1]},sharex=False)
@@ -300,7 +447,7 @@ def plot_centered_lines(name_out,
 
 def compute_length_masked(lines,redshift_bins):
     percentage_mask = []
-    (line_to_plot, names, types) = read_lines(lines)
+    (line_to_plot, names, types,wave_peak, significance_peak) = read_lines(lines,p1d=True)
     for i in range(len(redshift_bins)):
         lambda_min = (1 + redshift_bins[i] - 0.1)* lambdaLy
         lambda_max = (1 + redshift_bins[i] + 0.1)* lambdaLy
