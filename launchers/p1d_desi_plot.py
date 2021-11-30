@@ -24,10 +24,28 @@ velunits = bool(str(sys.argv[5]) == "True")
 model_compare = str(sys.argv[6])
 zmax = float(sys.argv[7])
 diff_study = bool(str(sys.argv[8]) == "True")
-
-
+comparison_str = str(sys.argv[9])
 
 ### P1D
+
+if model_compare == "None":
+    plot_diff_model = False
+    comparison = None
+    comparison_model = None
+    model_compare_str = "None"
+else:
+    plot_diff_model = True
+    if(comparison_str == "None"):
+        comparison = None
+        comparison_model = model_compare
+        model_compare_str = model_compare
+    else:
+        comparison = model_compare
+        comparison_model = None
+        model_compare_str = comparison_str
+
+
+
 
 pk_means_name = os.path.join(path_to_pk,
                              f"mean_Pk1d_snrcut1_par{'_vel' if velunits else ''}.fits.gz")
@@ -36,13 +54,8 @@ if(substract_sb):
                                     f"mean_Pk1d_snrcut1_par{'_vel' if velunits else ''}.fits.gz")
 
 
-outname = os.path.join(f"{path_plot}_model{model_compare}_zmax{zmax}_unit{'kms' if velunits else 'A'}")
-comparison = None
-plot_diff_model = False
-if model_compare == "None":
-    model_compare = None
-    plot_diff_model = False
-comparison_model = model_compare
+outname = os.path.join(f"{path_plot}_model{model_compare_str}_zmax{zmax}_unit{'kms' if velunits else 'A'}")
+
 comparison_model_file = ["/global/homes/r/ravouxco/2_Software/Python/Data/p1d_models/models_eBOSS_lowz.fits",
                          "/global/homes/r/ravouxco/2_Software/Python/Data/p1d_models/models_eBOSS_highz.fits"]
 plot_P = False
@@ -68,7 +81,7 @@ else:
 
 
 kwargs = {"res_label" :  'DESI',
-          "res_label2" : model_compare,
+          "res_label2" : model_compare_str,
           "diff_range" : 1.0,
           "no_errors_diff" : True,
           "marker_size" : 5,
