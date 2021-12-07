@@ -255,7 +255,7 @@ def define_wavevector_limits(args,velunits):
             nb_k_bin=int(k_sup/k_inf/4)
             k_dist=(k_sup-k_inf)/nb_k_bin
     else:
-        if("k_inf_vel" in args.keys()):
+        if("k_inf_lin" in args.keys()):
             k_inf=args["k_inf_lin"]
             k_sup=args["k_sup_lin"]
             k_dist=args["k_bin_dist_lin"]
