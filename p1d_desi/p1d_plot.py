@@ -220,7 +220,8 @@ def prepare_plot_values(data,
                         plot_P=False,
                         z_binsize=0.2,
                         velunits=False,
-                        substract_sb=None):
+                        substract_sb=None,
+                        substract_sb_comparison=True):
 
     dict_plot = {}
 
@@ -273,7 +274,8 @@ def prepare_plot_values(data,
             k_to_plot_comparison = comparison['meank'][iz,:]
             p_to_plot_comparison = comparison[meanvar][iz,:]
             if(substract_sb is not None):
-                p_to_plot_comparison = p_to_plot_comparison - p_sb
+                if(substract_sb_comparison):
+                    p_to_plot_comparison = p_to_plot_comparison - p_sb
             err_to_plot_comparison = comparison[errvar][iz,:]
 
         ## Comparison
@@ -355,11 +357,15 @@ def plot_data(data,
     fonttext = utils.return_key(kwargs,"fonttext",None)
     fontlab = utils.return_key(kwargs,"fontlab",None)
     fontlegend = utils.return_key(kwargs,"fontl",None)
-    z_binsize = utils.return_key(kwargs,"mark_size",0.2)
+    z_binsize = utils.return_key(kwargs,"z_binsize",0.2)
     colors = utils.return_key(kwargs,"colors",sns.color_palette('deep',len(zbins)))
     kmin = utils.return_key(kwargs,"kmin",4e-2)
     kmax = utils.return_key(kwargs,"kmax",2.5)
+    ymin = utils.return_key(kwargs,"ymin",None)
+    ymax = utils.return_key(kwargs,"ymax",None)
     grid = utils.return_key(kwargs,"grid",True)
+    substract_sb_comparison = utils.return_key(kwargs,"substract_sb_comparison",True)
+
 
     if(comparison is not None):
         comparison_data = read_pk_means(comparison)
@@ -383,7 +389,8 @@ def plot_data(data,
                                     plot_P=plot_P,
                                     z_binsize=z_binsize,
                                     velunits=velunits,
-                                    substract_sb=substract_sb)
+                                    substract_sb=substract_sb,
+                                    substract_sb_comparison=substract_sb_comparison)
 
 
     for iz,z in enumerate(zbins):
@@ -457,18 +464,21 @@ def plot_data(data,
         a.xaxis.set_tick_params(labelsize=fontlab)
         a.yaxis.set_tick_params(labelsize=fontlab)
         a.set_xlim(kmin,kmax)
-
-    if not plot_P:
-        ax.set_ylim(4e-3,2)
-    else:
-        if not velunits:
-            ax.set_ylim(0.01,0.5)
+    if(ymin is None):
+        if not plot_P:
+            ax.set_ylim(4e-3,2)
         else:
-            ax.set_ylim(1,300)
+            if not velunits:
+                ax.set_ylim(0.01,0.5)
+            else:
+                ax.set_ylim(1,300)
+    else:
+        ax.set_ylim(ymin,ymax)
+
     ax2.set_ylim(-diff_range/2,diff_range/2)
     handles, labels = ax.get_legend_handles_labels()
 
-    legend1 = ax.legend(handles, labels, loc=2, bbox_to_anchor=(1.03, 0.98), borderaxespad=0.,fontsize = fontlegend)
+    legend1 = ax.legend(handles, labels, loc=2, bbox_to_anchor=(1.03, 0.15), borderaxespad=0.,fontsize = fontlegend)
 
     ax.errorbar([0],[0], yerr =[0], fmt = marker_style,color='k', markersize = marker_size, label ='{}'.format(res_label))
     if (comparison_plot_style == "fill"):
@@ -478,7 +488,7 @@ def plot_data(data,
 
     handles, labels = ax.get_legend_handles_labels()
     handles,labels=zip(*[(h,l) for (h,l) in zip(handles,labels) if not 'z =' in l])
-    ax2.legend(handles, labels, loc=3, bbox_to_anchor=(1.03, 0.02), borderaxespad=0.,fontsize = fontlegend)
+    ax.legend(handles, labels, loc=2, bbox_to_anchor=(1.03, 0.9), borderaxespad=0.,fontsize = fontlegend)
 
     if not velunits:
         par1.set_xlim(*ax2.get_xlim())

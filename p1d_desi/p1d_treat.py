@@ -51,7 +51,7 @@ def compute_Pk_means_parallel(data_dir,
     Returns:
         [type]: [description]
     """
-    outfilename=os.path.join(data_dir,f'mean_Pk1d_snrcut{args["SNR_min"]}_par{"_log" if logsample else ""}{"_vel" if velunits else ""}.fits.gz')
+    outfilename=os.path.join(data_dir,f'mean_Pk1d_par{"_log" if logsample else ""}{"_vel" if velunits else ""}.fits.gz')
     if os.path.exists(outfilename) and not overwrite:
         print(f"found existing power, loading from file {outfilename}")
         outdir=t.Table.read(outfilename)
@@ -62,14 +62,7 @@ def compute_Pk_means_parallel(data_dir,
     #generate arrays
     zbinedges=zbins-0.1
     zbinedges=np.concatenate([zbinedges,zbinedges[[-1]]+args['z_binsize']])
-    if velunits:
-        k_inf=args["k_inf_vel"]
-        k_sup=args["k_sup_vel"]
-        k_dist=args["k_bin_dist_vel"]
-    else:
-        k_inf=args["k_inf_lin"]
-        k_sup=args["k_sup_lin"]
-        k_dist=args["k_bin_dist_lin"]
+    (k_inf,k_sup,k_dist) = define_wavevector_limits(args,velunits)
     if not logsample:
         kbinedges=np.arange(k_inf,k_sup,k_dist)
     else:
@@ -142,9 +135,6 @@ def compute_single_means(f,
             header=h.read_header()
             tab=t.Table(data)
             tab['z']=float(header['MEANZ'])
-            tab['snr']=float(header['MEANSNR'])
-            if float(header['meansnr'])<args['SNR_min']:
-                continue
             if (tab['Pk_noise'][tab['k']<kbinedges[-1]]>tab['Pk_raw'][tab['k']<kbinedges[-1]]*10000000).any():
                 print(f"file {f} hdu {i+1} has very high noise power, ignoring, max value: {(tab['Pk_noise'][tab['k']<kbinedges[-1]]/tab['Pk_raw'][tab['k']<kbinedges[-1]]).max()}*Praw")
                 continue
@@ -209,30 +199,18 @@ def compute_single_means(f,
 
 
 def compute_Pk_means(data_dir,
+                     args,
                      ncpu=1,
                      ignore_existing=False,
                      velunits=False,
-                     no_zbinning=False,
-                     k_inf_lin=0.01,
-                     k_sup_lin=10.0,
-                     k_bin_lin = 0.2,
-                     k_inf_vel=0.00001,
-                     k_sup_vel=0.1,
-                     k_bin_vel=0.002):
+                     no_zbinning=False):
     """ old, might be obsolete """
     files = glob.glob(os.path.join(data_dir,"*.fits.gz"))
     # files = glob.glob("{}/*.fits.gz".format(data_dir))
     #generate arrays
     zbinedges=np.arange(2.1,4.7,0.2)
-    if velunits:
-        k_inf=k_inf_vel
-        k_sup=k_sup_vel
-        k_bin=k_bin_vel
-    else:
-        k_inf=k_inf_lin
-        k_sup=k_sup_lin
-        k_bin=k_bin_lin
-    kbinedges=np.linspace(k_inf,k_sup,k_bin)
+    (k_inf,k_sup,k_dist) = define_wavevector_limits(args,velunits)
+    kbinedges=np.linspace(k_inf,k_sup,k_dist)
     outdir=t.Table()
     dataarr=[]
     for f in files:
@@ -242,7 +220,6 @@ def compute_Pk_means(data_dir,
             header=h.read_header()
             tab=t.Table(data)
             tab['z']=float(header['meanz'])
-            tab['snr']=float(header['meansnr'])
             dataarr.append(tab)
     #this part could be done per file for larger datasets and then recombined after
     dataarr=t.vstack(dataarr)
@@ -262,3 +239,31 @@ def compute_Pk_means(data_dir,
         outdir['error'+c]/=np.sqrt(N) #to get the error on the mean instead of standard deviation in the data
     outdir['N']=N
     return(outdir)
+
+
+
+def define_wavevector_limits(args,velunits):
+    pixsize_desi = 0.8
+    if velunits:
+        if("k_inf_vel" in args.keys()):
+            k_inf=args["k_inf_vel"]
+            k_sup=args["k_sup_vel"]
+            k_dist=args["k_bin_dist_vel"]
+        else:
+            k_inf=2*np.pi/((1200-1050)*(1+3.4)/args["rebinfac"])
+            k_sup=np.pi/pixsize_desi
+            nb_k_bin=int(k_sup/k_inf/4)
+            k_dist=(k_sup-k_inf)/nb_k_bin
+    else:
+        if("k_inf_vel" in args.keys()):
+            k_inf=args["k_inf_lin"]
+            k_sup=args["k_sup_lin"]
+            k_dist=args["k_bin_dist_lin"]
+        else:
+            k_inf=0.000813
+            k_dist=0.000542*args["rebinfac"]
+            k_inf_lin=2*np.pi/((1200-1050)*(1+3.4)/args["rebinfac"])
+            k_sup_lin=np.pi/pixsize_desi
+            nb_k_bin=int(k_sup_lin/k_inf_lin/4)
+            k_sup=k_inf + nb_k_bin*k_dist
+    return(k_inf,k_sup,k_dist)

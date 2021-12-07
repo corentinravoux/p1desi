@@ -48,10 +48,10 @@ else:
 
 
 pk_means_name = os.path.join(path_to_pk,
-                             f"mean_Pk1d_snrcut1_par{'_vel' if velunits else ''}.fits.gz")
+                             f"mean_Pk1d_par{'_vel' if velunits else ''}.fits.gz")
 if(substract_sb):
     pk_means_name_sb = os.path.join(path_sb_substract,
-                                    f"mean_Pk1d_snrcut1_par{'_vel' if velunits else ''}.fits.gz")
+                                    f"mean_Pk1d_par{'_vel' if velunits else ''}.fits.gz")
 
 
 outname = os.path.join(f"{path_plot}_model{model_compare_str}_zmax{zmax}_unit{'kms' if velunits else 'A'}")
@@ -82,7 +82,7 @@ else:
 
 kwargs = {"res_label" :  'DESI',
           "res_label2" : model_compare_str,
-          "diff_range" : 1.0,
+          "diff_range" : 0.4,
           "no_errors_diff" : True,
           "marker_size" : 5,
           "marker_style" : ".",
@@ -92,7 +92,10 @@ kwargs = {"res_label" :  'DESI',
           "z_binsize" : 0.2,
           "kmin" : kmin,
           "kmax" : kmax,
-          "grid" : True}
+          "ymin" : 0.006,
+          "ymax" : 0.2,
+          "grid" : True,
+          "substract_sb_comparison" : False}
 
 
 ### Noise study mean z

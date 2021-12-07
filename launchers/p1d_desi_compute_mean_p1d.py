@@ -37,7 +37,6 @@ nomedians=False
 logsample=False
 searchstr = '*'
 args={}
-args['SNR_min']=1
 args['z_binsize']=0.2
 args['k_inf_lin']=k_inf_lin
 args['k_sup_lin']=k_sup_lin
