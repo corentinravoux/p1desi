@@ -152,7 +152,7 @@ ${bal_flag} \
 --min-SNR ${snr_cut} \
 --mask-file ${lines} \
 --log ${path_log}/log_deltas_${folder_name} \
---iter ${path_log}/iter_deltas_${folder_name}
+--iter ${path_log}/iter_deltas_${folder_name} > ${path_log}/log_deltas_out_${folder_name} 2> ${path_log}/log_deltas_err_${folder_name}
 
 mkdir -p ${path_out}/pk1d_${noise_estimate}_noise_estimate
 
@@ -168,4 +168,4 @@ picca_Pk1D.py \
 --nb-pixel-masked-max 120 \
 --nb-part 3 \
 --SNR-min ${snr_cut} \
---nb-noise-exp 2500
+--nb-noise-exp 2500 > ${path_log}/log_p1d_out_${folder_name} 2> ${path_log}/log_p1d_err_${folder_name}
