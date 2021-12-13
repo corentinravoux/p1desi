@@ -2,6 +2,7 @@ import os
 
 
 def desi_data_keeping(main_config):
+    pk_path = main_config.getstr("pk_path")
     use_bookkeeping = main_config.getboolean("use_bookkeeping")
     if(use_bookkeeping):
         region = main_config.getstr("region")
@@ -15,17 +16,16 @@ def desi_data_keeping(main_config):
         region_sb = main_config.getstr("region_sb")
 
         folder_name=f"{region}_SNRcut{snr_cut}_lines{lines_name}_cat{catalog_name}_dla{dla_name}_bal{bal}{suffix_flag}"
-        folder_name_sb=f"{region_sb}_SNRcut{snr_cut}_lines{lines_name}_cat{catalog_name}_dla{dla_name}_bal{bal}{suffix_flag}"
-    print(folder_name)
+        pk = os.path.join(pk_path,f"p1d_{folder_name}",f"pk1d_{noise_estimate}_noise_estimate")
 
-    path_abs = main_config.getstr("path_abs")
+        if(region_sb is None):
+            pk_sb = None
+        else:
+            folder_name_sb=f"{region_sb}_SNRcut{snr_cut}_lines{lines_name}_cat{catalog_name}_dla{dla_name}_bal{bal}{suffix_flag}"
+            pk_sb = os.path.join(pk_path,f"p1d_{folder_name_sb}",f"pk1d_{noise_estimate}_noise_estimate")
 
-    # folder_name=${region}_SNRcut${snr_cut}_lines${lines_name}_cat${catalog_name}_dla${dla_name}_bal${bal}${suffix_flag}
-    # path_to_pk=${path_in}/p1d_${folder_name}/pk1d_${noise_estimate}_noise_estimate
-    #
-    # folder_name_sb=${region_sb}_SNRcut${snr_cut}_lines${lines_name}_cat${catalog_name}_dla${dla_name}_bal${bal}${suffix_flag}
-    # path_to_pk_sb=${path_in}/p1d_${folder_name_sb}/pk1d_${noise_estimate}_noise_estimate
-    #
-    # path_plot=${path_plot}/${region}/p1d_${folder_name}_${noise_estimate}_noise_estimate
-    #
-    #
+    else:
+        pk = main_config.getstr("abs_pk_path")
+        pk_sb = main_config.getstr("abs_pk_path_sb")
+
+    return(pk,pk_sb)

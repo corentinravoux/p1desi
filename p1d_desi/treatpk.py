@@ -267,5 +267,4 @@ def define_wavevector_limits(args,velunits):
             k_sup=np.pi/pixsize_desi
             nb_k_bin=int(k_sup/k_inf/4)
             k_dist=(k_sup-k_inf)/nb_k_bin
-    print(k_inf,k_sup,k_dist)
     return(k_inf,k_sup,k_dist)
