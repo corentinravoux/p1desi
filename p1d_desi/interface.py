@@ -114,7 +114,7 @@ def compute_mean(pk,mean_config,main_config):
 #     print("Plotting path: ",main_config.getstr("pk_path"))
 #     mean_pk = os.path.join(pk,f"mean_Pk1d_par{'_vel' if main_config.getboolean('velunits') else ''}.fits.gz")
 #     data = plot.read_pk_means(mean_pk)
-#     plot.plot_data(data,
+#     plotpk.plot_data(data,
 #                        zbins,
 #                        outname,
 #                        plot_P=plot_P,
@@ -126,7 +126,7 @@ def compute_mean(pk,mean_config,main_config):
 #
 #     if(substract_sb):
 #         pk_means_sb = plot.read_pk_means(pk_means_name_sb)
-#         plot.plot_data(data,
+#         plotpk.plot_data(data,
 #                            zbins,
 #                            f"{outname}_{region_sb}_substracted",
 #                            plot_P=plot_P,
@@ -139,7 +139,7 @@ def compute_mean(pk,mean_config,main_config):
 #
 #
 #
-#     plot.plot_noise_study(data,
+#     plotpk.plot_noise_study(data,
 #                           zbins,
 #                           outname,
 #                               k_units_noise_study,
@@ -154,7 +154,7 @@ def compute_mean(pk,mean_config,main_config):
 #
 #
 #     if(plot_noise_comparison_mean_z):
-#         plot.compute_and_plot_mean_z_noise_power(data,
+#         plotpk.compute_and_plot_mean_z_noise_power(data,
 #                                                      zbins,
 #                                                      outname,
 #                                                      **kwargs_noise2)
