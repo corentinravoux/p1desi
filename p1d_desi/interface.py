@@ -1,9 +1,8 @@
-
 import os
 import configparser
 import ast
 import numpy as np
-from p1d_desi import treatpk,plotpk
+from p1d_desi import treatpk,plotpk,bookkeeping
 
 
 def parse_int_tuple(input):
@@ -67,24 +66,8 @@ def main(input_file):
     main_config = config["main"]
     main_path = os.path.abspath(main_config["path"])
     os.makedirs(main_path,exist_ok=True)
-    pk_path = main_config.getstr("pk_path")
 
-    region = main_config.getstr("region")
-    snr_cut = main_config.getint("snr_cut")
-    lines_name = main_config.getstr("lines_name")
-    catalog_name = main_config.getstr("catalog_name")
-    dla_name = main_config.getstr("dla_name")
-    bal = main_config.getstr("bal")
-    suffix_flag = main_config.getstr("suffix_flag")
-    noise_estimate = main_config.getstr("noise_estimate")
-    region_sb = main_config.getstr("region_sb")
-
-    folder_name=f"{region}_SNRcut{snr_cut}_lines{lines_name}_cat{catalog_name}_dla{dla_name}_bal{bal}{suffix_flag}"
-    folder_name_sb=f"{region_sb}_SNRcut{snr_cut}_lines{lines_name}_cat{catalog_name}_dla{dla_name}_bal{bal}{suffix_flag}"
-
-    pk = os.path.join(pk_path,f"p1d_{folder_name}",f"pk1d_{noise_estimate}_noise_estimate")
-    pk_sb = os.path.join(pk_path,f"p1d_{folder_name_sb}",f"pk1d_{noise_estimate}_noise_estimate")
-
+    (pk,pk_sb) = bookkeeping.desi_data_keeping(main_config)
     mean_config = config["compute mean"]
     plot_config = config["plot power"]
     plot_noise_config = config["plot noise"]
@@ -121,7 +104,6 @@ def compute_mean(pk,mean_config,main_config):
 def plot(pk,pk_sb,path_plot,plot_config,main_config):
     print("Plotting path: ",pk)
     mean_pk = os.path.join(pk,f"mean_Pk1d_par{'_vel' if main_config.getboolean('velunits') else ''}.fits.gz")
-    mean_pk_sb = os.path.join(pk_sb,f"mean_Pk1d_par{'_vel' if main_config.getboolean('velunits') else ''}.fits.gz")
     velunits = main_config.getboolean("velunits")
     comparison_str = plot_config.getstr("comparison_str")
     substract_sb = plot_config.getboolean("substract_sb")
@@ -133,6 +115,7 @@ def plot(pk,pk_sb,path_plot,plot_config,main_config):
     if(plot_config.getboolean("plot_pk")):
         data = plotpk.read_pk_means(mean_pk)
         if(substract_sb):
+            mean_pk_sb = os.path.join(pk_sb,f"mean_Pk1d_par{'_vel' if main_config.getboolean('velunits') else ''}.fits.gz")
             substract_data = mean_pk_sb
             outname =  f"{outname}_{region_sb}_substracted"
         else:
