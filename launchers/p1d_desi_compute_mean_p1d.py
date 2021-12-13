@@ -7,7 +7,7 @@ Created on Thu Apr 30 09:50:01 2020
 """
 
 import numpy as np
-from p1d_desi import p1d_treat
+from p1d_desi import treatpk
 import sys
 
 path_to_pk = str(sys.argv[1])
@@ -50,7 +50,7 @@ args['k_bin_dist_vel']=k_bin_dist_vel
 
 if __name__ == "__main__":
     print("Treating path: ",path_to_pk)
-    data=p1d_treat.compute_Pk_means_parallel(path_to_pk,
+    data=treatpk.compute_Pk_means_parallel(path_to_pk,
                                              args,
                                              zbins,
                                              searchstr=searchstr,

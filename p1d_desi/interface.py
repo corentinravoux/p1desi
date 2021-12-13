@@ -2,7 +2,7 @@ import os
 import configparser
 import ast
 import numpy as np
-from p1d_desi import p1d_treat,p1d_plot
+from p1d_desi import treatpk,plot
 
 
 def parse_int_tuple(input):
@@ -97,7 +97,7 @@ def main(input_file):
 
 def compute_mean(pk,mean_config,main_config):
     print("Treating path: ",pk)
-    p1d_treat.compute_Pk_means_parallel(pk,
+    treatpk.compute_Pk_means_parallel(pk,
                                         mean_config.getdict("args_k_array"),
                                         np.array(mean_config.gettuplefloat("zbins")),
                                         searchstr=mean_config.getstr("searchstr"),
@@ -113,8 +113,8 @@ def compute_mean(pk,mean_config,main_config):
 #
 #     print("Plotting path: ",main_config.getstr("pk_path"))
 #     mean_pk = os.path.join(pk,f"mean_Pk1d_par{'_vel' if main_config.getboolean('velunits') else ''}.fits.gz")
-#     data = p1d_plot.read_pk_means(mean_pk)
-#     p1d_plot.plot_data(data,
+#     data = plot.read_pk_means(mean_pk)
+#     plot.plot_data(data,
 #                        zbins,
 #                        outname,
 #                        plot_P=plot_P,
@@ -125,8 +125,8 @@ def compute_mean(pk,mean_config,main_config):
 #                        **kwargs)
 #
 #     if(substract_sb):
-#         pk_means_sb = p1d_plot.read_pk_means(pk_means_name_sb)
-#         p1d_plot.plot_data(data,
+#         pk_means_sb = plot.read_pk_means(pk_means_name_sb)
+#         plot.plot_data(data,
 #                            zbins,
 #                            f"{outname}_{region_sb}_substracted",
 #                            plot_P=plot_P,
@@ -139,9 +139,9 @@ def compute_mean(pk,mean_config,main_config):
 #
 #
 #
-#     p1d_plot.plot_noise_study(data,
-#                               zbins,
-#                               outname,
+#     plot.plot_noise_study(data,
+#                           zbins,
+#                           outname,
 #                               k_units_noise_study,
 #                               use_diff_noise,
 #                               plot_noise_ratio,
@@ -154,7 +154,7 @@ def compute_mean(pk,mean_config,main_config):
 #
 #
 #     if(plot_noise_comparison_mean_z):
-#         p1d_plot.compute_and_plot_mean_z_noise_power(data,
+#         plot.compute_and_plot_mean_z_noise_power(data,
 #                                                      zbins,
 #                                                      outname,
 #                                                      **kwargs_noise2)

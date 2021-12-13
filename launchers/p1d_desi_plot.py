@@ -7,7 +7,7 @@ Created on Thu Apr 30 09:50:01 2020
 """
 
 import numpy as np
-from p1d_desi import p1d_plot
+from p1d_desi import plot
 import sys,os
 
 ### Input
@@ -129,8 +129,8 @@ kwargs_noise2 = {"kmin" : kmin,
 
 if __name__ == "__main__":
     print("Plotting path: ",pk_means_name)
-    data = p1d_plot.read_pk_means(pk_means_name)
-    p1d_plot.plot_data(data,
+    data = plot.read_pk_means(pk_means_name)
+    plot.plot_data(data,
                        zbins,
                        outname,
                        plot_P=plot_P,
@@ -141,8 +141,8 @@ if __name__ == "__main__":
                        **kwargs)
 
     if(substract_sb):
-        pk_means_sb = p1d_plot.read_pk_means(pk_means_name_sb)
-        p1d_plot.plot_data(data,
+        pk_means_sb = plot.read_pk_means(pk_means_name_sb)
+        plot.plot_data(data,
                            zbins,
                            f"{outname}_{region_sb}_substracted",
                            plot_P=plot_P,
@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
 
 
-    p1d_plot.plot_noise_study(data,
+    plot.plot_noise_study(data,
                               zbins,
                               outname,
                               k_units_noise_study,
@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
 
     if(plot_noise_comparison_mean_z):
-        p1d_plot.compute_and_plot_mean_z_noise_power(data,
+        plot.compute_and_plot_mean_z_noise_power(data,
                                                      zbins,
                                                      outname,
                                                      **kwargs_noise2)
