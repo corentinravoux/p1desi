@@ -141,7 +141,7 @@ if __name__ == "__main__":
                        **kwargs)
 
     if(substract_sb):
-        pk_means_sb = plot.read_pk_means(pk_means_name_sb)
+        pk_means_sb = plotpk.read_pk_means(pk_means_name_sb)
         plotpk.plot_data(data,
                            zbins,
                            f"{outname}_{region_sb}_substracted",
