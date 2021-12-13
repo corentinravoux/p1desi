@@ -58,7 +58,7 @@ def compute_Pk_means_parallel(data_dir,
         return outdir
     if ncpu>1:
         from multiprocessing import Pool
-    files = glob.glob("{}/Pk1D{}.fits.gz".format(data_dir,searchstr))
+    files = glob.glob(os.path.join(data_dir,f"Pk1D{searchstr}.fits.gz"))
     #generate arrays
     zbinedges=zbins-0.1
     zbinedges=np.concatenate([zbinedges,zbinedges[[-1]]+args['z_binsize']])
@@ -250,20 +250,22 @@ def define_wavevector_limits(args,velunits):
             k_sup=args["k_sup_vel"]
             k_dist=args["k_bin_dist_vel"]
         else:
-            k_inf=2*np.pi/((1200-1050)*(1+3.4)/args["rebinfac"])
-            k_sup=np.pi/pixsize_desi
-            nb_k_bin=int(k_sup/k_inf/4)
-            k_dist=(k_sup-k_inf)/nb_k_bin
-    else:
-        if("k_inf_lin" in args.keys()):
-            k_inf=args["k_inf_lin"]
-            k_sup=args["k_sup_lin"]
-            k_dist=args["k_bin_dist_lin"]
-        else:
             k_inf=0.000813
             k_dist=0.000542*args["rebinfac"]
             k_inf_lin=2*np.pi/((1200-1050)*(1+3.4)/args["rebinfac"])
             k_sup_lin=np.pi/pixsize_desi
             nb_k_bin=int(k_sup_lin/k_inf_lin/4)
             k_sup=k_inf + nb_k_bin*k_dist
+    else:
+        if("k_inf_lin" in args.keys()):
+            k_inf=args["k_inf_lin"]
+            k_sup=args["k_sup_lin"]
+            k_dist=args["k_bin_dist_lin"]
+        else:
+
+            k_inf=2*np.pi/((1200-1050)*(1+3.4)/args["rebinfac"])
+            k_sup=np.pi/pixsize_desi
+            nb_k_bin=int(k_sup/k_inf/4)
+            k_dist=(k_sup-k_inf)/nb_k_bin
+    print(k_inf,k_sup,k_dist)
     return(k_inf,k_sup,k_dist)

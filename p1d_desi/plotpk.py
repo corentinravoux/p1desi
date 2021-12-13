@@ -521,9 +521,10 @@ def plot_diff_figure(outname,
                      reslabel2):
     diff_data_model=[]
     chi_data_model=[]
+    mask_k = dict_plot[zbins[0]]["diff_k_to_plot"]<kmax
     for iz,z in enumerate(zbins):
-        diff_data_model.append(dict_plot[z]["diff_p_to_plot"][dict_plot[z]["diff_k_to_plot"]<kmax])
-        chi_data_model.append(dict_plot[z]["chi_p_to_plot"][dict_plot[z]["diff_k_to_plot"]<kmax])
+        diff_data_model.append(dict_plot[z]["diff_p_to_plot"][mask_k])
+        chi_data_model.append(dict_plot[z]["chi_p_to_plot"][mask_k])
     plt.figure()
     sns.violinplot(data=pandas.DataFrame(np.array(diff_data_model).T,None,zbins),
                   inner=None,orient='v',palette=colors,scale='width')
@@ -865,16 +866,16 @@ def plot_noise_comparison_function(zbins,
     fig2.savefig(f"{out_name}_ratio_diff_pipeline_power_unit{k_units}.pdf",format="pdf")
 
 
-def plot_side_band(zbins,
-                   data,
-                   out_name,
-                   mean_dict,
-                   noise_to_plot,
-                   labelnoise,
-                   k_units,
-                   side_band_legend,
-                   side_band_comp = None,
-                   **kwargs):
+def plot_side_band_study(zbins,
+                         data,
+                         out_name,
+                         mean_dict,
+                         noise_to_plot,
+                         labelnoise,
+                         k_units,
+                         side_band_legend,
+                         side_band_comp = None,
+                         **kwargs):
 
     kmin = utils.return_key(kwargs,"kmin",None)
     kmax = utils.return_key(kwargs,"kmax",None)
@@ -1073,13 +1074,13 @@ def plot_noise_study(data,
                                        **kwargs)
 
     if(plot_side_band):
-        plot_side_band(zbins,
-                       data,
-                       out_name,
-                       mean_dict,
-                       noise_to_plot,
-                       labelnoise,
-                       k_units,
-                       side_band_legend,
-                       side_band_comp=side_band_comp,
-                       **kwargs)
+        plot_side_band_study(zbins,
+                             data,
+                             out_name,
+                             mean_dict,
+                             noise_to_plot,
+                             labelnoise,
+                             k_units,
+                             side_band_legend,
+                             side_band_comp=side_band_comp,
+                             **kwargs)
