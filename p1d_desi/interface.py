@@ -109,7 +109,9 @@ def plot(pk,pk_sb,path_plot,plot_config,main_config):
     substract_sb = plot_config.getboolean("substract_sb")
     region_sb = plot_config.getstr("region_sb")
     plot_args = plot_config.getdict("plot_args")
-
+    comparison_model_file=list(plot_config.gettuplestr("comparison_model_file"))
+    if(len(comparison_model_file) == 1):
+        comparison_model_file = comparison_model_file[0]
     outname = os.path.join(path_plot,f"p1d_model{comparison_str}_unit{'kms' if velunits else 'A'}")
 
     if(plot_config.getboolean("plot_pk")):
@@ -126,7 +128,7 @@ def plot(pk,pk_sb,path_plot,plot_config,main_config):
                          plot_P=plot_config.getboolean("plot_P"),
                          comparison=plot_config.getstr("pk_comparison"),
                          comparison_model=plot_config.getstr("model_comparison"),
-                         comparison_model_file=list(plot_config.gettuplestr("comparison_model_file")),
+                         comparison_model_file=comparison_model_file,
                          plot_diff=plot_config.getboolean("plot_diff_model"),
                          substract_sb=substract_data,
                          **plot_args)

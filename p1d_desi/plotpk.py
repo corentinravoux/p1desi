@@ -496,7 +496,7 @@ def plot_data(data,
         par3.set_xlim(*ax2.get_xlim())
 
     ax.add_artist(legend1)
-    fig.subplots_adjust(top=0.95,bottom=0.114,left=0.078,right=0.758,hspace=0.2,wspace=0.2)
+    # fig.subplots_adjust(top=0.95,bottom=0.114,left=0.078,right=0.758,hspace=0.2,wspace=0.2)
     fig.tight_layout()
     fig.savefig(outname+f"{'' if not plot_P else '_powernotDelta'}_kmax_{kmax}.pdf")
 
@@ -532,6 +532,7 @@ def plot_diff_figure(outname,
         plt.errorbar(i,np.mean(d),scipy.stats.sem(d,ddof=0), color='0.3',marker='.')
     plt.xlabel('z')
     plt.ylabel('$(P-P_{model})/P$')
+    plt.tight_layout()
     plt.savefig(outname+f"_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}_diff.pdf")
     plt.figure()
     sns.violinplot(data=pandas.DataFrame(np.array(chi_data_model).T,None,zbins),inner=None,orient='v',palette=colors,scale='width')
@@ -539,6 +540,7 @@ def plot_diff_figure(outname,
         plt.errorbar(i,np.mean(d),scipy.stats.sem(d,ddof=0), color='0.3',marker='.')
     plt.xlabel('z')
     plt.ylabel('$(P-P_{model})/\sigma_P}$')
+    plt.tight_layout()
     plt.savefig(outname+f"_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}_chi.pdf")
 
 
@@ -795,6 +797,7 @@ def plot_mean_z_noise_power(dict_noise_diff,zbins,outname,dreshift = 0.02):
     ax[1].set_xlabel('z')
     ax[1].legend(handles = [Line2D([], [], color='k', marker='None', linestyle='None',
                                   label='Average for all redshift = ${}$%'.format(np.round(np.mean(dict_noise_diff["diff_over_pipeline"])*100,2)))],frameon=False)
+    plt.tight_layout()
     fig.savefig("{}_mean_ratio_diff_pipeline_power.pdf".format(outname),format="pdf")
 
 
@@ -822,6 +825,7 @@ def plot_several_mean_z_noise_power(list_dict,nameout,legend,colors,dreshift = 0
     ax[0].set_ylabel('$mean_{k}(P_{pipeline}) [\AA]$')
     ax[1].set_ylabel('$mean_{k}(P_{diff}) [\AA]$')
     ax[2].set_ylabel('$mean_{k}((P_{diff}-P_{pipeline})/P_{pipeline})$')
+    plt.tight_layout()
     fig.savefig("{}_mean_ratio_diff_pipeline_power.pdf".format(nameout),format="pdf")
 
 
