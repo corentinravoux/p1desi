@@ -18,6 +18,7 @@ compute_diff_flux=${15}
 dla=${16}
 dla_name=${17}
 bal=${18}
+nb_proc=${19}
 
 
 echo "input path for computation:"
@@ -56,6 +57,9 @@ echo "dla catalog name:"
 echo $dla_name
 echo "bal parameter cut:"
 echo $bal
+echo "Number of processors:"
+echo $nb_proc
+
 
 
 if [[ ${region} == "lya" ]]
@@ -140,7 +144,7 @@ picca_deltas.py \
 --lambda-max 7200.0 \
 --lambda-rest-min ${lrestmin} \
 --lambda-rest-max ${lrestmax} \
---nproc 16 \
+--nproc ${nb_proc} \
 --order 0 \
 ${use_constant_weight_flag} \
 ${coadd_picca_flag} \
@@ -163,7 +167,7 @@ picca_Pk1D.py \
 --lambda-obs-min 3750. \
 --noise-estimate ${noise_estimate} \
 --pixel-correction inverse \
---nproc 16 \
+--nproc ${nb_proc} \
 --use-desi-new-defaults \
 --nb-pixel-masked-max 120 \
 --nb-part 3 \
