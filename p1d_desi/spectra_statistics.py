@@ -19,7 +19,8 @@ from p1d_desi import utils
 def get_spectra_desi(spectra_path,
                      spectro,
                      cut_objects,
-                     compute_diff=False):
+                     compute_diff=False,
+                     get_fuji_pb_spectra=False):
 
     mask_desi_target_names = ["SV1_DESI_TARGET","SV2_DESI_TARGET","SV3_DESI_TARGET","DESI_TARGET"]
     mask_desi_target = [sv1_desi_mask,sv2_desi_mask,sv3_desi_mask,desi_mask]
@@ -42,15 +43,22 @@ def get_spectra_desi(spectra_path,
             spectra = read_spectra(spectra_names[i])
             if 'brz' not in spectra.bands:
                 spectra = coadd_cameras(spectra)
+            if 'brz' not in spectra.bands:
+                continue
             mask_target = np.full(spectra.fibermap["TARGETID"].shape,False)
             for k in range(len(mask_desi_target_names)):
                 if(mask_desi_target_names[k] in spectra.fibermap.colnames):
                     for j in range(len(cut_objects)):
                         mask_target |= ((spectra.fibermap[mask_desi_target_names[k]] & mask_desi_target[k][cut_objects[j]])!=0)
             if("COADD_FIBERSTATUS" in spectra.fibermap.colnames):
+                name_fiberstatus = "COADD_FIBERSTATUS"
                 mask_target = mask_target & (spectra.fibermap["COADD_FIBERSTATUS"]==0)
             elif("FIBERSTATUS" in spectra.fibermap.colnames):
-                mask_target = mask_target & (spectra.fibermap["FIBERSTATUS"]==0)
+                name_fiberstatus = "FIBERSTATUS"
+            if(get_fuji_pb_spectra):
+                mask_target = mask_target & (spectra.fibermap[name_fiberstatus]==0)
+            else:
+                mask_target = mask_target & ((spectra.fibermap[name_fiberstatus]==0)  |  (spectra.fibermap[name_fiberstatus]==8388608)  |  (spectra.fibermap[name_fiberstatus]==16777216))
             flux.append(spectra.flux['brz'][mask_target])
             pixel_mask.append(spectra.mask['brz'][mask_target])
             ivar=spectra.ivar['brz'][mask_target]
