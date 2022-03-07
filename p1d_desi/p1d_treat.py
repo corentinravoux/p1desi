@@ -142,6 +142,16 @@ def compute_single_means(f,
             data=h.read()
             header=h.read_header()
             tab=t.Table(data)
+            try:
+                tab.rename_column('K','k')
+                tab.rename_column('PK','Pk')
+                tab.rename_column('PK_RAW','Pk_raw')
+                tab.rename_column('PK_NOISE','Pk_noise')
+                tab.rename_column('PK_DIFF','Pk_diff')
+                tab.rename_column('COR_RESO','cor_reso')
+            except:
+                pass
+
             tab['z']=float(header['MEANZ'])
             tab['snr']=float(header['MEANSNR'])
             if float(header['meansnr'])<args['SNR_min']:
@@ -240,11 +250,21 @@ def compute_Pk_means(data_dir,
             data=h.read()
             header=h.read_header()
             tab=t.Table(data)
+            try:
+                tab.rename_column('K','k')
+                tab.rename_column('PK','Pk')
+                tab.rename_column('PK_RAW','Pk_raw')
+                tab.rename_column('PK_NOISE','Pk_noise')
+                tab.rename_column('PK_DIFF','Pk_diff')
+                tab.rename_column('COR_RESO','cor_reso')
+            except:
+                pass
             tab['z']=float(header['meanz'])
             tab['snr']=float(header['meansnr'])
             dataarr.append(tab)
     #this part could be done per file for larger datasets and then recombined after
     dataarr=t.vstack(dataarr)
+    #the following needs to be case insensitive
     dataarr['Delta2']=dataarr['k']*dataarr['Pk']/np.pi
     cols=dataarr.colnames
     N,zedges,kedges,numbers=binned_statistic_2d(dataarr['z'],dataarr['k'],dataarr['k'],statistic='count',bins=[zbinedges,kbinedges])
