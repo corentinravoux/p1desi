@@ -78,13 +78,13 @@ def main(input_file):
         compute_mean(pk,mean_config,main_config)
 
     path_plot = os.path.join(main_path,plot_config.getstr("path_plot"))
-    os.makedirs(path_plot,exist_ok=True)
     if(main_config.getboolean("plot_power")):
+        os.makedirs(path_plot,exist_ok=True)
         plot(pk,pk_sb,path_plot,plot_config,main_config)
 
     path_plot_noise = os.path.join(main_path,plot_noise_config.getstr("path_plot_noise"))
-    os.makedirs(path_plot_noise,exist_ok=True)
     if(main_config.getboolean("plot_noise")):
+        os.makedirs(path_plot_noise,exist_ok=True)
         plot_noise(pk,path_plot_noise,plot_noise_config,main_config)
 
 def compute_mean(pk,mean_config,main_config):
@@ -152,8 +152,8 @@ def plot_noise(pk,path_plot_noise,plot_noise_config,main_config):
                                 zbins_plot,
                                 outname,
                                 plot_noise_config.getstr("k_units_noise_study"),
-                                plot_noise_config.getboolean("plot_noise_ratio"),
                                 plot_noise_config.getboolean("use_diff_noise"),
+                                plot_noise_config.getboolean("plot_noise_ratio"),
                                 plot_noise_config.getboolean("plot_noise_comparison_mean_k"),
                                 plot_noise_config.getboolean("plot_side_band"),
                                 side_band_comp=plot_noise_config.getstr("side_band_comp"),

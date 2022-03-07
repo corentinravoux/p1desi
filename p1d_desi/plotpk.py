@@ -244,7 +244,7 @@ def prepare_plot_values(data,
         if(substract_sb is not None):
             dat_sb=substract_sb[iz]
             p_sb = dat_sb[meanvar][select]
-        k_to_plot=dat['meank'][select]
+        k_to_plot=np.array(dat['meank'][select])
         p_to_plot=dat[meanvar][select]
         if(substract_sb is not None):
             p_to_plot = p_to_plot - p_sb
@@ -478,7 +478,7 @@ def plot_data(data,
     ax2.set_ylim(-diff_range/2,diff_range/2)
     handles, labels = ax.get_legend_handles_labels()
 
-    legend1 = ax.legend(handles, labels, loc=2, bbox_to_anchor=(1.03, 0.15), borderaxespad=0.,fontsize = fontlegend)
+    legend1 = ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.03, -0.5, 0.4, 1.0), borderaxespad=0.,fontsize = fontlegend)
 
     ax.errorbar([0],[0], yerr =[0], fmt = marker_style,color='k', markersize = marker_size, label ='{}'.format(res_label))
     if (comparison_plot_style == "fill"):
@@ -496,8 +496,7 @@ def plot_data(data,
         par3.set_xlim(*ax2.get_xlim())
 
     ax.add_artist(legend1)
-    # fig.subplots_adjust(top=0.95,bottom=0.114,left=0.078,right=0.758,hspace=0.2,wspace=0.2)
-    fig.tight_layout()
+    fig.subplots_adjust(top=0.75,bottom=0.1,left=0.1,right=0.65,hspace=0.2,wspace=0.2)
     fig.savefig(outname+f"{'' if not plot_P else '_powernotDelta'}_kmax_{kmax}.pdf")
 
 
