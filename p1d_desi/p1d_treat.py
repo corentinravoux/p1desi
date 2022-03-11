@@ -151,7 +151,8 @@ def compute_single_means(f,
                 tab.rename_column('COR_RESO','cor_reso')
             except:
                 pass
-
+            if np.nansum(tab['Pk'])==0:
+                tab['Pk']=(tab['Pk_raw']-tab['Pk_noise'])/tab['cor_reso']
             tab['z']=float(header['MEANZ'])
             tab['snr']=float(header['MEANSNR'])
             if float(header['meansnr'])<args['SNR_min']:
@@ -259,6 +260,8 @@ def compute_Pk_means(data_dir,
                 tab.rename_column('COR_RESO','cor_reso')
             except:
                 pass
+            if np.nansum(tab['Pk'])==0:
+                tab['Pk']=(tab['Pk_raw']-tab['Pk_noise'])/tab['cor_reso']
             tab['z']=float(header['meanz'])
             tab['snr']=float(header['meansnr'])
             dataarr.append(tab)
