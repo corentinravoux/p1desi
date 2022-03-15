@@ -21,7 +21,7 @@ AUTHOR = 'Corentin Ravoux'
 REQUIRES_PYTHON = '>=3.6.0'
 VERSION = '1.0'
 
-scripts = glob.glob('scripts/*')
+scripts = glob.glob('scripts/*') + glob.glob('bash/*')
 packages = ['p1desi']
 
 # What packages are required for this module to be executed?
