@@ -67,12 +67,10 @@ def main(input_file):
     main_path = os.path.abspath(main_config["path"])
     os.makedirs(main_path,exist_ok=True)
 
-    (pk,pk_sb) = bookkeeping.desi_data_keeping(main_config)
+    (pk,pk_sb,outname) = bookkeeping.return_pk_path_interface(main_config)
     mean_config = config["compute mean"]
     plot_config = config["plot power"]
     plot_noise_config = config["plot noise"]
-
-
 
     if(main_config.getboolean("compute_mean")):
         compute_mean(pk,mean_config,main_config)
@@ -80,12 +78,16 @@ def main(input_file):
     path_plot = os.path.join(main_path,plot_config.getstr("path_plot"))
     if(main_config.getboolean("plot_power")):
         os.makedirs(path_plot,exist_ok=True)
-        plot(pk,pk_sb,path_plot,plot_config,main_config)
+        plot(pk,pk_sb,path_plot,plot_config,main_config,outname)
 
     path_plot_noise = os.path.join(main_path,plot_noise_config.getstr("path_plot_noise"))
     if(main_config.getboolean("plot_noise")):
         os.makedirs(path_plot_noise,exist_ok=True)
-        plot_noise(pk,path_plot_noise,plot_noise_config,main_config)
+        plot_noise(pk,path_plot_noise,plot_noise_config,main_config,outname)
+
+
+
+
 
 def compute_mean(pk,mean_config,main_config):
     print("Treating path: ",pk)
@@ -101,8 +103,8 @@ def compute_mean(pk,mean_config,main_config):
                                       logsample=mean_config.getboolean("logsample"))
 
 
-def plot(pk,pk_sb,path_plot,plot_config,main_config):
-    print("Plotting path: ",pk)
+def plot(pk,pk_sb,path_plot,plot_config,main_config,outname):
+    print("Plotting pk1d for path: ",pk)
     mean_pk = os.path.join(pk,f"mean_Pk1d_par{'_vel' if main_config.getboolean('velunits') else ''}.fits.gz")
     velunits = main_config.getboolean("velunits")
     comparison_str = plot_config.getstr("comparison_str")
@@ -112,7 +114,7 @@ def plot(pk,pk_sb,path_plot,plot_config,main_config):
     comparison_model_file=list(plot_config.gettuplestr("comparison_model_file"))
     if(len(comparison_model_file) == 1):
         comparison_model_file = comparison_model_file[0]
-    outname = os.path.join(path_plot,f"p1d_model{comparison_str}_unit{'kms' if velunits else 'A'}")
+    outname = os.path.join(path_plot,f"{outname}_model{comparison_str}_unit{'kms' if velunits else 'A'}")
 
     if(plot_config.getboolean("plot_pk")):
         data = plotpk.read_pk_means(mean_pk)
@@ -134,12 +136,12 @@ def plot(pk,pk_sb,path_plot,plot_config,main_config):
                          **plot_args)
 
 
-def plot_noise(pk,path_plot_noise,plot_noise_config,main_config):
+def plot_noise(pk,path_plot_noise,plot_noise_config,main_config,outname):
     # CR - move side_band in a metals study plotting
-    print("Plotting path: ",pk)
+    print("Plotting noise study for path: ",pk)
     mean_pk = os.path.join(pk,f"mean_Pk1d_par{'_vel' if main_config.getboolean('velunits') else ''}.fits.gz")
     velunits = main_config.getboolean("velunits")
-    outname = os.path.join(path_plot_noise,f"p1d_unit{'kms' if velunits else 'A'}")
+    outname = os.path.join(path_plot_noise,f"{outname}_unit{'kms' if velunits else 'A'}")
     zbins_plot = np.array(plot_noise_config.gettuplefloat("zbins_plot"))
 
     plot_args_noise = plot_noise_config.getdict("plot_args_noise")

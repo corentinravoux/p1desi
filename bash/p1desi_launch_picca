@@ -13,12 +13,10 @@ catalog_name=${10}
 noise_estimate=${11}
 mode=${12}
 use_constant_weight=${13}
-coadd_picca=${14}
-compute_diff_flux=${15}
-dla=${16}
-dla_name=${17}
-bal=${18}
-nb_proc=${19}
+dla=${14}
+dla_name=${15}
+bal=${16}
+nb_proc=${17}
 
 
 echo "input path for computation:"
@@ -47,20 +45,14 @@ echo "mode:"
 echo $mode
 echo "constant weight option:"
 echo $use_constant_weight
-echo "picca coadding option:"
-echo $coadd_picca
-echo "diff computation option:"
-echo $compute_diff_flux
 echo "dla catalog:"
 echo $dla
 echo "dla catalog name:"
 echo $dla_name
 echo "bal parameter cut:"
 echo $bal
-echo "Number of processors:"
+echo "number of processors:"
 echo $nb_proc
-
-
 
 if [[ ${region} == "lya" ]]
 then
@@ -76,14 +68,6 @@ lrestmin=1410.0
 lrestmax=1520.0
 fi
 
-if [[ ${suffix} == "None" ]]
-then
-suffix_flag=""
-else
-suffix_flag=${suffix}
-fi
-
-
 if [[ ${use_constant_weight} == "True" ]]
 then
 use_constant_weight_flag="--use-constant-weight"
@@ -91,22 +75,13 @@ else
 use_constant_weight_flag=""
 fi
 
-
-if [[ ${coadd_picca} == "True" ]]
+if [[ ${noise_estimate} == "diff" ]]
 then
 coadd_picca_flag="--coadd-by-picca"
+compute_diff_flux_flag="--compute-diff-flux"
 else
 coadd_picca_flag=""
-fi
-
-
-if [[ ${compute_diff_flux} == "True" ]]
-then
-compute_diff_flux_flag="--compute-diff-flux"
-diff_suffix="_diff"
-else
 compute_diff_flux_flag=""
-diff_suffix=""
 fi
 
 if [[ ${dla_name} == "None" ]]
@@ -123,15 +98,20 @@ else
 bal_flag="--bi-max "${bal}
 fi
 
-
-folder_name=${region}_SNRcut${snr_cut}_lines${lines_name}_cat${catalog_name}_dla${dla_name}_bal${bal}${diff_suffix}${suffix_flag}
+folder_name=$(p1desi_bookkeeping.py --region ${region} \
+                                    --snr-cut ${snr_cut} \
+                                    --lines-name ${lines_name} \
+                                    --catalog-name ${catalog_name} \
+                                    --dla-name ${dla_name} \
+                                    --bal ${bal} \
+                                    --suffix ${suffix} \
+                                    --noise-estimate ${noise_estimate} 2>&1 > /dev/null)
 
 path_out=${path_out}/p1d_${folder_name}
 
-
 mkdir -p ${path_out}/deltas
+mkdir -p ${path_out}/pk1d
 mkdir -p ${path_log}
-
 
 picca_deltas.py \
 --in-dir "$path_in" \
@@ -155,15 +135,13 @@ ${bal_flag} \
 --mc-rebin-fac 4 \
 --min-SNR ${snr_cut} \
 --mask-file ${lines} \
---log ${path_log}/log_deltas_${folder_name} \
---iter ${path_log}/iter_deltas_${folder_name} > ${path_log}/log_deltas_out_${folder_name} 2> ${path_log}/log_deltas_err_${folder_name}
-
-mkdir -p ${path_out}/pk1d_${noise_estimate}_noise_estimate
+--log ${path_log}/delta_log_${folder_name} \
+--iter ${path_log}/delta_iter_${folder_name} > ${path_log}/delta_output_${folder_name} 2> ${path_log}/delta_error_${folder_name}
 
 picca_Pk1D.py \
 --in-dir ${path_out}/deltas \
 --in-format fits \
---out-dir ${path_out}/pk1d_${noise_estimate}_noise_estimate \
+--out-dir ${path_out}/pk1d \
 --lambda-obs-min 3750. \
 --noise-estimate ${noise_estimate} \
 --pixel-correction inverse \
@@ -172,4 +150,4 @@ picca_Pk1D.py \
 --nb-pixel-masked-max 120 \
 --nb-part 3 \
 --SNR-min ${snr_cut} \
---nb-noise-exp 2500 > ${path_log}/log_p1d_out_${folder_name} 2> ${path_log}/log_p1d_err_${folder_name}
+--nb-noise-exp 2500 > ${path_log}/p1d_output_${folder_name} 2> ${path_log}/p1d_error_${folder_name}
