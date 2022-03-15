@@ -1,2 +1,2 @@
-# p1d_desi
+# p1desi
 P1D utilities for DESI SV
