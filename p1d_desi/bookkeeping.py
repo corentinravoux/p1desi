@@ -1,6 +1,13 @@
 import os
 
 
+
+
+def path_pk(region,snr_cut,lines_name,catalog_name,dla_name,bal,suffix_flag):
+    folder_name=f"{region}_SNRcut{snr_cut}_lines{lines_name}_cat{catalog_name}_dla{dla_name}_bal{bal}{suffix_flag}"
+    return(folder_name)
+
+
 def desi_data_keeping(main_config):
     pk_path = main_config.getstr("pk_path")
     use_bookkeeping = main_config.getboolean("use_bookkeeping")
@@ -13,10 +20,13 @@ def desi_data_keeping(main_config):
         bal = main_config.getstr("bal")
         suffix_flag = main_config.getstr("suffix_flag")
         noise_estimate = main_config.getstr("noise_estimate")
-        region_sb = main_config.getstr("region_sb")
+
 
         folder_name=f"{region}_SNRcut{snr_cut}_lines{lines_name}_cat{catalog_name}_dla{dla_name}_bal{bal}{suffix_flag}"
         pk = os.path.join(pk_path,f"p1d_{folder_name}",f"pk1d_{noise_estimate}_noise_estimate")
+
+
+        region_sb = main_config.getstr("region_sb")
 
         if(region_sb is None):
             pk_sb = None
