@@ -60,7 +60,7 @@ def compute_Pk_means_parallel(data_dir,
         from multiprocessing import Pool
     files = glob.glob(os.path.join(data_dir,f"Pk1D{searchstr}.fits.gz"))
     #generate arrays
-    zbinedges=zbins-0.1
+    zbinedges=zbins-args['z_binsize']/2
     zbinedges=np.concatenate([zbinedges,zbinedges[[-1]]+args['z_binsize']])
     (k_inf,k_sup,k_dist) = define_wavevector_limits(args,velunits)
     if not logsample:
@@ -134,7 +134,19 @@ def compute_single_means(f,
             data=h.read()
             header=h.read_header()
             tab=t.Table(data)
+            try:
+                tab.rename_column('K','k')
+                tab.rename_column('PK','Pk')
+                tab.rename_column('PK_RAW','Pk_raw')
+                tab.rename_column('PK_NOISE','Pk_noise')
+                tab.rename_column('PK_DIFF','Pk_diff')
+                tab.rename_column('COR_RESO','cor_reso')
+            except:
+                pass
+            if np.nansum(tab['Pk'])==0:
+                tab['Pk']=(tab['Pk_raw']-tab['Pk_noise'])/tab['cor_reso']
             tab['z']=float(header['MEANZ'])
+            tab['snr']=float(header['MEANSNR'])
             if (tab['Pk_noise'][tab['k']<kbinedges[-1]]>tab['Pk_raw'][tab['k']<kbinedges[-1]]*10000000).any():
                 print(f"file {f} hdu {i+1} has very high noise power, ignoring, max value: {(tab['Pk_noise'][tab['k']<kbinedges[-1]]/tab['Pk_raw'][tab['k']<kbinedges[-1]]).max()}*Praw")
                 continue
@@ -219,10 +231,23 @@ def compute_Pk_means(data_dir,
             data=h.read()
             header=h.read_header()
             tab=t.Table(data)
-            tab['z']=float(header['meanz'])
+            try:
+                tab.rename_column('K','k')
+                tab.rename_column('PK','Pk')
+                tab.rename_column('PK_RAW','Pk_raw')
+                tab.rename_column('PK_NOISE','Pk_noise')
+                tab.rename_column('PK_DIFF','Pk_diff')
+                tab.rename_column('COR_RESO','cor_reso')
+            except:
+                pass
+            if np.nansum(tab['Pk'])==0:
+                tab['Pk']=(tab['Pk_raw']-tab['Pk_noise'])/tab['cor_reso']
+            tab['z']=float(header['MEANZ'])
+            tab['snr']=float(header['MEANSNR'])
             dataarr.append(tab)
     #this part could be done per file for larger datasets and then recombined after
     dataarr=t.vstack(dataarr)
+    #the following needs to be case insensitive
     dataarr['Delta2']=dataarr['k']*dataarr['Pk']/np.pi
     dataarr['Delta2_nonoise']=dataarr['k']*(dataarr['Pk_raw']/dataarr['cor_reso'])/np.pi
     dataarr['Pk_norescor']=dataarr['Pk_raw']-dataarr['Pk_noise']
