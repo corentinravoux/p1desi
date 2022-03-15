@@ -13,16 +13,16 @@ from shutil import rmtree
 from setuptools import setup, Command
 
 # Package meta-data.
-NAME = 'p1d_desi'
+NAME = 'p1desi'
 DESCRIPTION = 'P1D utilities for DESI SV measurement'
-URL = 'https://github.com/corentinravoux/p1d_desi'
+URL = 'https://github.com/corentinravoux/p1desi'
 EMAIL = 'corentin.ravoux01@hotmail.fr'
 AUTHOR = 'Corentin Ravoux'
 REQUIRES_PYTHON = '>=3.6.0'
 VERSION = '1.0'
 
 scripts = glob.glob('scripts/*')
-packages = ['p1d_desi']
+packages = ['p1desi']
 
 # What packages are required for this module to be executed?
 REQUIRED = [

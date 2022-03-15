@@ -2,7 +2,7 @@ import os
 import configparser
 import ast
 import numpy as np
-from p1d_desi import treatpk,plotpk,bookkeeping
+from p1desi import treatpk,plotpk,bookkeeping
 
 
 def parse_int_tuple(input):

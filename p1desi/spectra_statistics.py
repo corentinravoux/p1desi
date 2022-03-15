@@ -8,7 +8,7 @@ from desitarget.sv3.sv3_targetmask import desi_mask as sv3_desi_mask
 from desitarget.targetmask import desi_mask
 from desispec.io import read_spectra
 from desispec.coaddition import coadd_cameras
-from p1d_desi import utils
+from p1desi import utils
 
 
 

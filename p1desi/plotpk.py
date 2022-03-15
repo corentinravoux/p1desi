@@ -19,7 +19,7 @@ from matplotlib.lines import Line2D
 import struct
 import astropy.table as t
 
-from p1d_desi import utils
+from p1desi import utils
 
 
 def read_pk_means(pk_means_name):

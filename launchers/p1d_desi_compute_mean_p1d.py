@@ -7,7 +7,7 @@ Created on Thu Apr 30 09:50:01 2020
 """
 
 import numpy as np
-from p1d_desi import treatpk
+from p1desi import treatpk
 import sys
 
 path_to_pk = str(sys.argv[1])
