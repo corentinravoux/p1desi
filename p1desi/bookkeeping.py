@@ -43,3 +43,7 @@ def return_pk_path_interface(main_config):
         folder_name = main_config.getstr("outname")
 
     return(pk,pk_sb,outname)
+
+
+def return_mean_pk_name(velunits,logsample):
+    return(f'mean_Pk1d{"_log" if logsample else ""}{"_vel" if velunits else ""}.fits.gz')

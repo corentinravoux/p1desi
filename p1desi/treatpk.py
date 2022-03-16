@@ -16,6 +16,7 @@ import os
 import numpy as np
 import fitsio
 import astropy.table as t
+from p1desi import bookkeeping
 from scipy.stats import binned_statistic_2d
 from scipy.stats import binned_statistic
 
@@ -51,7 +52,7 @@ def compute_Pk_means_parallel(data_dir,
     Returns:
         [type]: [description]
     """
-    outfilename=os.path.join(data_dir,f'mean_Pk1d_par{"_log" if logsample else ""}{"_vel" if velunits else ""}.fits.gz')
+    outfilename=os.path.join(data_dir,bookkeeping.return_mean_pk_name(velunits,logsample))
     if os.path.exists(outfilename) and not overwrite:
         print(f"found existing power, loading from file {outfilename}")
         outdir=t.Table.read(outfilename)
