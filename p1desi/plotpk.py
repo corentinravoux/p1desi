@@ -544,184 +544,6 @@ def plot_diff_figure(outname,
 
 
 
-#
-# def plot_differences(name_ref,
-#                      name_comparison,
-#                      zbins,
-#                      outname,
-#                      plot_P=False,
-#                      comparison=None,
-#                      comparison_model=None,
-#                      comparison_model_file=None,
-#                      plot_diff=False,
-#                      substract_sb=None,
-#                      **kwargs):
-#
-#
-#     data_ref = read_pk_means(name_ref)
-#
-#     if comparison is not None:
-#         k_to_plot_comparison = comparison['meank'][iz,:]
-#         p_to_plot_comparison = comparison[meanvar][iz,:]
-#         if(substract_sb is not None):
-#             p_to_plot_comparison = p_to_plot_comparison - p_sb
-#         err_to_plot_comparison = comparison[errvar][iz,:]
-#
-#
-#     # velunits = data.meta["VELUNITS"]
-#     #
-#     # res_label = utils.return_key(kwargs,"res_label","")
-#     # res_label2 = utils.return_key(kwargs,"res_label2","")
-#     # diff_range = utils.return_key(kwargs,"diff_range",0.4)
-#     # no_errors_diff = utils.return_key(kwargs,"no_errors_diff",False)
-#     # marker_size = utils.return_key(kwargs,"marker_size",6)
-#     # marker_style = utils.return_key(kwargs,"marker_style","o")
-#     # fonttext = utils.return_key(kwargs,"fonttext",None)
-#     # fontlab = utils.return_key(kwargs,"fontlab",None)
-#     # fontlegend = utils.return_key(kwargs,"fontl",None)
-#     # z_binsize = utils.return_key(kwargs,"mark_size",0.2)
-#     # colors = utils.return_key(kwargs,"colors",sns.color_palette('deep',len(zbins)))
-#     # kmin = utils.return_key(kwargs,"kmin",4e-2)
-#     # kmax = utils.return_key(kwargs,"kmax",2.5)
-#     # grid = utils.return_key(kwargs,"grid",True)
-#
-#
-#
-#     comparison_plot_style = utils.return_key(kwargs,"comparison_plot_style",None)
-#
-#
-#     fig,(ax,ax2) = plt.subplots(2,figsize = (8, 8),gridspec_kw=dict(height_ratios=[3,1]),sharex=True)
-#     if not velunits:
-#         par1,par2,par3 = adjust_fig(fig,ax,ax2,fonttext)
-#
-#
-#     dict_plot = prepare_plot_values(data,
-#                                     zbins,
-#                                     comparison=comparison_data,
-#                                     comparison_model=comparison_model,
-#                                     comparison_model_file=comparison_model_file,
-#                                     plot_P=plot_P,
-#                                     z_binsize=z_binsize,
-#                                     velunits=velunits,
-#                                     substract_sb=substract_sb)
-#
-#
-#     for iz,z in enumerate(zbins):
-#         ax.errorbar(dict_plot[z]["k_to_plot"],
-#                     dict_plot[z]["p_to_plot"],
-#                     yerr =dict_plot[z]["err_to_plot"],
-#                     fmt = marker_style,
-#                     color = colors[iz],
-#                     markersize = marker_size,
-#                     label =r' z = {:1.1f}, {} chunks'.format(z,dict_plot[z]["number_chunks"]))
-#
-#         if(dict_plot[z]["k_to_plot_comparison"] is not None):
-#             if((comparison_plot_style == "fill")&(dict_plot[z]["err_to_plot_comparison"] is not None)):
-#                 ax.fill_between(dict_plot[z]["k_to_plot_comparison"],
-#                                 dict_plot[z]["p_to_plot_comparison"]-dict_plot[z]["err_to_plot_comparison"],
-#                                 dict_plot[z]["p_to_plot_comparison"]+dict_plot[z]["err_to_plot_comparison"],
-#                                 alpha=0.5,
-#                                 color = colors[iz])
-#             else:
-#                 if(dict_plot[z]["err_to_plot_comparison"] is not None):
-#                     ax.errorbar(dict_plot[z]["k_to_plot_comparison"],
-#                                 dict_plot[z]["p_to_plot_comparison"],
-#                                 dict_plot[z]["err_to_plot_comparison"],
-#                                 color = colors[iz],ls=':')
-#                 else:
-#                     ax.plot(dict_plot[z]["k_to_plot_comparison"],
-#                             dict_plot[z]["p_to_plot_comparison"],
-#                             color = colors[iz],ls=':')
-#             if(no_errors_diff):
-#                 ax2.plot(dict_plot[z]["diff_k_to_plot"],
-#                          dict_plot[z]["diff_p_to_plot"],
-#                          color=colors[iz],label='',marker='.',ls='',zorder=-iz)
-#             else:
-#                 ax2.errorbar(dict_plot[z]["diff_k_to_plot"],
-#                              dict_plot[z]["diff_p_to_plot"],
-#                              dict_plot[z]["diff_err_to_plot"],
-#                              color=colors[iz],label='',ls='',marker='.',zorder=-iz)
-#
-#
-#     if((dict_plot["minrescor"]!=np.inf)|(dict_plot["minrescor"]!=0.0)):
-#         ax.fill_betweenx([-1000,1000],
-#                          [dict_plot["minrescor"],dict_plot["minrescor"]],
-#                          [dict_plot["maxrescor"],dict_plot["maxrescor"]],
-#                          color='0.7',zorder=-30)
-#         ax2.fill_betweenx([-1000,1000],
-#                           [dict_plot["minrescor"],dict_plot["minrescor"]],
-#                           [dict_plot["maxrescor"],dict_plot["maxrescor"]],
-#                           color='0.7',zorder=-30,label='')
-#
-#     if velunits:
-#         ax2.set_xlabel(r' k [s/km]', fontsize = fonttext)
-#     else:
-#         ax2.set_xlabel(r' k [1/$\AA$]', fontsize = fonttext)
-#
-#     if plot_P:
-#         ax.set_ylabel(r'$P_{1d}$ ', fontsize=fonttext, labelpad=-1)
-#         ax2.set_ylabel(r'$(P_{1d,data}-P_{1d,comp})/P_{1d,comp}$')
-#     else:
-#         ax.set_ylabel(r'$\Delta^2_{1d}$ ', fontsize=fonttext, labelpad=-1)
-#         ax2.set_ylabel(r'$(\Delta^2_{1d,data}-\Delta^2_{1d,comp})/\Delta^2_{1d,comp}$')
-#
-#     ax.set_yscale('log')
-#
-#     for a in ax,ax2:
-#         if(grid):
-#             a.grid()
-#         a.xaxis.set_ticks_position('both')
-#         a.xaxis.set_tick_params(direction='in')
-#         a.yaxis.set_ticks_position('both')
-#         a.yaxis.set_tick_params(direction='in')
-#         a.xaxis.set_tick_params(labelsize=fontlab)
-#         a.yaxis.set_tick_params(labelsize=fontlab)
-#         a.set_xlim(kmin,kmax)
-#
-#     if not plot_P:
-#         ax.set_ylim(4e-3,2)
-#     else:
-#         if not velunits:
-#             ax.set_ylim(0.01,0.5)
-#         else:
-#             ax.set_ylim(1,300)
-#     ax2.set_ylim(-diff_range/2,diff_range/2)
-#     handles, labels = ax.get_legend_handles_labels()
-#
-#     legend1 = ax.legend(handles, labels, loc=2, bbox_to_anchor=(1.03, 0.98), borderaxespad=0.,fontsize = fontlegend)
-#
-#     ax.errorbar([0],[0], yerr =[0], fmt = marker_style,color='k', markersize = marker_size, label ='{}'.format(res_label))
-#     if (comparison_plot_style == "fill"):
-#         ax.fill_between([0],[0],[0],label=res_label2,color='k')
-#     else:
-#         ax.plot([0],[0],label=res_label2,color='k',ls=':')
-#
-#     handles, labels = ax.get_legend_handles_labels()
-#     handles,labels=zip(*[(h,l) for (h,l) in zip(handles,labels) if not 'z =' in l])
-#     ax2.legend(handles, labels, loc=3, bbox_to_anchor=(1.03, 0.02), borderaxespad=0.,fontsize = fontlegend)
-#
-#     if not velunits:
-#         par1.set_xlim(*ax2.get_xlim())
-#         par2.set_xlim(*ax2.get_xlim())
-#         par3.set_xlim(*ax2.get_xlim())
-#
-#     ax.add_artist(legend1)
-#     fig.subplots_adjust(top=0.95,bottom=0.114,left=0.078,right=0.758,hspace=0.2,wspace=0.2)
-#     fig.tight_layout()
-#     fig.savefig(outname+f"{'' if not plot_P else '_powernotDelta'}_kmax_{kmax}.pdf")
-#
-#
-#     if plot_diff:
-#         plot_diff_figure(outname,
-#                          zbins,
-#                          dict_plot,
-#                          kmax,
-#                          colors,
-#                          res_label,
-#                          res_label2)
-#
-
-
 ### Noise comparison plots
 
 
@@ -797,7 +619,7 @@ def plot_mean_z_noise_power(dict_noise_diff,zbins,outname,dreshift = 0.02):
     ax[1].legend(handles = [Line2D([], [], color='k', marker='None', linestyle='None',
                                   label='Average for all redshift = ${}$%'.format(np.round(np.mean(dict_noise_diff["diff_over_pipeline"])*100,2)))],frameon=False)
     plt.tight_layout()
-    fig.savefig("{}_mean_ratio_diff_pipeline_power.pdf".format(outname),format="pdf")
+    fig.savefig("{}_mean_ratio_diff_pipeline_power_redshift.pdf".format(outname),format="pdf")
 
 
 
@@ -825,7 +647,7 @@ def plot_several_mean_z_noise_power(list_dict,nameout,legend,colors,dreshift = 0
     ax[1].set_ylabel('$mean_{k}(P_{diff}) [\AA]$')
     ax[2].set_ylabel('$mean_{k}((P_{diff}-P_{pipeline})/P_{pipeline})$')
     plt.tight_layout()
-    fig.savefig("{}_mean_ratio_diff_pipeline_power.pdf".format(nameout),format="pdf")
+    fig.savefig("{}_mean_ratio_diff_pipeline_power_redshift.pdf".format(nameout),format="pdf")
 
 
 
@@ -866,7 +688,7 @@ def plot_noise_comparison_function(zbins,
         ax2[3].set_xlabel('k[$s/km$]')
     if(kmin is not None): ax2[0].set_xlim(kmin,kmax)
     fig2.tight_layout()
-    fig2.savefig(f"{out_name}_ratio_diff_pipeline_power_unit{k_units}.pdf",format="pdf")
+    fig2.savefig(f"{out_name}_ratio_diff_pipeline_power_wavevector_unit{k_units}.pdf",format="pdf")
 
 
 def plot_side_band_study(zbins,
@@ -878,6 +700,7 @@ def plot_side_band_study(zbins,
                          k_units,
                          side_band_legend,
                          side_band_comp = None,
+                         side_band_fitpolynome = False,
                          **kwargs):
 
     kmin = utils.return_key(kwargs,"kmin",None)
@@ -907,17 +730,19 @@ def plot_side_band_study(zbins,
         ax3[3].set_ylabel('$mean_{z}(P_{SB}) [\AA]$')
     elif(k_units == "kms"):
         ax3[3].set_ylabel('$mean_{z}(P_{SB}) [km/s]$')
-    poly = scipy.polyfit(mean_dict["k_array"],mean_dict["meanPk"],6)
-    Poly = np.polynomial.polynomial.Polynomial(np.flip(poly))
-    cont_k_array = np.linspace(np.min(mean_dict["k_array"]),np.max(mean_dict["k_array"]),300)
-    polynome = Poly(cont_k_array)
-    mean_dict["poly"]= polynome
-    mean_dict["k_cont"]=cont_k_array
-    ax3[3].plot(cont_k_array,polynome)
+    if(side_band_fitpolynome):
+        poly = scipy.polyfit(mean_dict["k_array"],mean_dict["meanPk"],6)
+        Poly = np.polynomial.polynomial.Polynomial(np.flip(poly))
+        cont_k_array = np.linspace(np.min(mean_dict["k_array"]),np.max(mean_dict["k_array"]),300)
+        polynome = Poly(cont_k_array)
+        mean_dict["poly"]= polynome
+        mean_dict["k_cont"]=cont_k_array
+        ax3[3].plot(cont_k_array,polynome)
     if(side_band_comp is not None):
         yerr =np.sqrt( side_band_comp["error_meanPk_noise"]**2 + side_band_comp["error_meanPk_raw"]**2)
         ax3[3].errorbar(side_band_comp["k_array"],side_band_comp["meanPk_raw"] - side_band_comp["meanPk_noise"],yerr, fmt = 'o',label=side_band_legend[1])
-        ax3[3].plot(side_band_comp["k_cont"],side_band_comp["poly"])
+        if(side_band_fitpolynome):
+            ax3[3].plot(side_band_comp["k_cont"],side_band_comp["poly"])
         ax3[3].legend()
     if(k_units == "A"):
         ax3[3].set_xlabel('k[1/$\AA$]')
@@ -1075,6 +900,26 @@ def plot_noise_study(data,
                                        mean_dict,
                                        k_units,
                                        **kwargs)
+
+
+
+
+
+def plot_metal_study(data,
+                     zbins,
+                     out_name,
+                     k_units,
+                     use_diff_noise,
+                     plot_side_band,
+                     side_band_comp=None,
+                     side_band_legend=["SB1","SB2"],
+                     **kwargs):
+
+    mean_dict = return_mean_z_dict(zbins,data)
+    if(use_diff_noise):
+        noise_to_plot,labelnoise = 'meanPk_diff','diff'
+    else:
+        noise_to_plot,labelnoise = 'meanPk_noise','pipeline'
 
     if(plot_side_band):
         plot_side_band_study(zbins,
