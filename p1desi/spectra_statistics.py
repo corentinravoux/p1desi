@@ -114,14 +114,12 @@ def get_spectra_desi(spectra_path,
 
 ### Histo functions
 
-def outlier_insensitive_std(x,axis=0):
-    return ((np.nanpercentile(x,84.135,axis=axis)-np.nanpercentile(x,15.865,axis=axis))/2)
-
 
 def hist_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
     w = (y>range_y[0]) & (y<range_y[1])
     if(outlier_insensitive):
         means_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic='median')
+        outlier_insensitive_std = lambda x : (np.nanpercentile(x,84.135,axis=0)-np.nanpercentile(x,15.865,axis=0))/2
         std_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic=outlier_insensitive_std)
         nb_entries_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic='count')
 
@@ -146,6 +144,7 @@ def hist_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
 def var_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
     w = (y>range_y[0]) & (y<range_y[1])
     if(outlier_insensitive):
+        outlier_insensitive_std = lambda x : (np.nanpercentile(x,84.135,axis=0)-np.nanpercentile(x,15.865,axis=0))/2
         std_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic=outlier_insensitive_std)
     else:
         std_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic='std')
@@ -172,7 +171,8 @@ def hist_profile_2d_bins(x, y, bins,statistic="mean",outlier_insensitive=False):
             if(statistic == "mean"):
                 bin_2d_stat.append(np.nanmedian(bin_y))
             elif(statistic == "var"):
-                bin_2d_stat.append(outlier_insensitive_std(bin_y,axis=None)**2)
+                outlier_insensitive_std = lambda x : (np.nanpercentile(x,84.135)-np.nanpercentile(x,15.865))/2
+                bin_2d_stat.append(outlier_insensitive_std(bin_y)**2)
         else:
             if(statistic == "mean"):
                 bin_2d_stat.append(np.nanmean(bin_y))
@@ -430,7 +430,7 @@ def plot_hist_var_outlier_insensitive(name_out,
                                       nb_bins,
                                       **kwargs):
 
-    V_diff_outliers = outlier_insensitive_std(diff)
+    V_diff_outliers = ((np.nanpercentile(diff,84.135,axis=0)-np.nanpercentile(diff,15.865,axis=0))/2)**2
     V_pipeline_outliers = np.nanmedian(var_pipeline,axis=0)
 
     plot_variance(f"{name_out}_raw_var_outlier_insensitive",
