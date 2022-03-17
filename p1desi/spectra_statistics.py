@@ -114,11 +114,14 @@ def get_spectra_desi(spectra_path,
 
 ### Histo functions
 
+def outlier_insensitive_std(x):
+    return ((np.nanpercentile(x,84.135,axis=0)-np.nanpercentile(x,15.865,axis=0))/2)
+
+
 def hist_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
     w = (y>range_y[0]) & (y<range_y[1])
     if(outlier_insensitive):
         means_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic='median')
-        outlier_insensitive_std = lambda x : (np.nanpercentile(x,84.135,axis=0)-np.nanpercentile(x,15.865,axis=0))/2
         std_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic=outlier_insensitive_std)
         nb_entries_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic='count')
 
@@ -143,7 +146,6 @@ def hist_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
 def var_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
     w = (y>range_y[0]) & (y<range_y[1])
     if(outlier_insensitive):
-        outlier_insensitive_std = lambda x : (np.nanpercentile(x,84.135,axis=0)-np.nanpercentile(x,15.865,axis=0))/2
         std_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic=outlier_insensitive_std)
     else:
         std_result = binned_statistic(x[w], y[w], bins=bins, range=range_x, statistic='std')
@@ -170,7 +172,6 @@ def hist_profile_2d_bins(x, y, bins,statistic="mean",outlier_insensitive=False):
             if(statistic == "mean"):
                 bin_2d_stat.append(np.nanmedian(bin_y))
             elif(statistic == "var"):
-                outlier_insensitive_std = lambda x : (np.nanpercentile(x,84.135)-np.nanpercentile(x,15.865))/2
                 bin_2d_stat.append(outlier_insensitive_std(bin_y)**2)
         else:
             if(statistic == "mean"):
@@ -332,7 +333,7 @@ def plot_variance_histogram(name_out,
 
 
 
-    fig.savefig("{}_hist.pdf".format(name_out),format="pdf")
+    fig.savefig(f"{name_out}.pdf",format="pdf")
     plt.close()
 
 
@@ -381,12 +382,135 @@ def plot_variance(name_out,V_diff,V_pipeline,wavelength,overlap_regions=None,poi
         ax[0].fill_between(wavelength,min(np.min(V_diff),np.min(V_pipeline)), max(np.max(V_diff),np.max(V_pipeline)), where= ((wavelength> overlap_regions[0][0])&(wavelength < overlap_regions[0][1]))|((wavelength> overlap_regions[1][0])&(wavelength < overlap_regions[1][1])),color='green', alpha=0.25)
         ax[1].fill_between(wavelength,np.min(ratio), np.max(ratio), where= ((wavelength> overlap_regions[0][0])&(wavelength < overlap_regions[0][1]))|((wavelength> overlap_regions[1][0])&(wavelength < overlap_regions[1][1])),color='green', alpha=0.25)
 
-    fig.savefig("{}.pdf".format(name_out),format="pdf")
+    fig.savefig(f"{name_out}.pdf",format="pdf")
     plt.close()
 
 
 
 ### Flux Variance vs Noise functions
+
+def plot_hist(name_out,
+              var_pipeline,
+              diff,
+              wavelength,
+              nb_bins,
+              **kwargs):
+
+    V_diff = np.nanvar(diff,axis=0)
+    V_pipeline = np.nanmean(var_pipeline,axis=0)
+
+    plot_variance(f"{name_out}_raw",
+                  V_diff,
+                  V_pipeline,
+                  wavelength,
+                  **kwargs)
+
+    plot_variance_histogram(f"{name_out}_histogram",
+                            V_diff,
+                            V_pipeline,
+                            wavelength,
+                            nb_bins=nb_bins,
+                            outlier_insensitive=False,
+                            **kwargs)
+
+    plot_variance_histogram(f"{name_out}_histogram_bin_outlier_insensitive",
+                            V_diff,
+                            V_pipeline,
+                            wavelength,
+                            nb_bins=nb_bins,
+                            outlier_insensitive=True,
+                            **kwargs)
+
+
+
+def plot_hist_var_outlier_insensitive(name_out,
+                                      var_pipeline,
+                                      diff,
+                                      wavelength,
+                                      nb_bins,
+                                      **kwargs):
+
+    V_diff_outliers = outlier_insensitive_std(diff)
+    V_pipeline_outliers = np.nanmedian(var_pipeline,axis=0)
+
+    plot_variance(f"{name_out}_raw_var_outlier_insensitive",
+                  V_diff_outliers,
+                  V_pipeline_outliers,
+                  wavelength,
+                  **kwargs)
+
+
+    plot_variance_histogram(f"{name_out}_histogram_var_outlier_insensitive",
+                            V_diff_outliers,
+                            V_pipeline_outliers,
+                            wavelength,
+                            nb_bins=nb_bins,
+                            outlier_insensitive=False,
+                            **kwargs)
+
+    plot_variance_histogram(f"{name_out}_histogram_var_outlier_insensitive_bin_outlier_insensitive",
+                            V_diff_outliers,
+                            V_pipeline_outliers,
+                            wavelength,
+                            nb_bins=nb_bins,
+                            outlier_insensitive=True,
+                            **kwargs)
+
+
+
+def plot_2d_hist(name_out,
+                 var_pipeline,
+                 diff,
+                 wavelength,
+                 nb_bins,
+                 **kwargs):
+
+    bin_wave,V_pipeline = hist_profile_2d_bins(wavelength,
+                                               var_pipeline,
+                                               nb_bins,
+                                               statistic="mean",
+                                               outlier_insensitive=False)
+
+    bin_wave,V_diff = hist_profile_2d_bins(wavelength,
+                                           diff,
+                                           nb_bins,
+                                           statistic="var",
+                                           outlier_insensitive=False)
+
+    plot_variance(f"{name_out}_2d_histogram",
+                  V_diff,
+                  V_pipeline,
+                  bin_wave,
+                  points=True,
+                  **kwargs)
+
+
+    bin_wave,V_pipeline = hist_profile_2d_bins(wavelength,
+                                               var_pipeline,
+                                               nb_bins,
+                                               statistic="mean",
+                                               outlier_insensitive=True)
+
+    bin_wave,V_diff = hist_profile_2d_bins(wavelength,
+                                           diff,
+                                           nb_bins,
+                                           statistic="var",
+                                           outlier_insensitive=True)
+
+    plot_variance(f"{name_out}_2d_histogram_outlier_insensitive",
+                  V_diff,
+                  V_pipeline,
+                  bin_wave,
+                  points=True,
+                  **kwargs)
+
+
+
+
+
+
+#### Other plot functions Obsolete
+
 
 
 def plot_noise_fluxvariance_comparison(V_coadd,V_pipeline,wavelength,name_out,nb_bins=40):
@@ -453,9 +577,6 @@ def plot_noise_fluxvariance_ratio(name_out,spectra_array,noise_array,wavelength,
 
 
 
-
-
-#### Other plot functions
 
 def plot_ra_dec_diagram(name_out,ra,dec,cut_objects):
     plt.figure()
