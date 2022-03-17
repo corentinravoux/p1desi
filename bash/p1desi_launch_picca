@@ -17,6 +17,7 @@ dla=${14}
 dla_name=${15}
 bal=${16}
 nb_proc=${17}
+run_delta=${18}
 
 
 echo "input path for computation:"
@@ -53,6 +54,8 @@ echo "bal parameter cut:"
 echo $bal
 echo "number of processors:"
 echo $nb_proc
+echo "running of deltas:"
+echo $run_delta
 
 if [[ ${region} == "lya" ]]
 then
@@ -107,9 +110,11 @@ folder_name=$(p1desi_bookkeeping.py --region ${region} \
                                     --noise-estimate ${noise_estimate} 2>&1 > /dev/null)
 
 path_out=${path_out}/p1d_${folder_name}
-
-mkdir -p ${path_out}/deltas
 mkdir -p ${path_log}
+
+if [[ ${run_delta} == "True" ]]
+then
+mkdir -p ${path_out}/deltas
 
 picca_deltas.py \
 --in-dir "$path_in" \
@@ -135,23 +140,21 @@ ${bal_flag} \
 --mask-file ${lines} \
 --log ${path_log}/delta_log_${folder_name} \
 --iter ${path_log}/delta_iter_${folder_name} > ${path_log}/delta_output_${folder_name} 2> ${path_log}/delta_error_${folder_name}
+fi
 
-for i in "${!snr_cut[@]}"; do
 
-  snr=${snr_cut[i]}
-  mkdir -p ${path_out}/pk1d_SNRcut${snr}
+mkdir -p ${path_out}/pk1d_SNRcut${snr_cut}
 
-  picca_Pk1D.py \
-  --in-dir ${path_out}/deltas \
-  --in-format fits \
-  --out-dir ${path_out}/pk1d_SNRcut${snr} \
-  --lambda-obs-min 3750. \
-  --noise-estimate ${noise_estimate} \
-  --pixel-correction inverse \
-  --nproc ${nb_proc} \
-  --use-desi-new-defaults \
-  --nb-pixel-masked-max 120 \
-  --nb-part 3 \
-  --SNR-min ${snr} \
-  --nb-noise-exp 2500 > ${path_log}/p1d_output_${folder_name}_SNRcut${snr} 2> ${path_log}/p1d_error_${folder_name}_SNRcut${snr}
-done
+picca_Pk1D.py \
+--in-dir ${path_out}/deltas \
+--in-format fits \
+--out-dir ${path_out}/pk1d_SNRcut${snr_cut} \
+--lambda-obs-min 3750. \
+--noise-estimate ${noise_estimate} \
+--pixel-correction inverse \
+--nproc ${nb_proc} \
+--use-desi-new-defaults \
+--nb-pixel-masked-max 120 \
+--nb-part 3 \
+--SNR-min ${snr_cut} \
+--nb-noise-exp 2500 > ${path_log}/p1d_output_${folder_name}_SNRcut${snr_cut} 2> ${path_log}/p1d_error_${folder_name}_SNRcut${snr_cut}
