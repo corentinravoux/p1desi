@@ -114,8 +114,8 @@ def get_spectra_desi(spectra_path,
 
 ### Histo functions
 
-def outlier_insensitive_std(x):
-    return ((np.nanpercentile(x,84.135,axis=0)-np.nanpercentile(x,15.865,axis=0))/2)
+def outlier_insensitive_std(x,axis=0):
+    return ((np.nanpercentile(x,84.135,axis=axis)-np.nanpercentile(x,15.865,axis=axis))/2)
 
 
 def hist_profile(x, y, bins, range_x,range_y,outlier_insensitive=False):
@@ -172,7 +172,7 @@ def hist_profile_2d_bins(x, y, bins,statistic="mean",outlier_insensitive=False):
             if(statistic == "mean"):
                 bin_2d_stat.append(np.nanmedian(bin_y))
             elif(statistic == "var"):
-                bin_2d_stat.append(outlier_insensitive_std(bin_y)**2)
+                bin_2d_stat.append(outlier_insensitive_std(bin_y,axis=None)**2)
         else:
             if(statistic == "mean"):
                 bin_2d_stat.append(np.nanmean(bin_y))
