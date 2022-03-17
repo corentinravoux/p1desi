@@ -99,7 +99,6 @@ bal_flag="--bi-max "${bal}
 fi
 
 folder_name=$(p1desi_bookkeeping.py --region ${region} \
-                                    --snr-cut ${snr_cut} \
                                     --lines-name ${lines_name} \
                                     --catalog-name ${catalog_name} \
                                     --dla-name ${dla_name} \
@@ -110,7 +109,6 @@ folder_name=$(p1desi_bookkeeping.py --region ${region} \
 path_out=${path_out}/p1d_${folder_name}
 
 mkdir -p ${path_out}/deltas
-mkdir -p ${path_out}/pk1d
 mkdir -p ${path_log}
 
 picca_deltas.py \
@@ -133,21 +131,27 @@ ${dla_flag} \
 ${bal_flag} \
 --use-desi-P1d-changes \
 --mc-rebin-fac 4 \
---min-SNR ${snr_cut} \
+--min-SNR 1 \
 --mask-file ${lines} \
 --log ${path_log}/delta_log_${folder_name} \
 --iter ${path_log}/delta_iter_${folder_name} > ${path_log}/delta_output_${folder_name} 2> ${path_log}/delta_error_${folder_name}
 
-picca_Pk1D.py \
---in-dir ${path_out}/deltas \
---in-format fits \
---out-dir ${path_out}/pk1d \
---lambda-obs-min 3750. \
---noise-estimate ${noise_estimate} \
---pixel-correction inverse \
---nproc ${nb_proc} \
---use-desi-new-defaults \
---nb-pixel-masked-max 120 \
---nb-part 3 \
---SNR-min ${snr_cut} \
---nb-noise-exp 2500 > ${path_log}/p1d_output_${folder_name} 2> ${path_log}/p1d_error_${folder_name}
+for i in "${!snr_cut[@]}"; do
+
+  snr=${snr_cut[i]}
+  mkdir -p ${path_out}/pk1d_SNRcut${snr}
+
+  picca_Pk1D.py \
+  --in-dir ${path_out}/deltas \
+  --in-format fits \
+  --out-dir ${path_out}/pk1d_SNRcut${snr} \
+  --lambda-obs-min 3750. \
+  --noise-estimate ${noise_estimate} \
+  --pixel-correction inverse \
+  --nproc ${nb_proc} \
+  --use-desi-new-defaults \
+  --nb-pixel-masked-max 120 \
+  --nb-part 3 \
+  --SNR-min ${snr} \
+  --nb-noise-exp 2500 > ${path_log}/p1d_output_${folder_name}_SNRcut${snr} 2> ${path_log}/p1d_error_${folder_name}_SNRcut${snr}
+done

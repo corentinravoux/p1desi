@@ -4,7 +4,7 @@ path_in="${1}"
 path_out=${2}
 path_log=${3}
 suffix=${4}
-snr_cut=${5}
+snr=${5}
 noise_estimate=${6}
 
 
@@ -17,7 +17,7 @@ echo $path_log
 echo "specific suffix:"
 echo $suffix
 echo "SNR cut:"
-echo $snr_cut
+echo $snr
 echo "noise estimate for p1d:"
 echo $noise_estimate
 
@@ -34,18 +34,18 @@ fi
 
 mkdir -p ${path_log}
 
-mkdir -p ${path_out}/pk1d_${noise_estimate}_noise_estimate${suffix_flag}
+mkdir -p ${path_out}/pk1d_SNRcut${snr}
 
 picca_Pk1D.py \
---in-dir $path_in \
+--in-dir ${path_out}/deltas \
 --in-format fits \
---out-dir ${path_out}/pk1d_${noise_estimate}_noise_estimate${suffix_flag} \
+--out-dir ${path_out}/pk1d_SNRcut${snr} \
 --lambda-obs-min 3750. \
 --noise-estimate ${noise_estimate} \
 --pixel-correction inverse \
---nproc 16 \
+--nproc ${nb_proc} \
 --use-desi-new-defaults \
 --nb-pixel-masked-max 120 \
 --nb-part 3 \
---SNR-min ${snr_cut} \
---nb-noise-exp 2500 > ${path_log}/log_p1d_out_${noise_estimate}_noise_estimate${suffix_flag} 2> ${path_log}/log_p1d_err_${noise_estimate}_noise_estimate${suffix_flag}
+--SNR-min ${snr} \
+--nb-noise-exp 2500 > ${path_log}/p1d_output_SNRcut${snr} 2> ${path_log}/p1d_error_SNRcut${snr}
