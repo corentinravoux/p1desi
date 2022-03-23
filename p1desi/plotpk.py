@@ -27,6 +27,42 @@ def read_pk_means(pk_means_name):
     return(pkmeans)
 
 
+def return_mean_z_dict(zbins,data):
+    mean_dict = {"meanPk_diff" : [],"meanPk_noise" : [],"meanPk_raw" : [], "error_diffovernoise":[], "error_meanPk_diffoverraw":[], "error_meanPk_noiseoverraw":[],"error_meanPk_raw":[],"k_array":[],"error_meanPk_noise" : [],"errorPk" : [],"meanPk" : []}
+    for z,d in zip(zbins,data):
+        mean_dict["meanPk"].append(d['meanPk'])
+        mean_dict["errorPk"].append(d['errorPk'])
+        mean_dict["meanPk_noise"].append(d['meanPk_noise'])
+        mean_dict["meanPk_raw"].append(d['meanPk_raw'])
+        yerr = (d['errorPk_noise'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_noise'] / d['meanPk_noise'])**2)
+        mean_dict["error_meanPk_noiseoverraw"].append(yerr)
+        mean_dict["k_array"] = d['meank']
+        mean_dict["error_meanPk_raw"].append(d['errorPk_raw'])
+        mean_dict["error_meanPk_noise"].append(d['errorPk_noise'])
+
+        mean_dict["meanPk_diff"].append(d['meanPk_diff'])
+        mean_dict["error_diffovernoise"].append(yerr)
+        yerr = (d['errorPk_diff'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_diff'] / d['meanPk_diff'])**2)
+        mean_dict["error_meanPk_diffoverraw"].append(yerr)
+
+    mean_dict["meanPk_noise"] = np.mean(mean_dict["meanPk_noise"],axis=0)
+    mean_dict["error_meanPk_noiseoverraw"] =np.mean(mean_dict["error_meanPk_noiseoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noiseoverraw"]))
+    mean_dict["meanPk_raw"] = np.mean(mean_dict["meanPk_raw"],axis=0)
+    mean_dict["error_meanPk_raw"] = np.mean(mean_dict['error_meanPk_raw'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_raw"]))
+    mean_dict["meanPk"] = np.mean(mean_dict["meanPk"],axis=0)
+    mean_dict["errorPk"] = np.mean(mean_dict['errorPk'],axis=0)/np.sqrt(len(mean_dict["errorPk"]))
+
+
+    mean_dict["error_meanPk_noise"] = np.mean(mean_dict['error_meanPk_noise'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noise"]))
+    mean_dict["meanPk_diff"] = np.mean(mean_dict["meanPk_diff"],axis=0)
+    mean_dict["error_meanPk_diffoverraw"] = np.mean(mean_dict["error_meanPk_diffoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_diffoverraw"]))
+
+    mean_dict["error_diffovernoise"] = np.mean(mean_dict["error_diffovernoise"],axis=0)/np.sqrt(len(mean_dict["error_diffovernoise"]))
+
+    return(mean_dict)
+
+
+
 
 ### P1D plots
 
@@ -658,9 +694,6 @@ def plot_several_mean_z_noise_power(list_dict,nameout,legend,colors,dreshift = 0
 
 
 
-# Noise power ratio
-
-
 def plot_noise_comparison_function(zbins,
                                    data,
                                    out_name,
@@ -696,70 +729,6 @@ def plot_noise_comparison_function(zbins,
     if(kmin is not None): ax2[0].set_xlim(kmin,kmax)
     fig2.tight_layout()
     fig2.savefig(f"{out_name}_ratio_diff_pipeline_power_wavevector_unit{k_units}.pdf",format="pdf")
-
-
-def plot_side_band_study(zbins,
-                         data,
-                         out_name,
-                         mean_dict,
-                         noise_to_plot,
-                         labelnoise,
-                         k_units,
-                         side_band_legend,
-                         side_band_comp = None,
-                         side_band_fitpolynome = False,
-                         **kwargs):
-
-    kmin = utils.return_key(kwargs,"kmin",None)
-    kmax = utils.return_key(kwargs,"kmax",None)
-    fig3,ax3=plt.subplots(4,1,figsize=(8,10),sharex=True)
-
-    for z,d in zip(zbins,data):
-        ax3[0].plot(d['meank'],d['meanPk_raw'],label=f'{z:.1f}')
-        if(k_units == "A"):
-            ax3[0].set_ylabel('$P_{raw} [\AA]$')
-        elif(k_units == "kms"):
-            ax3[0].set_ylabel('$P_{raw} [km/s]$')
-        ax3[0].legend()
-        ax3[1].plot(d['meank'],d[noise_to_plot],label=f'{z:.1f}')
-        if(k_units == "A"):
-            ax3[1].set_ylabel('$P_{' + labelnoise +'} [\AA]$')
-        elif(k_units == "kms"):
-            ax3[1].set_ylabel('$P_{' + labelnoise +'} [km/s]$')
-        ax3[2].plot(d['meank'],d['meanPk_raw'] - d[noise_to_plot],label=f'{z:.1f}')
-        if(k_units == "A"):
-            ax3[2].set_ylabel('$ (P_{raw} - P_{pipeline}) [\AA]$')
-        elif(k_units == "kms"):
-            ax3[2].set_ylabel('$ (P_{raw} - P_{pipeline}) [km/s]$')
-
-    ax3[3].errorbar(mean_dict["k_array"],mean_dict["meanPk"],mean_dict["errorPk"], fmt = 'o',label=side_band_legend[0])
-    if(k_units == "A"):
-        ax3[3].set_ylabel('$mean_{z}(P_{SB}) [\AA]$')
-    elif(k_units == "kms"):
-        ax3[3].set_ylabel('$mean_{z}(P_{SB}) [km/s]$')
-    if(side_band_fitpolynome):
-        poly = scipy.polyfit(mean_dict["k_array"],mean_dict["meanPk"],6)
-        Poly = np.polynomial.polynomial.Polynomial(np.flip(poly))
-        cont_k_array = np.linspace(np.min(mean_dict["k_array"]),np.max(mean_dict["k_array"]),300)
-        polynome = Poly(cont_k_array)
-        mean_dict["poly"]= polynome
-        mean_dict["k_cont"]=cont_k_array
-        ax3[3].plot(cont_k_array,polynome)
-    if(side_band_comp is not None):
-        yerr =np.sqrt( side_band_comp["error_meanPk_noise"]**2 + side_band_comp["error_meanPk_raw"]**2)
-        ax3[3].errorbar(side_band_comp["k_array"],side_band_comp["meanPk_raw"] - side_band_comp["meanPk_noise"],yerr, fmt = 'o',label=side_band_legend[1])
-        if(side_band_fitpolynome):
-            ax3[3].plot(side_band_comp["k_cont"],side_band_comp["poly"])
-        ax3[3].legend()
-    if(k_units == "A"):
-        ax3[3].set_xlabel('k[1/$\AA$]')
-        place_k_speed_unit_axis(fig3,ax3[0])
-    elif(k_units == "kms"):
-        ax3[3].set_xlabel('k[$s/km$]')
-    if(kmin is not None): ax3[0].set_xlim(kmin,kmax)
-    fig3.tight_layout()
-    fig3.savefig(f"{out_name}_side_band_unit{k_units}.pdf",format="pdf")
-
 
 
 def plot_noise_power_ratio(data,
@@ -836,41 +805,6 @@ def plot_noise_power_ratio(data,
     fig.savefig(f"{out_name}_ratio_{labelnoise}_raw_power_unit{k_units}.pdf",format="pdf")
 
 
-def return_mean_z_dict(zbins,data):
-    mean_dict = {"meanPk_diff" : [],"meanPk_noise" : [],"meanPk_raw" : [], "error_diffovernoise":[], "error_meanPk_diffoverraw":[], "error_meanPk_noiseoverraw":[],"error_meanPk_raw":[],"k_array":[],"error_meanPk_noise" : [],"errorPk" : [],"meanPk" : []}
-    for z,d in zip(zbins,data):
-        mean_dict["meanPk"].append(d['meanPk'])
-        mean_dict["errorPk"].append(d['errorPk'])
-        mean_dict["meanPk_noise"].append(d['meanPk_noise'])
-        mean_dict["meanPk_raw"].append(d['meanPk_raw'])
-        yerr = (d['errorPk_noise'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_noise'] / d['meanPk_noise'])**2)
-        mean_dict["error_meanPk_noiseoverraw"].append(yerr)
-        mean_dict["k_array"] = d['meank']
-        mean_dict["error_meanPk_raw"].append(d['errorPk_raw'])
-        mean_dict["error_meanPk_noise"].append(d['errorPk_noise'])
-
-        mean_dict["meanPk_diff"].append(d['meanPk_diff'])
-        mean_dict["error_diffovernoise"].append(yerr)
-        yerr = (d['errorPk_diff'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_diff'] / d['meanPk_diff'])**2)
-        mean_dict["error_meanPk_diffoverraw"].append(yerr)
-
-    mean_dict["meanPk_noise"] = np.mean(mean_dict["meanPk_noise"],axis=0)
-    mean_dict["error_meanPk_noiseoverraw"] =np.mean(mean_dict["error_meanPk_noiseoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noiseoverraw"]))
-    mean_dict["meanPk_raw"] = np.mean(mean_dict["meanPk_raw"],axis=0)
-    mean_dict["error_meanPk_raw"] = np.mean(mean_dict['error_meanPk_raw'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_raw"]))
-    mean_dict["meanPk"] = np.mean(mean_dict["meanPk"],axis=0)
-    mean_dict["errorPk"] = np.mean(mean_dict['errorPk'],axis=0)/np.sqrt(len(mean_dict["errorPk"]))
-
-
-    mean_dict["error_meanPk_noise"] = np.mean(mean_dict['error_meanPk_noise'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noise"]))
-    mean_dict["meanPk_diff"] = np.mean(mean_dict["meanPk_diff"],axis=0)
-    mean_dict["error_meanPk_diffoverraw"] = np.mean(mean_dict["error_meanPk_diffoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_diffoverraw"]))
-
-    mean_dict["error_diffovernoise"] = np.mean(mean_dict["error_diffovernoise"],axis=0)/np.sqrt(len(mean_dict["error_diffovernoise"]))
-
-    return(mean_dict)
-
-
 
 def plot_noise_study(data,
                      zbins,
@@ -916,6 +850,75 @@ def plot_noise_study(data,
                                        mean_dict,
                                        k_units,
                                        **kwargs)
+
+
+
+# Metals power plots
+
+
+
+def plot_side_band_study(zbins,
+                         data,
+                         out_name,
+                         mean_dict,
+                         noise_to_plot,
+                         labelnoise,
+                         k_units,
+                         side_band_legend,
+                         side_band_comp = None,
+                         side_band_fitpolynome = False,
+                         **kwargs):
+
+    kmin = utils.return_key(kwargs,"kmin",None)
+    kmax = utils.return_key(kwargs,"kmax",None)
+    fig3,ax3=plt.subplots(4,1,figsize=(8,10),sharex=True)
+
+    for z,d in zip(zbins,data):
+        ax3[0].plot(d['meank'],d['meanPk_raw'],label=f'{z:.1f}')
+        if(k_units == "A"):
+            ax3[0].set_ylabel('$P_{raw} [\AA]$')
+        elif(k_units == "kms"):
+            ax3[0].set_ylabel('$P_{raw} [km/s]$')
+        ax3[0].legend()
+        ax3[1].plot(d['meank'],d[noise_to_plot],label=f'{z:.1f}')
+        if(k_units == "A"):
+            ax3[1].set_ylabel('$P_{' + labelnoise +'} [\AA]$')
+        elif(k_units == "kms"):
+            ax3[1].set_ylabel('$P_{' + labelnoise +'} [km/s]$')
+        ax3[2].plot(d['meank'],d['meanPk_raw'] - d[noise_to_plot],label=f'{z:.1f}')
+        if(k_units == "A"):
+            ax3[2].set_ylabel('$ (P_{raw} - P_{pipeline}) [\AA]$')
+        elif(k_units == "kms"):
+            ax3[2].set_ylabel('$ (P_{raw} - P_{pipeline}) [km/s]$')
+
+    ax3[3].errorbar(mean_dict["k_array"],mean_dict["meanPk"],mean_dict["errorPk"], fmt = 'o',label=side_band_legend[0])
+    if(k_units == "A"):
+        ax3[3].set_ylabel('$mean_{z}(P_{SB}) [\AA]$')
+    elif(k_units == "kms"):
+        ax3[3].set_ylabel('$mean_{z}(P_{SB}) [km/s]$')
+    if(side_band_fitpolynome):
+        poly = scipy.polyfit(mean_dict["k_array"],mean_dict["meanPk"],6)
+        Poly = np.polynomial.polynomial.Polynomial(np.flip(poly))
+        cont_k_array = np.linspace(np.min(mean_dict["k_array"]),np.max(mean_dict["k_array"]),300)
+        polynome = Poly(cont_k_array)
+        mean_dict["poly"]= polynome
+        mean_dict["k_cont"]=cont_k_array
+        ax3[3].plot(cont_k_array,polynome)
+    if(side_band_comp is not None):
+        yerr =np.sqrt( side_band_comp["error_meanPk_noise"]**2 + side_band_comp["error_meanPk_raw"]**2)
+        ax3[3].errorbar(side_band_comp["k_array"],side_band_comp["meanPk_raw"] - side_band_comp["meanPk_noise"],yerr, fmt = 'o',label=side_band_legend[1])
+        if(side_band_fitpolynome):
+            ax3[3].plot(side_band_comp["k_cont"],side_band_comp["poly"])
+        ax3[3].legend()
+    if(k_units == "A"):
+        ax3[3].set_xlabel('k[1/$\AA$]')
+        place_k_speed_unit_axis(fig3,ax3[0])
+    elif(k_units == "kms"):
+        ax3[3].set_xlabel('k[$s/km$]')
+    if(kmin is not None): ax3[0].set_xlim(kmin,kmax)
+    fig3.tight_layout()
+    fig3.savefig(f"{out_name}_side_band_unit{k_units}.pdf",format="pdf")
+
 
 
 
