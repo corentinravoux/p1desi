@@ -41,7 +41,7 @@ def return_pk_path_interface(main_config):
     else:
         pk = main_config.getstr("abs_pk_path")
         pk_sb = main_config.getstr("abs_pk_path_sb")
-        folder_name = main_config.getstr("outname")
+        outname = main_config.getstr("outname")
 
     return(pk,pk_sb,outname)
 

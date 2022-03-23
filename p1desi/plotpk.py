@@ -284,7 +284,6 @@ def prepare_plot_values(data,
                 p_sb = p_sb - ((1 - beta_correction_sb)/beta_correction_sb) * dat_sb['meanPk_noraw'][select_sb]
         k_to_plot=np.array(dat['meank'][select])
         p_to_plot=dat[meanvar][select]
-        p_noise_to_plot=dat["meanPk_noise"][select]
         if(beta_correction is not None):
             p_to_plot = p_to_plot - ((1 - beta_correction)/beta_correction) * dat['meanPk_noraw'][select]
         if(substract_sb is not None):
