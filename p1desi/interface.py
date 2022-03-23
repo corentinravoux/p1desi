@@ -134,9 +134,11 @@ def plot(mean_pk,mean_pk_sb,path_plot,plot_config,main_config,outname):
     else:
         substract_data = None
 
-    comparison_model_file=list(plot_config.gettuplestr("comparison_model_file"))
-    if(len(comparison_model_file) == 1):
-        comparison_model_file = comparison_model_file[0]
+    comparison_model_file = plot_config.gettuplestr("comparison_model_file")
+    if(comparison_model_file is not None):
+        comparison_model_file=list(plot_config.gettuplestr("comparison_model_file"))
+        if(len(comparison_model_file) == 1):
+            comparison_model_file = comparison_model_file[0]
     outname = os.path.join(path_plot,f"{outname}_model{plot_config.getstr('comparison_str')}")
 
     plotpk.plot_data(plotpk.read_pk_means(mean_pk),
