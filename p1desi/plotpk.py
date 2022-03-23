@@ -200,9 +200,6 @@ def place_k_wavelength_unit_axis(fig,ax,z,fontt=None):
 
 
 
-
-
-
 def make_patch_spines_invisible(ax):
     ax.set_frame_on(True)
     ax.patch.set_visible(False)
@@ -510,7 +507,6 @@ def plot_data(data,
     fig.subplots_adjust(top=0.75,bottom=0.1,left=0.1,right=0.65,hspace=0.2,wspace=0.2)
     fig.savefig(outname+f"{'' if not plot_P else '_powernotDelta'}_kmax_{kmax}.pdf")
 
-
     if plot_diff:
         plot_diff_figure(outname,
                          zbins,
@@ -776,12 +772,16 @@ def plot_noise_power_ratio(data,
                            fit_asymptote= False,
                            **kwargs):
 
+
+
+    save_txt = utils.return_key(kwargs,"save_txt",True)
     kmin = utils.return_key(kwargs,"kmin",None)
     kmax = utils.return_key(kwargs,"kmax",None)
     ncol_legend = utils.return_key(kwargs,"ncol_legend",2)
     fig,ax=plt.subplots(4,1,figsize=(8,10),sharex=True)
+    txt_to_save = []
     for z,d in zip(zbins,data):
-        ax[0].plot(d['meank'],d['meanPk_raw'],label=f'{z:.1f}')
+        ax[0].plot(d['meank'],d['meanPk_raw'],label=f'{z:.1f} ({d["N_chunks"]})')
         if(k_units == "A"):
             ax[0].set_ylabel('$P_{raw} [\AA]$')
         elif(k_units == "kms"):
@@ -794,7 +794,12 @@ def plot_noise_power_ratio(data,
             ax[1].set_ylabel('$P_{' + labelnoise +'} [km/s]$')
         ax[2].plot(d['meank'],d[noise_to_plot]/d['meanPk_raw'],label=f'{z:.1f}')
         ax[2].set_ylabel('$P_{' + labelnoise +'}/P_{raw}$')
+        if(save_txt):
+            z_array = np.full(d['meank'].shape,z)
+            txt_to_save.append(np.stack([z_array,d['meank'],d['meanPk_raw'],d[noise_to_plot]],axis=1))
 
+    txt_to_save = np.concatenate(txt_to_save,axis=0)
+    np.savetxt(f"{out_name}_ratio_{labelnoise}_raw_power_unit{k_units}.txt",txt_to_save,header = f"z k Pk_raw {labelnoise}")
 
     ax[3].errorbar(mean_dict["k_array"],mean_dict[noise_to_plot]/mean_dict["meanPk_raw"], yerr =mean_dict["error_{}overraw".format(noise_to_plot)], fmt = 'o')#,marker_size=6)
     ax[3].set_ylabel('$mean_{z}(P_{' + labelnoise +'}/P_{raw})$')
@@ -825,8 +830,8 @@ def plot_noise_power_ratio(data,
     if(kmin is not None): ax[0].set_xlim(kmin,kmax)
     for i in [0,1,2,3]:
         ax[i].grid()
-    ax[2].set_ylim(0.0,1.1)
-    ax[3].set_ylim(0.0,1.1)
+    ax[2].set_ylim(0.5,1.1)
+    ax[3].set_ylim(0.5,1.1)
     fig.tight_layout()
     fig.savefig(f"{out_name}_ratio_{labelnoise}_raw_power_unit{k_units}.pdf",format="pdf")
 

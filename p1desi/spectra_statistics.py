@@ -362,6 +362,9 @@ def plot_variance(name_out,V_diff,V_pipeline,wavelength,overlap_regions=None,poi
     ax[0].set_ylabel("$Var_i$")
     ax[0].legend(["diff","pipeline"])
 
+
+
+
     ax[1].plot(wavelength,ratio, label="ratio",color="b",linestyle=linestyle,marker=marker)
     ax[1].set_ylabel("$(Var(diff) - Var(pipeline)) / Var(pipeline)$")
     ax[1].axhline(color="k")
@@ -371,11 +374,11 @@ def plot_variance(name_out,V_diff,V_pipeline,wavelength,overlap_regions=None,poi
                        color="gray",
                        alpha=alpha_fill)
 
-
     ax[2].plot(wavelength,diff, label="diff",color="b",linestyle=linestyle,marker=marker)
     ax[2].set_xlabel("Observed wavelength [$\AA$]")
     ax[2].set_ylabel("$Var(diff) - Var(pipeline)$")
     ax[2].axhline(color="k")
+
 
 
     if(overlap_regions is not None):
