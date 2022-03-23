@@ -76,13 +76,17 @@ def main(input_file):
         compute_mean(pk,mean_config,main_config)
 
     velunits = main_config.getboolean("velunits")
-    logsample=main_config.getboolean("logsample")
+    logsample = main_config.getboolean("logsample")
     mean_pk = os.path.join(pk,bookkeeping.return_mean_pk_name(velunits,logsample))
     if(pk_sb is not None):
         mean_pk_sb = os.path.join(pk_sb,bookkeeping.return_mean_pk_name(velunits,logsample))
     else:
         mean_pk_sb = None
-    outname = f"{outname}_unit{'kms' if velunits else 'A'}"
+    suffix_plot = main_config.getstr("suffix_plot")
+    if(suffix_plot is not None):
+        outname = f"{outname}_{suffix_plot}_unit{'kms' if velunits else 'A'}"
+    else:
+        outname = f"{outname}_unit{'kms' if velunits else 'A'}"
 
     if(main_config.getboolean("plot_power")):
         plot_config = config["plot power"]
