@@ -78,13 +78,15 @@ else
 use_constant_weight_flag=""
 fi
 
-if [[ ${noise_estimate} == "diff" ]]
+if [[ ${noise_estimate} == "pipeline" ]]
 then
-coadd_picca_flag="--coadd-by-picca"
-compute_diff_flux_flag="--compute-diff-flux"
-else
 coadd_picca_flag=""
 compute_diff_flux_flag=""
+noise_estimate_p1d="pipeline"
+else
+coadd_picca_flag="--coadd-by-picca"
+compute_diff_flux_flag="--compute-diff-flux "${noise_estimate}
+noise_estimate_p1d="diff"
 fi
 
 if [[ ${dla_name} == "None" ]]
@@ -150,7 +152,7 @@ picca_Pk1D.py \
 --in-format fits \
 --out-dir ${path_out}/pk1d_SNRcut${snr_cut} \
 --lambda-obs-min 3750. \
---noise-estimate ${noise_estimate} \
+--noise-estimate ${noise_estimate_p1d} \
 --pixel-correction inverse \
 --nproc ${nb_proc} \
 --use-desi-new-defaults \
