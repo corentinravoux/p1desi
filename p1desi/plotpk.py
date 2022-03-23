@@ -221,7 +221,9 @@ def prepare_plot_values(data,
                         z_binsize=0.2,
                         velunits=False,
                         substract_sb=None,
-                        substract_sb_comparison=True):
+                        substract_sb_comparison=True,
+                        beta_correction=None,
+                        beta_correction_sb=None):
 
     dict_plot = {}
 
@@ -243,9 +245,15 @@ def prepare_plot_values(data,
         select=dat['N']>0
         if(substract_sb is not None):
             dat_sb=substract_sb[iz]
-            p_sb = dat_sb[meanvar][select]
+            select_sb = dat_sb['N']>0
+            p_sb = dat_sb[meanvar][select_sb]
+            if(beta_correction_sb is not None):
+                p_sb = p_sb - ((1 - beta_correction_sb)/beta_correction_sb) * dat_sb['meanPk_noraw'][select_sb]
         k_to_plot=np.array(dat['meank'][select])
         p_to_plot=dat[meanvar][select]
+        p_noise_to_plot=dat["meanPk_noise"][select]
+        if(beta_correction is not None):
+            p_to_plot = p_to_plot - ((1 - beta_correction)/beta_correction) * dat['meanPk_noraw'][select]
         if(substract_sb is not None):
             p_to_plot = p_to_plot - p_sb
         err_to_plot=dat[errvar][select]
@@ -344,6 +352,8 @@ def plot_data(data,
               comparison_model_file=None,
               plot_diff=False,
               substract_sb=None,
+              beta_correction=None,
+              beta_correction_sb=None,
               **kwargs):
 
     velunits = data.meta["VELUNITS"]
@@ -390,8 +400,9 @@ def plot_data(data,
                                     z_binsize=z_binsize,
                                     velunits=velunits,
                                     substract_sb=substract_sb,
-                                    substract_sb_comparison=substract_sb_comparison)
-
+                                    substract_sb_comparison=substract_sb_comparison,
+                                    beta_correction=beta_correction,
+                                    beta_correction_sb=beta_correction_sb)
 
     for iz,z in enumerate(zbins):
         ax.errorbar(dict_plot[z]["k_to_plot"],

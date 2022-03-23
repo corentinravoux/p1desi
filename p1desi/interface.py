@@ -144,6 +144,8 @@ def plot(mean_pk,mean_pk_sb,path_plot,plot_config,main_config,outname):
                      comparison_model_file=comparison_model_file,
                      plot_diff=plot_config.getboolean("plot_diff_model"),
                      substract_sb=substract_data,
+                     beta_correction=plot_config.getfloat("beta_correction"),
+                     beta_correction_sb=plot_config.getfloat("beta_correction_sb"),
                      **plot_config.getdict("plot_args"))
 
 
