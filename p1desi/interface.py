@@ -23,6 +23,27 @@ def parse_str_tuple(input):
     else:
         return tuple(str(k.strip()) for k in input.strip().split(','))
 
+def parse_int_list(input):
+    if(input == "None"):
+        return([None])
+    else:
+        return list(int(k.strip()) for k in input.strip().split(','))
+
+
+def parse_float_list(input):
+    if(input == "None"):
+        return([None])
+    else:
+        return list(float(k.strip()) for k in input.strip().split(','))
+
+
+def parse_str_list(input):
+    if(input == "None"):
+        return([None])
+    else:
+        return list(str(k.strip()) for k in input.strip().split(','))
+
+
 def parse_dict(input):
     if(input == "None"):
         return(None)
@@ -59,6 +80,9 @@ def main(input_file):
                                                    "tupleint": parse_int_tuple,
                                                    "tuplefloat": parse_float_tuple,
                                                    "tuplestr": parse_str_tuple,
+                                                   "listint": parse_int_list,
+                                                   "listfloat": parse_float_list,
+                                                   "liststr": parse_str_list,
                                                    "dict":parse_dict})
     config.optionxform = lambda option: option
     config.read(input_file)
@@ -68,47 +92,49 @@ def main(input_file):
     main_path = os.path.abspath(path_config["path"])
     os.makedirs(main_path,exist_ok=True)
 
-    (pk,pk_sb,outname) = bookkeeping.return_pk_path_interface(path_config)
-
-    if(main_config.getboolean("compute_mean")):
-        print("Treating path: ",pk)
-        mean_config = config["compute mean"]
-        compute_mean(pk,mean_config,main_config)
-
-    velunits = main_config.getboolean("velunits")
-    logsample = main_config.getboolean("logsample")
-    mean_pk = os.path.join(pk,bookkeeping.return_mean_pk_name(velunits,logsample))
-    if(pk_sb is not None):
-        mean_pk_sb = os.path.join(pk_sb,bookkeeping.return_mean_pk_name(velunits,logsample))
-    else:
-        mean_pk_sb = None
-    suffix_plot = main_config.getstr("suffix_plot")
-    if(suffix_plot is not None):
-        outname = f"{outname}_{suffix_plot}_unit{'kms' if velunits else 'A'}"
-    else:
-        outname = f"{outname}_unit{'kms' if velunits else 'A'}"
-
-    if(main_config.getboolean("plot_power")):
-        plot_config = config["plot power"]
-        path_plot = os.path.join(main_path,plot_config.getstr("path_plot"))
-        os.makedirs(path_plot,exist_ok=True)
-        print("Plotting pk1d for path: ",pk)
-        plot(mean_pk,mean_pk_sb,path_plot,plot_config,main_config,outname)
-
-    if(main_config.getboolean("plot_noise")):
-        plot_noise_config = config["plot noise"]
-        path_plot_noise = os.path.join(main_path,plot_noise_config.getstr("path_plot_noise"))
-        os.makedirs(path_plot_noise,exist_ok=True)
-        print("Plotting noise study for path: ",pk)
-        plot_noise(mean_pk,path_plot_noise,plot_noise_config,main_config,outname)
+    (pks,pk_sbs,outnames) = bookkeeping.return_pk_path_interface(path_config)
 
 
-    if(main_config.getboolean("plot_metals")):
-        plot_metals_config = config["plot metals"]
-        path_plot_metals = os.path.join(main_path,plot_metals_config.getstr("path_plot_metals"))
-        os.makedirs(path_plot_metals,exist_ok=True)
-        print("Plotting metals study for path: ",pk)
-        plot_metals(mean_pk,path_plot_metals,plot_metals_config,main_config,outname)
+    for pk,pk_sb,outname in zip(pks,pk_sbs,outnames):
+        if(main_config.getboolean("compute_mean")):
+            print("Treating path: ",pk)
+            mean_config = config["compute mean"]
+            compute_mean(pk,mean_config,main_config)
+
+        velunits = main_config.getboolean("velunits")
+        logsample = main_config.getboolean("logsample")
+        mean_pk = os.path.join(pk,bookkeeping.return_mean_pk_name(velunits,logsample))
+        if(pk_sb is not None):
+            mean_pk_sb = os.path.join(pk_sb,bookkeeping.return_mean_pk_name(velunits,logsample))
+        else:
+            mean_pk_sb = None
+        suffix_plot = main_config.getstr("suffix_plot")
+        if(suffix_plot is not None):
+            outname = f"{outname}_{suffix_plot}_unit{'kms' if velunits else 'A'}"
+        else:
+            outname = f"{outname}_unit{'kms' if velunits else 'A'}"
+
+        if(main_config.getboolean("plot_power")):
+            plot_config = config["plot power"]
+            path_plot = os.path.join(main_path,plot_config.getstr("path_plot"))
+            os.makedirs(path_plot,exist_ok=True)
+            print("Plotting pk1d for path: ",pk)
+            plot(mean_pk,mean_pk_sb,path_plot,plot_config,main_config,outname)
+
+        if(main_config.getboolean("plot_noise")):
+            plot_noise_config = config["plot noise"]
+            path_plot_noise = os.path.join(main_path,plot_noise_config.getstr("path_plot_noise"))
+            os.makedirs(path_plot_noise,exist_ok=True)
+            print("Plotting noise study for path: ",pk)
+            plot_noise(mean_pk,path_plot_noise,plot_noise_config,main_config,outname)
+
+
+        if(main_config.getboolean("plot_metals")):
+            plot_metals_config = config["plot metals"]
+            path_plot_metals = os.path.join(main_path,plot_metals_config.getstr("path_plot_metals"))
+            os.makedirs(path_plot_metals,exist_ok=True)
+            print("Plotting metals study for path: ",pk)
+            plot_metals(mean_pk,path_plot_metals,plot_metals_config,main_config,outname)
 
 
 

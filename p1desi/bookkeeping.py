@@ -1,4 +1,4 @@
-import os
+import os,itertools
 
 def return_folder_name(region,lines_name,catalog_name,dla_name,bal,noise_estimate,suffix):
     if(suffix == "None")|(suffix == None):
@@ -18,31 +18,32 @@ def return_pk_path_interface(main_config):
     pk_path = main_config.getstr("pk_path")
     use_bookkeeping = main_config.getboolean("use_bookkeeping")
     if(use_bookkeeping):
-        region = main_config.getstr("region")
-        lines_name = main_config.getstr("lines_name")
-        catalog_name = main_config.getstr("catalog_name")
-        dla_name = main_config.getstr("dla_name")
-        bal = main_config.getstr("bal")
-        noise_estimate = main_config.getstr("noise_estimate")
-        suffix = main_config.getstr("suffix")
+        pk = []
+        pk_sb = []
+        outname = []
+        region = main_config.getliststr("region")
+        lines_name = main_config.getliststr("lines_name")
+        catalog_name = main_config.getliststr("catalog_name")
+        dla_name = main_config.getliststr("dla_name")
+        bal = main_config.getlistfloat("bal")
+        noise_estimate = main_config.getliststr("noise_estimate")
+        suffix = main_config.getliststr("suffix")
+        snr_cut = main_config.getlistint("snr_cut")
+        for param in itertools.product(region,lines_name,catalog_name,dla_name,bal,noise_estimate,suffix,snr_cut):
+            folder_name=return_folder_name(*param[:-1])
+            outname.append(f"{folder_name}_SNRcut{param[-1]}")
+            pk.append(return_pk_path(pk_path,folder_name,param[-1]))
 
-        folder_name=return_folder_name(region,lines_name,catalog_name,dla_name,bal,noise_estimate,suffix)
-
-        snr_cut = main_config.getint("snr_cut")
-        outname = f"{folder_name}_SNRcut{snr_cut}"
-        pk = return_pk_path(pk_path,folder_name,snr_cut)
-
-        region_sb = main_config.getstr("region_sb")
-        if(region_sb is None):
-            pk_sb = None
-        else:
-            folder_name_sb=return_folder_name(region_sb,snr_cut,lines_name,catalog_name,dla_name,bal,noise_estimate,suffix)
-            pk_sb = return_pk_path(pk_path,folder_name_sb,snr_cut)
+            region_sb = main_config.getstr("region_sb")
+            if(region_sb is None):
+                pk_sb.append(None)
+            else:
+                folder_name_sb=return_folder_name(region_sb,*param[1:-1])
+                pk_sb.append(return_pk_path(pk_path,folder_name_sb,param[-1]))
     else:
-        pk = main_config.getstr("abs_pk_path")
-        pk_sb = main_config.getstr("abs_pk_path_sb")
-        outname = main_config.getstr("outname")
-
+        pk = main_config.gettuplestr("abs_pk_path")
+        pk_sb = main_config.gettuplestr("abs_pk_path_sb")
+        outname = main_config.gettuplestr("outname")
     return(pk,pk_sb,outname)
 
 
