@@ -20,7 +20,8 @@ def get_spectra_desi(spectra_path,
                      spectro,
                      cut_objects,
                      compute_diff=False,
-                     get_fuji_pb_spectra=False):
+                     get_fuji_pb_spectra=False,
+                     nexp_min=None):
 
     mask_desi_target_names = ["SV1_DESI_TARGET","SV2_DESI_TARGET","SV3_DESI_TARGET","DESI_TARGET"]
     mask_desi_target = [sv1_desi_mask,sv2_desi_mask,sv3_desi_mask,desi_mask]
@@ -41,6 +42,7 @@ def get_spectra_desi(spectra_path,
 
         for i in range(len(spectra_names)):
             spectra = read_spectra(spectra_names[i])
+
             if 'brz' not in spectra.bands:
                 spectra = coadd_cameras(spectra)
             if 'brz' not in spectra.bands:
@@ -56,21 +58,20 @@ def get_spectra_desi(spectra_path,
             elif("FIBERSTATUS" in spectra.fibermap.colnames):
                 name_fiberstatus = "FIBERSTATUS"
             if(get_fuji_pb_spectra):
-                mask_target = mask_target & (spectra.fibermap[name_fiberstatus]==0)
-            else:
                 mask_target = mask_target & ((spectra.fibermap[name_fiberstatus]==0)  |  (spectra.fibermap[name_fiberstatus]==8388608)  |  (spectra.fibermap[name_fiberstatus]==16777216))
-            flux.append(spectra.flux['brz'][mask_target])
-            pixel_mask.append(spectra.mask['brz'][mask_target])
-            ivar=spectra.ivar['brz'][mask_target]
-            mask_ivar = (ivar == np.inf) | (ivar <= 10**-8)
-            ivar[~mask_ivar] = 1/ivar[~mask_ivar]
-            var.append(ivar)
+            else:
+                mask_target = mask_target & (spectra.fibermap[name_fiberstatus]==0)
             target_id_to_append = spectra.fibermap["TARGETID"][mask_target]
-            target_id.append(target_id_to_append)
-            ra.append(spectra.fibermap["TARGET_RA"][mask_target])
-            dec.append(spectra.fibermap["TARGET_DEC"][mask_target])
             if(compute_diff):
                 exp = read_spectra(exp_names[i])
+                num_exp = int(exp.num_spectra()/500)
+                if(num_exp % 2 == 1):
+                    print("Spectra file rejected due to odd number of expoures")
+                    continue
+                if(nexp_min is not None):
+                    if(num_exp<nexp_min):
+                        print("Spectra file rejected due to too few expoures")
+                        continue
                 for band in ["b","r","z"]:
                     for j in range(len(target_id_to_append)):
                         mask_targetid = exp.fibermap["TARGETID"] == target_id_to_append[j]
@@ -78,13 +79,25 @@ def get_spectra_desi(spectra_path,
                         ivar_exp = exp.ivar[band][mask_targetid]
                         for k in range(len(spectra_exp)):
                             spectra_exp[k,:] = (-1)**k * spectra_exp[k,:]
-                        if(len(spectra_exp)%2 == 1):
-                            ivar_exp[-1,:] = np.zeros(ivar_exp[-1,:].shape)
-                            spectra_exp[-1,:] = np.zeros(spectra_exp[-1,:].shape)
+                        # if(len(spectra_exp)%2 == 1):
+                        #     ivar_exp[-1,:] = np.zeros(ivar_exp[-1,:].shape)
+                        #     spectra_exp[-1,:] = np.zeros(spectra_exp[-1,:].shape)
                         exp.flux[band][mask_targetid] = spectra_exp
                         exp.ivar[band][mask_targetid] = ivar_exp
                 exp = coadd_cameras(exp)
                 diff_flux.append(exp.flux['brz'][mask_target])
+
+
+            flux.append(spectra.flux['brz'][mask_target])
+            pixel_mask.append(spectra.mask['brz'][mask_target])
+            ivar=spectra.ivar['brz'][mask_target]
+            mask_ivar = (ivar == np.inf) | (ivar <= 10**-8)
+            ivar[~mask_ivar] = 1/ivar[~mask_ivar]
+            var.append(ivar)
+            target_id.append(target_id_to_append)
+            ra.append(spectra.fibermap["TARGET_RA"][mask_target])
+            dec.append(spectra.fibermap["TARGET_DEC"][mask_target])
+
 
 
     wavelength = spectra.wave['brz']
@@ -107,7 +120,6 @@ def get_spectra_desi(spectra_path,
         diff_flux = None
 
     return wavelength, flux, diff_flux, var, target_id, ra, dec
-
 
 
 
