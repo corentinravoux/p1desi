@@ -950,3 +950,17 @@ def plot_metal_study(data,
                              side_band_legend,
                              side_band_comp=side_band_comp,
                              **kwargs)
+
+
+# Line plots
+
+def plot_lines_study(multiple_data,
+                     zbins,
+                     out_name,
+                     k_units,
+                     **kwargs):
+    for i in range(len(multiple_data)):
+        mean_dict = return_mean_z_dict(zbins,multiple_data[i])
+        mean_dict["k_array"],mean_dict["meanPk"]
+
+    return()
