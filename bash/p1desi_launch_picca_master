@@ -1,0 +1,203 @@
+#!/bin/bash -l
+
+path_in="${1}"
+surveys=${2}
+path_out=${3}
+region=${4}
+suffix=${5}
+snr_cut=${6}
+lines=${7}
+lines_name=${8}
+cat=${9}
+catalog_name=${10}
+noise_estimate=${11}
+mode=${12}
+use_constant_weight=${13}
+dla=${14}
+dla_name=${15}
+bal=${16}
+nb_proc=${17}
+run_delta=${18}
+use_bookkeeping=${19}
+
+
+echo "input path for computation:"
+echo $path_in
+echo "surveys used for computation:"
+echo $surveys
+echo "output path for computation:"
+echo $path_out
+echo "p1d region name:"
+echo $region
+echo "specific suffix:"
+echo $suffix
+echo "SNR cut:"
+echo $snr_cut
+echo "sky line file:"
+echo $lines
+echo "sky line name:"
+echo $lines_name
+echo "QSO catalog file:"
+echo $cat
+echo "QSO catalog name:"
+echo $catalog_name
+echo "noise estimate for p1d:"
+echo $noise_estimate
+echo "mode:"
+echo $mode
+echo "constant weight option:"
+echo $use_constant_weight
+echo "dla catalog:"
+echo $dla
+echo "dla catalog name:"
+echo $dla_name
+echo "bal parameter cut:"
+echo $bal
+echo "number of processors:"
+echo $nb_proc
+echo "running of deltas:"
+echo $run_delta
+echo "Use of bookkeeping:"
+echo $use_bookkeeping
+
+
+if [[ ${region} == "lya" ]]
+then
+lrestmin=1040.0
+lrestmax=1200.0
+elif [[ ${region} == "SB1" ]]
+then
+lrestmin=1270.0
+lrestmax=1380.0
+elif [[ ${region} == "SB2" ]]
+then
+lrestmin=1410.0
+lrestmax=1520.0
+fi
+
+if [[ ${noise_estimate} == "pipeline" ]]
+then
+coadd_picca_flag="False"
+else
+coadd_picca_flag="True"
+fi
+
+number_mask=0
+
+if [[ ${lines_name} == "None" ]]
+then
+lines_flag1=""
+lines_flag2=""
+lines_flag3=""
+else
+lines_flag1="type 0 = LinesMask"
+lines_flag2="[mask arguments 0]"
+lines_flag3="filename = "${lines}
+number_mask=$((number_mask+1))
+fi
+
+if [[ ${dla_name} == "None" ]]
+then
+dla_flag1=""
+dla_flag2=""
+dla_flag3=""
+dla_flag4=""
+else
+dla_flag1="type 1 = DlaMask"
+dla_flag2="[mask arguments 1]"
+dla_flag3="los_id name = TARGETID"
+dla_flag4="filename = "${dla}
+number_mask=$((number_mask+1))
+fi
+
+
+if [[ ${bal} == "None" ]]
+then
+bal_flag=""
+else
+bal_flag="BI max = "${bal}
+fi
+
+if [[ ${use_bookkeeping} == "True" ]]
+then
+folder_name=$(p1desi_bookkeeping.py --region ${region} \
+                                    --lines-name ${lines_name} \
+                                    --catalog-name ${catalog_name} \
+                                    --dla-name ${dla_name} \
+                                    --bal ${bal} \
+                                    --suffix ${suffix} \
+                                    --noise-estimate ${noise_estimate} 2>&1 > /dev/null)
+else
+folder_name=${suffix}
+fi
+
+path_out=${path_out}/p1d_${folder_name}
+mkdir -p ${path_out}
+
+if [[ ${run_delta} == "True" ]]
+then
+
+echo -e '[general]
+overwrite = True
+out dir = '"${path_out}"'
+logging level console = INFO
+logging level file = INFO
+
+[data]
+type = '"${mode}"'
+analysis type = PK 1D
+input directory = '"${path_in}"'
+catalogue = '"${cat}"'
+lambda min = 3500.0
+lambda max = 7600.0
+lambda min rest frame = '"${lrestmin}"'
+lambda max rest frame = '"${lrestmax}"'
+delta lambda = 0.8
+delta lambda rest frame = 2.6666666666666666666666
+lambda abs IGM = LYA
+wave solution = lin
+keep surveys = '"${surveys}"'
+use non-coadded spectra = '"${coadd_picca_flag}"'
+'"${bal_flag}"'
+
+[corrections]
+num corrections = 0
+
+[masks]
+num masks = '"${number_mask}"'
+'"${lines_flag1}"'
+'"${dla_flag1}"'
+
+[expected flux]
+type = Dr16ExpectedFlux
+iter out prefix = delta_attributes
+num iterations = 7
+use constant weight = '"${use_constant_weight}"'
+num processors = '"${nb_proc}"'
+order = 0
+
+'"${lines_flag2}"'
+'"${lines_flag3}"'
+
+'"${dla_flag2}"'
+'"${dla_flag3}"'
+'"${dla_flag4}"'' > ${path_out}/delta_interface_${folder_name}
+
+picca_delta_extraction.py ${path_out}/delta_interface_${folder_name}
+fi
+
+
+mkdir -p ${path_out}/pk1d_SNRcut${snr_cut}
+
+picca_Pk1D.py \
+--in-dir ${path_out}/Delta \
+--in-format fits \
+--out-dir ${path_out}/pk1d_SNRcut${snr_cut} \
+--out-format fits \
+--lambda-obs-min 3750. \
+--noise-estimate ${noise_estimate} \
+--num-processors ${nb_proc} \
+--nb-pixel-masked-max 120 \
+--nb-part 3 \
+--SNR-min ${snr_cut} \
+--num-noise-exp 2500 > ${path_out}/Log/p1d_output_${folder_name}_SNRcut${snr_cut} 2> ${path_out}/Log/p1d_error_${folder_name}_SNRcut${snr_cut}
