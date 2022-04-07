@@ -418,9 +418,6 @@ def plot_data(data,
     comparison_plot_style = utils.return_key(kwargs,"comparison_plot_style",None)
 
 
-    fig,(ax,ax2) = plt.subplots(2,figsize = (8, 8),gridspec_kw=dict(height_ratios=[3,1]),sharex=True)
-    if not velunits:
-        par1,par2,par3 = adjust_fig(fig,ax,ax2,fonttext)
 
 
     dict_plot = prepare_plot_values(data,
@@ -435,6 +432,15 @@ def plot_data(data,
                                     substract_sb_comparison=substract_sb_comparison,
                                     beta_correction=beta_correction,
                                     beta_correction_sb=beta_correction_sb)
+    if(dict_plot[zbins[0]]["k_to_plot_comparison"] is not None):
+        fig,(ax,ax2) = plt.subplots(2,figsize = (8, 8),gridspec_kw=dict(height_ratios=[3,1]),sharex=True)
+    else:
+        fig,ax = plt.subplots(1,figsize = (8, 8))
+
+    if(dict_plot[zbins[0]]["k_to_plot_comparison"] is not None):
+        if not velunits:
+            par1,par2,par3 = adjust_fig(fig,ax,ax2,fonttext)
+
 
     for iz,z in enumerate(zbins):
         ax.errorbar(dict_plot[z]["k_to_plot"],
@@ -478,35 +484,54 @@ def plot_data(data,
                          [dict_plot["minrescor"],dict_plot["minrescor"]],
                          [dict_plot["maxrescor"],dict_plot["maxrescor"]],
                          color='0.7',zorder=-30)
-        ax2.fill_betweenx([-1000,1000],
-                          [dict_plot["minrescor"],dict_plot["minrescor"]],
-                          [dict_plot["maxrescor"],dict_plot["maxrescor"]],
-                          color='0.7',zorder=-30,label='')
+        if(dict_plot[z]["k_to_plot_comparison"] is not None):
+            ax2.fill_betweenx([-1000,1000],
+                              [dict_plot["minrescor"],dict_plot["minrescor"]],
+                              [dict_plot["maxrescor"],dict_plot["maxrescor"]],
+                              color='0.7',zorder=-30,label='')
 
-    if velunits:
-        ax2.set_xlabel(r' k [s/km]', fontsize = fonttext)
+    if(dict_plot[z]["k_to_plot_comparison"] is not None):
+        if velunits:
+            ax2.set_xlabel(r' k [s/km]', fontsize = fonttext)
+        else:
+            ax2.set_xlabel(r' k [1/$\AA$]', fontsize = fonttext)
+
     else:
-        ax2.set_xlabel(r' k [1/$\AA$]', fontsize = fonttext)
+        if velunits:
+            ax.set_xlabel(r' k [s/km]', fontsize = fonttext)
+        else:
+            ax.set_xlabel(r' k [1/$\AA$]', fontsize = fonttext)
 
     if plot_P:
         ax.set_ylabel(r'$P_{1d}$ ', fontsize=fonttext, labelpad=-1)
-        ax2.set_ylabel(r'$(P_{1d,data}-P_{1d,comp})/P_{1d,comp}$')
+        if(dict_plot[z]["k_to_plot_comparison"] is not None):
+            ax2.set_ylabel(r'$(P_{1d,data}-P_{1d,comp})/P_{1d,comp}$')
     else:
         ax.set_ylabel(r'$\Delta^2_{1d}$ ', fontsize=fonttext, labelpad=-1)
-        ax2.set_ylabel(r'$(\Delta^2_{1d,data}-\Delta^2_{1d,comp})/\Delta^2_{1d,comp}$')
+        if(dict_plot[z]["k_to_plot_comparison"] is not None):
+            ax2.set_ylabel(r'$(\Delta^2_{1d,data}-\Delta^2_{1d,comp})/\Delta^2_{1d,comp}$')
 
     ax.set_yscale('log')
-
-    for a in ax,ax2:
+    if(grid):
+        ax.grid()
+    ax.xaxis.set_ticks_position('both')
+    ax.xaxis.set_tick_params(direction='in')
+    ax.yaxis.set_ticks_position('both')
+    ax.yaxis.set_tick_params(direction='in')
+    ax.xaxis.set_tick_params(labelsize=fontlab)
+    ax.yaxis.set_tick_params(labelsize=fontlab)
+    ax.set_xlim(kmin,kmax)
+    if(dict_plot[z]["k_to_plot_comparison"] is not None):
         if(grid):
-            a.grid()
-        a.xaxis.set_ticks_position('both')
-        a.xaxis.set_tick_params(direction='in')
-        a.yaxis.set_ticks_position('both')
-        a.yaxis.set_tick_params(direction='in')
-        a.xaxis.set_tick_params(labelsize=fontlab)
-        a.yaxis.set_tick_params(labelsize=fontlab)
-        a.set_xlim(kmin,kmax)
+            ax2.grid()
+        ax2.xaxis.set_ticks_position('both')
+        ax2.xaxis.set_tick_params(direction='in')
+        ax2.yaxis.set_ticks_position('both')
+        ax2.yaxis.set_tick_params(direction='in')
+        ax2.xaxis.set_tick_params(labelsize=fontlab)
+        ax2.yaxis.set_tick_params(labelsize=fontlab)
+        ax2.set_xlim(kmin,kmax)
+
     if(ymin is None):
         if not plot_P:
             ax.set_ylim(4e-3,2)
@@ -518,7 +543,8 @@ def plot_data(data,
     else:
         ax.set_ylim(ymin,ymax)
 
-    ax2.set_ylim(-diff_range/2,diff_range/2)
+    if(dict_plot[z]["k_to_plot_comparison"] is not None):
+        ax2.set_ylim(-diff_range/2,diff_range/2)
     handles, labels = ax.get_legend_handles_labels()
 
     legend1 = ax.legend(handles, labels, loc='upper left', bbox_to_anchor=(1.03, -0.5, 0.4, 1.0), borderaxespad=0.,fontsize = fontlegend)
@@ -533,10 +559,11 @@ def plot_data(data,
     handles,labels=zip(*[(h,l) for (h,l) in zip(handles,labels) if not 'z =' in l])
     ax.legend(handles, labels, loc=2, bbox_to_anchor=(1.03, 0.9), borderaxespad=0.,fontsize = fontlegend)
 
-    if not velunits:
-        par1.set_xlim(*ax2.get_xlim())
-        par2.set_xlim(*ax2.get_xlim())
-        par3.set_xlim(*ax2.get_xlim())
+    if(dict_plot[z]["k_to_plot_comparison"] is not None):
+        if not velunits:
+            par1.set_xlim(*ax2.get_xlim())
+            par2.set_xlim(*ax2.get_xlim())
+            par3.set_xlim(*ax2.get_xlim())
 
     ax.add_artist(legend1)
     fig.subplots_adjust(top=0.75,bottom=0.1,left=0.1,right=0.65,hspace=0.2,wspace=0.2)
