@@ -41,9 +41,9 @@ def return_pk_path_interface(main_config):
                 folder_name_sb=return_folder_name(region_sb,*param[1:-1])
                 pk_sb.append(return_pk_path(pk_path,folder_name_sb,param[-1]))
     else:
-        pk = main_config.gettuplestr("abs_pk_path")
-        pk_sb = main_config.gettuplestr("abs_pk_path_sb")
-        outname = main_config.gettuplestr("outname")
+        pk = main_config.getliststr("abs_pk_path")
+        pk_sb = main_config.getliststr("abs_pk_path_sb")
+        outname = main_config.getliststr("outname")
     return(pk,pk_sb,outname)
 
 
