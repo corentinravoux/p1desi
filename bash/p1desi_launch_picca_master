@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
 path_in="${1}"
-surveys=${2}
+surveys="${2}"
 path_out=${3}
 region=${4}
 suffix=${5}
@@ -141,7 +141,7 @@ echo -e '[general]
 overwrite = True
 out dir = '"${path_out}"'
 logging level console = INFO
-logging level file = INFO
+logging level file = DEBUG
 
 [data]
 type = '"${mode}"'

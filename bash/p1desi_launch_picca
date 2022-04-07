@@ -18,6 +18,7 @@ dla_name=${15}
 bal=${16}
 nb_proc=${17}
 run_delta=${18}
+use_bookkeeping=${19}
 
 
 echo "input path for computation:"
@@ -56,6 +57,8 @@ echo "number of processors:"
 echo $nb_proc
 echo "running of deltas:"
 echo $run_delta
+echo "Use of bookkeeping:"
+echo $use_bookkeeping
 
 if [[ ${region} == "lya" ]]
 then
@@ -103,6 +106,8 @@ else
 bal_flag="--bi-max "${bal}
 fi
 
+if [[ ${use_bookkeeping} == "True" ]]
+then
 folder_name=$(p1desi_bookkeeping.py --region ${region} \
                                     --lines-name ${lines_name} \
                                     --catalog-name ${catalog_name} \
@@ -110,6 +115,9 @@ folder_name=$(p1desi_bookkeeping.py --region ${region} \
                                     --bal ${bal} \
                                     --suffix ${suffix} \
                                     --noise-estimate ${noise_estimate} 2>&1 > /dev/null)
+else
+folder_name=${suffix}
+fi
 
 path_out=${path_out}/p1d_${folder_name}
 mkdir -p ${path_log}
