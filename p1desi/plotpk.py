@@ -406,6 +406,7 @@ def plot_data(data,
     ymin = utils.return_key(kwargs,"ymin",None)
     ymax = utils.return_key(kwargs,"ymax",None)
     grid = utils.return_key(kwargs,"grid",True)
+    figsize = utils.return_key(kwargs,"figsize",(8, 8))
     substract_sb_comparison = utils.return_key(kwargs,"substract_sb_comparison",True)
 
 
@@ -433,9 +434,9 @@ def plot_data(data,
                                     beta_correction=beta_correction,
                                     beta_correction_sb=beta_correction_sb)
     if(dict_plot[zbins[0]]["k_to_plot_comparison"] is not None):
-        fig,(ax,ax2) = plt.subplots(2,figsize = (8, 8),gridspec_kw=dict(height_ratios=[3,1]),sharex=True)
+        fig,(ax,ax2) = plt.subplots(2,figsize = figsize,gridspec_kw=dict(height_ratios=[3,1]),sharex=True)
     else:
-        fig,ax = plt.subplots(1,figsize = (8, 8))
+        fig,ax = plt.subplots(1,figsize = figsize)
 
     if(dict_plot[zbins[0]]["k_to_plot_comparison"] is not None):
         if not velunits:
@@ -765,6 +766,7 @@ def plot_noise_power_ratio(data,
                            labelnoise,
                            k_units,
                            fit_asymptote= False,
+                           plot_difference = False,
                            **kwargs):
 
 
@@ -773,6 +775,10 @@ def plot_noise_power_ratio(data,
     kmin = utils.return_key(kwargs,"kmin",None)
     kmax = utils.return_key(kwargs,"kmax",None)
     ncol_legend = utils.return_key(kwargs,"ncol_legend",2)
+    ratio_y_min = utils.return_key(kwargs,"ratio_y_min",0.5)
+    ratio_y_max = utils.return_key(kwargs,"ratio_y_max",1.1)
+    diff_y_min = utils.return_key(kwargs,"diff_y_min",-0.01)
+    diff_y_max = utils.return_key(kwargs,"diff_y_max",0.01)
     fig,ax=plt.subplots(4,1,figsize=(8,10),sharex=True)
     txt_to_save = []
     for z,d in zip(zbins,data):
@@ -787,8 +793,12 @@ def plot_noise_power_ratio(data,
             ax[1].set_ylabel('$P_{' + labelnoise +'} [\AA]$')
         elif(k_units == "kms"):
             ax[1].set_ylabel('$P_{' + labelnoise +'} [km/s]$')
-        ax[2].plot(d['meank'],d[noise_to_plot]/d['meanPk_raw'],label=f'{z:.1f}')
-        ax[2].set_ylabel('$P_{' + labelnoise +'}/P_{raw}$')
+        if(plot_difference):
+            ax[2].plot(d['meank'], d['meanPk_raw'] - d[noise_to_plot],label=f'{z:.1f}')
+            ax[2].set_ylabel('$P_{raw} - P_{' + labelnoise +'}$')
+        else:
+            ax[2].plot(d['meank'],d[noise_to_plot]/d['meanPk_raw'],label=f'{z:.1f}')
+            ax[2].set_ylabel('$P_{' + labelnoise +'}/P_{raw}$')
         if(save_txt):
             z_array = np.full(d['meank'].shape,z)
             txt_to_save.append(np.stack([z_array,d['meank'],d['meanPk_raw'],d[noise_to_plot]],axis=1))
@@ -796,25 +806,35 @@ def plot_noise_power_ratio(data,
     txt_to_save = np.concatenate(txt_to_save,axis=0)
     np.savetxt(f"{out_name}_ratio_{labelnoise}_raw_power_unit{k_units}.txt",txt_to_save,header = f"z k Pk_raw {labelnoise}")
 
-    ax[3].errorbar(mean_dict["k_array"],mean_dict[noise_to_plot]/mean_dict["meanPk_raw"], yerr =mean_dict["error_{}overraw".format(noise_to_plot)], fmt = 'o')#,marker_size=6)
-    ax[3].set_ylabel('$mean_{z}(P_{' + labelnoise +'}/P_{raw})$')
+    if(plot_difference):
+        ax[3].plot(mean_dict["k_array"],mean_dict["meanPk_raw"] - mean_dict[noise_to_plot], marker = 'o')
+        ax[3].set_ylabel('$mean_{z}(P_{raw} - P_{' + labelnoise +'})$')
+    else:
+        ax[3].errorbar(mean_dict["k_array"],mean_dict[noise_to_plot]/mean_dict["meanPk_raw"], yerr =mean_dict["error_{}overraw".format(noise_to_plot)], fmt = 'o')#,marker_size=6)
+        ax[3].set_ylabel('$mean_{z}(P_{' + labelnoise +'}/P_{raw})$')
     if(fit_asymptote):
         try :
             f_const = lambda x,a : np.array([a for i in range(len(x))])
             if(np.min(mean_dict["k_array"])> 3.0) : kmin_fit = np.min(mean_dict["k_array"])
             else : kmin_fit = 3.0
             mask = mean_dict["k_array"] > kmin_fit
+            if plot_difference :
+                init_value = 0
+                fit = (mean_dict["meanPk_raw"] - mean_dict[noise_to_plot])[mask]
+            else :
+                init_value = 1
+                fit = (mean_dict[noise_to_plot]/mean_dict["meanPk_raw"])[mask]
             arg_func = scipy.optimize.curve_fit(f_const,
                                                 mean_dict["k_array"][mask],
-                                                (mean_dict[noise_to_plot]/mean_dict["meanPk_raw"])[mask],
-                                                p0=[1])
+                                                fit,
+                                                p0=[init_value])
             cont_k_array = np.linspace(kmin_fit,np.max(mean_dict["k_array"]),500)
             fit_exp = f_const(cont_k_array,*arg_func[0])
             fit_exp_min = f_const(cont_k_array,*(arg_func[0]-np.diag(arg_func[1])))
             fit_exp_max = f_const(cont_k_array,*(arg_func[0]+np.diag(arg_func[1])))
             ax[3].fill_between(cont_k_array, fit_exp_min, fit_exp_max,facecolor='grey', interpolate=True,alpha=0.5)
             ax[3].plot(cont_k_array,fit_exp)
-            ax[3].legend(["asymptote = {}".format(np.round(arg_func[0][0],3))])
+            ax[3].legend(["asymptote = {}".format(np.round(arg_func[0][0],5))])
         except:
             print("Pdiff over Praw fit did not converge")
     if(k_units == "A"):
@@ -825,9 +845,15 @@ def plot_noise_power_ratio(data,
     if(kmin is not None): ax[0].set_xlim(kmin,kmax)
     for i in [0,1,2,3]:
         ax[i].grid()
-    ax[2].set_ylim(0.5,1.1)
-    ax[3].set_ylim(0.5,1.1)
+    if(plot_difference):
+        ax[2].set_ylim(diff_y_min,diff_y_max)
+        ax[3].set_ylim(diff_y_min,diff_y_max)
+    else:
+        ax[2].set_ylim(ratio_y_min,ratio_y_max)
+        ax[3].set_ylim(ratio_y_min,ratio_y_max)
     fig.tight_layout()
+    if(plot_difference):
+        out_name = f"{out_name}_power_difference"
     fig.savefig(f"{out_name}_ratio_{labelnoise}_raw_power_unit{k_units}.pdf",format="pdf")
 
 
@@ -843,6 +869,7 @@ def plot_noise_study(data,
                      side_band_comp=None,
                      side_band_legend=["SB1","SB2"],
                      fit_asymptote_ratio= False,
+                     plot_difference = False,
                      **kwargs):
 
 
@@ -868,6 +895,7 @@ def plot_noise_study(data,
                                labelnoise,
                                k_units,
                                fit_asymptote= fit_asymptote_ratio,
+                               plot_difference = plot_difference,
                                **kwargs)
     if(plot_noise_comparison):
         plot_noise_comparison_function(zbins,
@@ -990,4 +1018,19 @@ def plot_lines_study(multiple_data,
         mean_dict = return_mean_z_dict(zbins,multiple_data[i])
         mean_dict["k_array"],mean_dict["meanPk"]
 
+    return()
+
+
+
+
+
+
+
+# Uncertainties plots
+
+def plot_uncertainties(data,
+                       zbins,
+                       out_name,
+                       k_units,
+                       **kwargs):
     return()

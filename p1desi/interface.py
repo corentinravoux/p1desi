@@ -196,6 +196,7 @@ def plot_noise(mean_pk,path_plot_noise,plot_noise_config,main_config,outname):
                             side_band_comp=plot_noise_config.getstr("side_band_comp"),
                             side_band_legend=plot_noise_config.gettuplestr("side_band_legend"),
                             fit_asymptote_ratio= plot_noise_config.getboolean("fit_asymptote_ratio"),
+                            plot_difference = plot_noise_config.getboolean("plot_difference"),
                             **plot_noise_config.getdict("plot_args_noise"))
 
 
