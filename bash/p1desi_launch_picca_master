@@ -90,8 +90,8 @@ lines_flag1=""
 lines_flag2=""
 lines_flag3=""
 else
-lines_flag1="type 0 = LinesMask"
-lines_flag2="[mask arguments 0]"
+lines_flag1="type "${number_mask}" = LinesMask"
+lines_flag2="[mask arguments "${number_mask}"]"
 lines_flag3="filename = "${lines}
 number_mask=$((number_mask+1))
 fi
@@ -103,8 +103,8 @@ dla_flag2=""
 dla_flag3=""
 dla_flag4=""
 else
-dla_flag1="type 1 = DlaMask"
-dla_flag2="[mask arguments 1]"
+dla_flag1="type "${number_mask}" = DlaMask"
+dla_flag2="[mask arguments "${number_mask}"]"
 dla_flag3="los_id name = TARGETID"
 dla_flag4="filename = "${dla}
 number_mask=$((number_mask+1))
@@ -142,6 +142,7 @@ overwrite = True
 out dir = '"${path_out}"'
 logging level console = INFO
 logging level file = DEBUG
+num processors = '"${nb_proc}"'
 
 [data]
 type = '"${mode}"'
@@ -173,7 +174,6 @@ type = Dr16ExpectedFlux
 iter out prefix = delta_attributes
 num iterations = 7
 use constant weight = '"${use_constant_weight}"'
-num processors = '"${nb_proc}"'
 order = 0
 
 '"${lines_flag2}"'
