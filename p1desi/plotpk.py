@@ -812,6 +812,7 @@ def plot_noise_power_ratio(data,
     else:
         ax[3].errorbar(mean_dict["k_array"],mean_dict[noise_to_plot]/mean_dict["meanPk_raw"], yerr =mean_dict["error_{}overraw".format(noise_to_plot)], fmt = 'o')#,marker_size=6)
         ax[3].set_ylabel('$mean_{z}(P_{' + labelnoise +'}/P_{raw})$')
+    legend = []
     if(fit_asymptote):
         try :
             f_const = lambda x,a : np.array([a for i in range(len(x))])
@@ -834,9 +835,14 @@ def plot_noise_power_ratio(data,
             fit_exp_max = f_const(cont_k_array,*(arg_func[0]+np.diag(arg_func[1])))
             ax[3].fill_between(cont_k_array, fit_exp_min, fit_exp_max,facecolor='grey', interpolate=True,alpha=0.5)
             ax[3].plot(cont_k_array,fit_exp)
-            ax[3].legend(["asymptote = {}".format(np.round(arg_func[0][0],5))])
+            legend.append("asymptote = {}".format(np.round(arg_func[0][0],5)))
         except:
             print("Pdiff over Praw fit did not converge")
+    mask_k = mean_dict["k_array"] > 3.10
+
+    legend = legend + [f'alpha = {np.mean((mean_dict["meanPk_raw"] - mean_dict[noise_to_plot])[mask_k])}',
+                        f'beta = {np.mean((mean_dict[noise_to_plot]/mean_dict["meanPk_raw"])[mask_k])}']
+    ax[3].legend(legend)
     if(k_units == "A"):
         ax[3].set_xlabel('k[1/$\AA$]')
         place_k_speed_unit_axis(fig,ax[0])

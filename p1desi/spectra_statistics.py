@@ -206,31 +206,42 @@ def plot_variance_histogram(name_out,
                             overlap_regions=None,
                             nb_bins=40,
                             outlier_insensitive=False,
+                            plot_ratio = True,
                             **kwargs):
 
+    style = utils.return_key(kwargs,"style",None)
+    if(style is not None):
+        plt.style.use(style)
+    fontsize = utils.return_key(kwargs,"fontsize",16)
+    fontsize_legend = utils.return_key(kwargs,"fontsize_legend",13)
+    labelsize = utils.return_key(kwargs,"labelsize",12)
     alpha = utils.return_key(kwargs,"alpha",0.3)
-    figsize = utils.return_key(kwargs,"figsize",(8,10))
+    figsize = utils.return_key(kwargs,"figsize",(8,7))
     alpha_fill=utils.return_key(kwargs,"alpha_fill",0.5)
     size_fill=utils.return_key(kwargs,"size_fill",0.2)
     ylim_diff=utils.return_key(kwargs,"ylim_diff",None)
     ylim_ratio=utils.return_key(kwargs,"ylim_ratio",None)
-
-    fig,ax=plt.subplots(3,1,figsize=figsize,sharex=True)
+    if(plot_ratio):
+        fig,ax=plt.subplots(3,1,figsize=figsize,sharex=True)
+    else:
+        fig,ax=plt.subplots(2,1,figsize=figsize,sharex=True)
     bin_centers, means1, disp1 = hist_profile(wavelength,V_diff,nb_bins,
                                             (np.min(wavelength),np.max(wavelength)),
                                             (np.min(V_diff),np.max(V_diff)),
                                             outlier_insensitive=outlier_insensitive)
 
 
-    ax[0].errorbar(x=bin_centers, y=means1, yerr=disp1, linestyle='none', marker='.', label="diff",color="b")
+    ax[0].errorbar(x=bin_centers, y=means1, yerr=disp1, linestyle='none', marker='.', label="diff",color="C0")
     bin_centers, means2, disp2 = hist_profile(wavelength,V_pipeline,nb_bins,
                                             (np.min(wavelength),np.max(wavelength)),
                                             (np.min(V_pipeline),np.max(V_pipeline)),
                                             outlier_insensitive=outlier_insensitive)
-    ax[0].errorbar(x=bin_centers, y=means2, yerr=disp2, linestyle='none', marker='.', label="ivar",color="r")
+    ax[0].errorbar(x=bin_centers, y=means2, yerr=disp2, linestyle='none', marker='.', label="ivar",color="C1")
 
-    ax[0].set_ylabel("$Var_i$")
-    ax[0].legend(["diff","pipeline"])
+    ax[0].set_ylabel(r"$\overline{\mathbb{V}}_{i}$",fontsize = fontsize)
+    ax[0].legend(["Diff","Pipeline"],fontsize = fontsize_legend)
+    ax[0].tick_params(axis='x', labelsize=labelsize)
+    ax[0].tick_params(axis='y', labelsize=labelsize)
 
     (ratio_means,ratio_disp) = ( (means1 - means2)/means2,
                                  (means1/means2) * np.sqrt((disp1/means1)**2 + (disp2/means2)**2) )
@@ -241,58 +252,19 @@ def plot_variance_histogram(name_out,
     ratio = (V_diff - V_pipeline)/V_pipeline
     diff = (V_diff - V_pipeline)
 
+
+
     ax[1].plot(wavelength,
-               ratio,
-               color="r",
-               alpha=alpha)
-
-    ax[1].errorbar(x=bin_centers,
-                   y=ratio_means,
-                   yerr=ratio_disp,
-                   linestyle='none',
-                   marker='.',
-                   color="b")
-
-
-    bin_centers, means_ratio, disp_ratio = hist_profile(wavelength,ratio,nb_bins,
-                                            (np.min(wavelength),np.max(wavelength)),
-                                            (np.min(ratio),np.max(ratio)),
-                                            outlier_insensitive=outlier_insensitive)
-
-    ax[1].errorbar(x=bin_centers,
-                   y=means_ratio,
-                   yerr=disp_ratio,
-                   linestyle='none',
-                   marker='.',
-                   color="g")
-
-
-    ax[1].legend(["Ratio","Ratio of bins","Binned ratio"])
-
-    ax[1].set_ylabel("$(Var(diff) - Var(pipeline)) / Var(pipeline)$")
-
-    ax[1].axhline(color="k")
-    ax[1].fill_between(wavelength,
-                       y1=np.full(wavelength.shape,-size_fill),
-                       y2=np.full(wavelength.shape,size_fill),
-                       color="gray",
-                       alpha=alpha_fill)
-
-
-    if(ylim_ratio is not None):
-        ax[1].set_ylim(ylim_ratio)
-
-    ax[2].plot(wavelength,
                diff,
-               color="r",
+               color="C3",
                alpha=alpha)
 
-    ax[2].errorbar(x=bin_centers,
+    ax[1].errorbar(x=bin_centers,
                    y=diff_mean,
                    yerr=diff_disp,
                    linestyle='none',
                    marker='.',
-                   color="b")
+                   color="C2")
 
 
     bin_centers, means_diff, disp_diff = hist_profile(wavelength,diff,nb_bins,
@@ -300,24 +272,70 @@ def plot_variance_histogram(name_out,
                                             (np.min(ratio),np.max(ratio)),
                                             outlier_insensitive=outlier_insensitive)
 
-    ax[2].errorbar(x=bin_centers,
+    ax[1].errorbar(x=bin_centers,
                    y=means_diff,
                    yerr=disp_diff,
                    linestyle='none',
                    marker='.',
-                   color="g")
+                   color="C4")
 
 
-    ax[2].legend(["Difference","Difference of bins","Binned difference"])
+    ax[1].legend(["Difference","Difference of bins","Binned difference"],fontsize = fontsize_legend)
+    ax[1].set_ylabel("$\overline{\mathbb{V}}_{\mathrm{diff}} - \overline{\mathbb{V}}_{\mathrm{pip}}$",fontsize = fontsize)
+    ax[1].tick_params(axis='x', labelsize=labelsize)
+    ax[1].tick_params(axis='y', labelsize=labelsize)
 
-    ax[2].set_xlabel("Observed wavelength [$\AA$]")
-    ax[2].set_ylabel("$Var(diff) - Var(pipeline)$")
-
-    ax[2].axhline(color="k")
+    ax[1].axhline(color="k")
 
     if(ylim_diff is not None):
-        ax[2].set_ylim(ylim_diff)
+        ax[1].set_ylim(ylim_diff)
 
+    if(plot_ratio):
+        ax[2].set_xlabel("$\lambda_{\mathrm{obs}} [\AA]$",fontsize = fontsize)
+    else:
+        ax[1].set_xlabel("$\lambda_{\mathrm{obs}} [\AA]$",fontsize = fontsize)
+    if(plot_ratio):
+        ax[2].plot(wavelength,
+                   ratio,
+                   color="C3",
+                   alpha=alpha)
+
+        ax[2].errorbar(x=bin_centers,
+                       y=ratio_means,
+                       yerr=ratio_disp,
+                       linestyle='none',
+                       marker='.',
+                       color="C2")
+
+
+        bin_centers, means_ratio, disp_ratio = hist_profile(wavelength,ratio,nb_bins,
+                                                (np.min(wavelength),np.max(wavelength)),
+                                                (np.min(ratio),np.max(ratio)),
+                                                outlier_insensitive=outlier_insensitive)
+
+        ax[2].errorbar(x=bin_centers,
+                       y=means_ratio,
+                       yerr=disp_ratio,
+                       linestyle='none',
+                       marker='.',
+                       color="C4")
+
+
+        ax[2].legend(["Ratio","Ratio of bins","Binned ratio"],fontsize = fontsize_legend)
+        ax[2].set_ylabel("$\overline{\mathbb{V}}_{\mathrm{diff}}  - \overline{\mathbb{V}}_{\mathrm{pip}} ) / \overline{\mathbb{V}}_{\mathrm{pip}}$",fontsize = fontsize)
+        ax[2].tick_params(axis='x', labelsize=labelsize)
+        ax[2].tick_params(axis='y', labelsize=labelsize)
+
+        ax[2].axhline(color="k")
+        ax[2].fill_between(wavelength,
+                           y1=np.full(wavelength.shape,-size_fill),
+                           y2=np.full(wavelength.shape,size_fill),
+                           color="gray",
+                           alpha=alpha_fill)
+
+
+        if(ylim_ratio is not None):
+            ax[2].set_ylim(ylim_ratio)
 
     if(overlap_regions is not None):
         for i in range(len(overlap_regions)):
@@ -325,9 +343,6 @@ def plot_variance_histogram(name_out,
             overlap_bin_pipeline = np.mean(V_pipeline[(wavelength> overlap_regions[i][0])&(wavelength < overlap_regions[i][1])])
             ax[0].plot([np.mean(overlap_regions[i])],[overlap_bin_diff], marker='.',color ="b")
             ax[0].plot([np.mean(overlap_regions[i])],[overlap_bin_pipeline], marker='.',color ="r")
-            overlap_bin_ratio = (overlap_bin_diff - overlap_bin_pipeline)/overlap_bin_pipeline
-            ax[1].plot([np.mean(overlap_regions[i])],[overlap_bin_ratio], marker='.',color ="b")
-
             ax[0].fill_between(wavelength,np.min(means1), np.max(means1),
                                where= ((wavelength> overlap_regions[0][0])&
                                        (wavelength < overlap_regions[0][1]))|
@@ -335,16 +350,7 @@ def plot_variance_histogram(name_out,
                                        (wavelength < overlap_regions[1][1])),
                                color='green',
                                alpha=0.25)
-            ax[1].fill_between(wavelength,np.min(means1), np.max(means1),
-                               where= ((wavelength> overlap_regions[0][0])&
-                                       (wavelength < overlap_regions[0][1]))|
-                                       ((wavelength> overlap_regions[1][0])&
-                                       (wavelength < overlap_regions[1][1])),
-                               color='green',
-                               alpha=0.25)
-
-
-
+    fig.tight_layout()
     fig.savefig(f"{name_out}.pdf",format="pdf")
     plt.close()
 
