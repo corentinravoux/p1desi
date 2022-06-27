@@ -10,8 +10,8 @@ def return_delta_path(pk_path,folder_name):
     pk = os.path.join(pk_path,f"p1d_{folder_name}","deltas")
     return(pk)
 
-def return_pk_path(pk_path,folder_name,snr_cut):
-    pk = os.path.join(pk_path,f"p1d_{folder_name}",f"pk1d_SNRcut{snr_cut}")
+def return_pk_path(pk_path,folder_name,snr_cut_path):
+    pk = os.path.join(pk_path,f"p1d_{folder_name}",f"pk1d_SNRcut{snr_cut_path}")
     return(pk)
 
 def return_pk_path_interface(main_config):
@@ -28,8 +28,8 @@ def return_pk_path_interface(main_config):
         bal = main_config.getlistfloat("bal")
         noise_estimate = main_config.getliststr("noise_estimate")
         suffix = main_config.getliststr("suffix")
-        snr_cut = main_config.getlistint("snr_cut")
-        for param in itertools.product(region,lines_name,catalog_name,dla_name,bal,noise_estimate,suffix,snr_cut):
+        snr_cut_path = main_config.getlistint("snr_cut_path")
+        for param in itertools.product(region,lines_name,catalog_name,dla_name,bal,noise_estimate,suffix,snr_cut_path):
             folder_name=return_folder_name(*param[:-1])
             outname.append(f"{folder_name}_SNRcut{param[-1]}")
             pk.append(return_pk_path(pk_path,folder_name,param[-1]))
@@ -47,5 +47,5 @@ def return_pk_path_interface(main_config):
     return(pk,pk_sb,outname)
 
 
-def return_mean_pk_name(velunits,logsample):
-    return(f'mean_Pk1d{"_log" if logsample else ""}{"_vel" if velunits else ""}.fits.gz')
+def return_mean_pk_name(velunits,logsample,snr_cut_mean=None):
+    return(f'mean_Pk1d{"_log" if logsample else ""}{"_vel" if velunits else ""}{"_snr_cut_mean" if snr_cut_mean is not None else ""}.fits.gz')

@@ -32,7 +32,8 @@ def get_exposure_list(path,
     if(ebv_max is not None):
         mask_total &= ( fitsio.FITS(path)[1]["EBV"][:]  < ebv_max)
 
-
+    print("PATH:")
+    print(path)
     print("EXPTIME:")
     print(fitsio.FITS(path)[1]["EXPTIME"][:][mask_total])
     print("EFFTIME:")

@@ -19,6 +19,7 @@ import astropy.table as t
 from p1desi import bookkeeping
 from scipy.stats import binned_statistic_2d
 from scipy.stats import binned_statistic
+from bisect import bisect
 
 
 
@@ -33,8 +34,8 @@ def compute_Pk_means_parallel(data_dir,
                               velunits=False,
                               debug=False,
                               nomedians=False,
-                              logsample=False
-                              ):
+                              logsample=False,
+                              snr_cut_mean=None):
     """Computes the power spectrum from picca_pk1d outputs
 
     Args:
@@ -48,11 +49,12 @@ def compute_Pk_means_parallel(data_dir,
         debug (bool, optional): generates intermediate files. Defaults to False.
         nomedians (bool, optional): should we skip computation of medians (faster). Defaults to False.
         logsample (bool, optional): Should the k-bins be sampled in log instead of linearly. Defaults to False.
+        logsample (dict, optional): mean SNR treshold to apply for each redshift bins Defaults to None.
 
     Returns:
         [type]: [description]
     """
-    outfilename=os.path.join(data_dir,bookkeeping.return_mean_pk_name(velunits,logsample))
+    outfilename=os.path.join(data_dir,bookkeeping.return_mean_pk_name(velunits,logsample,snr_cut_mean=snr_cut_mean))
     if os.path.exists(outfilename) and not overwrite:
         print(f"found existing power, loading from file {outfilename}")
         outdir=t.Table.read(outfilename)
@@ -71,7 +73,7 @@ def compute_Pk_means_parallel(data_dir,
     outdir=t.Table()
     if ncpu>1:
         with Pool(ncpu) as pool:
-            dataarr_all=pool.starmap(compute_single_means,[[f,args,zbinedges,kbinedges,debug,nomedians,logsample,velunits] for f in files])
+            dataarr_all=pool.starmap(compute_single_means,[[f,args,zbinedges,kbinedges,debug,nomedians,logsample,velunits,snr_cut_mean] for f in files])
     else:
         dataarr_all=[compute_single_means(f,args,zbinedges,kbinedges,debug=debug,nomedians=nomedians,logsample=logsample,velunits=velunits) for f in files]
     dataarr_all=[d for d in dataarr_all if d is not None] #filter for files where S/N criterion is never fulfilled
@@ -126,10 +128,13 @@ def compute_single_means(f,
                          debug=False,
                          nomedians=False,
                          logsample=False,
-                         velunits=False):
+                         velunits=False,
+                         snr_cut_mean=None):
     dataarr=[]
     outdir=t.Table()
     zarr=[]
+    if(snr_cut_mean is not None):
+        zbins = zbinedges[:-1] + args['z_binsize']/2
     with fitsio.FITS(f) as hdus:
         for i,h in enumerate(hdus[1:]):
             data=h.read()
@@ -144,11 +149,22 @@ def compute_single_means(f,
                 tab.rename_column('COR_RESO','cor_reso')
             except:
                 pass
+            try:
+                tab.rename_column('PK_NOISE_MISS','Pk_noise_miss')
+            except:
+                pass
             if np.nansum(tab['Pk'])==0:
                 tab['Pk']=(tab['Pk_raw']-tab['Pk_noise'])/tab['cor_reso']
             tab['z']=float(header['MEANZ'])
             tab['snr']=float(header['MEANSNR'])
-            if (tab['Pk_noise'][tab['k']<kbinedges[-1]]>tab['Pk_raw'][tab['k']<kbinedges[-1]]*10000000).any():
+            if snr_cut_mean is not None :
+                if len(snr_cut_mean) != len(zbins) :
+                    raise ValueError("Please provide same size zbins and snr_cut_mean arrays")
+                zbinedges_position = bisect(zbinedges,header['MEANZ'])
+                zbin_position = zbinedges_position + (zbinedges_position == 0) - (zbinedges_position == len(zbinedges)) - 1
+                if(header['MEANSNR'] < snr_cut_mean[zbin_position]):
+                    continue
+            if (tab['Pk_noise'][tab['k']<kbinedges[-1]]>tab['Pk_raw'][tab['k']<kbinedges[-1]]*1000000).any():
                 print(f"file {f} hdu {i+1} has very high noise power, ignoring, max value: {(tab['Pk_noise'][tab['k']<kbinedges[-1]]/tab['Pk_raw'][tab['k']<kbinedges[-1]]).max()}*Praw")
                 continue
             dataarr.append(tab)
@@ -162,6 +178,10 @@ def compute_single_means(f,
     dataarr['Pk_norescor']=dataarr['Pk_raw']-dataarr['Pk_noise']
     dataarr['Pk_nonoise']=dataarr['Pk_raw']/dataarr['cor_reso']
     dataarr['Pk_noraw']=dataarr['Pk_noise']/dataarr['cor_reso']
+    try:
+        dataarr['Pk_noraw_miss']=dataarr['Pk_noise_miss']/dataarr['cor_reso']
+    except:
+        pass
     dataarr['Pk/Pnoise']=dataarr['Pk_raw']/dataarr['Pk_noise']  #take the ratio this way as the noise power will fluctuate less even in the tails (i.e. less divisions by 0)
     cols=dataarr.colnames
     N_chunks,zedges_chunks,numbers_chunks=binned_statistic(zarr,zarr,statistic='count',bins=zbinedges)
@@ -218,7 +238,7 @@ def compute_Pk_means(data_dir,
                      ignore_existing=False,
                      velunits=False,
                      no_zbinning=False):
-    """ old, might be obsolete """
+    """ obsolete """
     files = glob.glob(os.path.join(data_dir,"*.fits.gz"))
     # files = glob.glob("{}/*.fits.gz".format(data_dir))
     #generate arrays
@@ -238,6 +258,7 @@ def compute_Pk_means(data_dir,
                 tab.rename_column('PK','Pk')
                 tab.rename_column('PK_RAW','Pk_raw')
                 tab.rename_column('PK_NOISE','Pk_noise')
+                tab.rename_column('PK_NOISE_MISS','Pk_noise_miss')
                 tab.rename_column('PK_DIFF','Pk_diff')
                 tab.rename_column('COR_RESO','cor_reso')
             except:
@@ -296,3 +317,34 @@ def define_wavevector_limits(args,velunits):
             nb_k_bin=int(k_sup/k_inf/4)
             k_dist=(k_sup-k_inf)/nb_k_bin
     return(k_inf,k_sup,k_dist)
+
+
+def model_noise_correction(SNR,A,g,B):
+    power_law = A * SNR**(-g) + B
+    return(power_law)
+
+
+
+def correct_individual_pk_noise(pk_in,
+                                pk_out,
+                                qsocat,
+                                correction):
+    pk_files = glob.glob(os.path.join(pk_in,"Pk1D-*"))
+    qso_file = fitsio.FITS(qsocat)["QSO_CAT"]
+    targetid_qso = qso_file["TARGETID"][:]
+    survey_qso = qso_file["SURVEY"][:]
+
+
+    for i in range(len(pk_files)):
+        pk_out_name = pk_files[i].split("/")[-1]
+        f_out = fitsio.FITS(os.path.join(pk_out,pk_out_name),'rw',clobber=True)
+        f = fitsio.FITS(pk_files[i])
+        for j in range(1,len(f)):
+            header = f[j].read_header()
+            snr = header["MEANSNR"]
+            id = header["LOS_ID"]
+            survey_id = survey_qso[np.argwhere(targetid_qso == id)[0]][0]
+            p_noise_miss = model_noise_correction(snr,*correction[survey_id])
+            line = f[j].read()
+            line['PK_NOISE'] = line['PK_NOISE'] + p_noise_miss
+            f_out.write(line,header=header,extname=str(id))

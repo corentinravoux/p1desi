@@ -103,9 +103,10 @@ def main(input_file):
 
         velunits = main_config.getboolean("velunits")
         logsample = main_config.getboolean("logsample")
-        mean_pk = os.path.join(pk,bookkeeping.return_mean_pk_name(velunits,logsample))
+        snr_cut_mean = main_config.gettuplefloat("snr_cut_mean")
+        mean_pk = os.path.join(pk,bookkeeping.return_mean_pk_name(velunits,logsample,snr_cut_mean=snr_cut_mean))
         if(pk_sb is not None):
-            mean_pk_sb = os.path.join(pk_sb,bookkeeping.return_mean_pk_name(velunits,logsample))
+            mean_pk_sb = os.path.join(pk_sb,bookkeeping.return_mean_pk_name(velunits,logsample,snr_cut_mean=snr_cut_mean))
         else:
             mean_pk_sb = None
         suffix_plot = main_config.getstr("suffix_plot")
@@ -150,7 +151,8 @@ def compute_mean(pk,mean_config,main_config):
                                       velunits=main_config.getboolean("velunits"),
                                       debug=mean_config.getboolean("debug"),
                                       nomedians=mean_config.getboolean("nomedians"),
-                                      logsample=main_config.getboolean("logsample"))
+                                      logsample=main_config.getboolean("logsample"),
+                                      snr_cut_mean=main_config.gettuplefloat("snr_cut_mean"))
 
 
 def plot(mean_pk,mean_pk_sb,path_plot,plot_config,main_config,outname):
