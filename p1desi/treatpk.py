@@ -49,7 +49,7 @@ def compute_Pk_means_parallel(data_dir,
         debug (bool, optional): generates intermediate files. Defaults to False.
         nomedians (bool, optional): should we skip computation of medians (faster). Defaults to False.
         logsample (bool, optional): Should the k-bins be sampled in log instead of linearly. Defaults to False.
-        logsample (dict, optional): mean SNR treshold to apply for each redshift bins Defaults to None.
+        snr_cut_mean (dict, optional): mean SNR treshold to apply for each redshift bins Defaults to None.
 
     Returns:
         [type]: [description]
@@ -66,6 +66,7 @@ def compute_Pk_means_parallel(data_dir,
     zbinedges=zbins-args['z_binsize']/2
     zbinedges=np.concatenate([zbinedges,zbinedges[[-1]]+args['z_binsize']])
     (k_inf,k_sup,k_dist) = define_wavevector_limits(args,velunits)
+    print(f"wavenumber range and spacing {(k_inf,k_sup,k_dist)}")
     if not logsample:
         kbinedges=np.arange(k_inf,k_sup,k_dist)
     else:
