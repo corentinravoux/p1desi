@@ -136,27 +136,20 @@ def read_in_model(filename):
     return z,k,kpk
 
 
-
 def kAAtokskm(x, pos=None,z=2.2):
     kstr=x
-    c=3e5
-    lya=1216
-    knew=float(kstr)/(c/(1+z)/lya)
+    knew=float(kstr)/(utils.speed_light/(1+z)/utils.lambdaLy)
     transformed_label='{:.3f}'.format(knew)
     return transformed_label
 
 def kskmtokAA(x,z=2.2):
     kstr=x
-    c=3e5
-    lya=1216
-    knew=float(kstr)*(c/(1+z)/lya)
+    knew=float(kstr)*(utils.speed_light/(1+z)/utils.lambdaLy)
     transformed_label='{:.3f}'.format(knew)
     return transformed_label
 
 def convert_data_to_kms(data):
-    c=3e5
-    lya=1216
-    scale_fac = (c/(1+data["z"])/lya)
+    scale_fac = (utils.speed_light/(1+data["z"])/utils.lambdaLy)
     if(data is not None):
         for key in data.keys():
             if((key!="rescor")|(key!="z")|(key!="nmodes")):
@@ -910,107 +903,6 @@ def plot_noise_study(data,
                                        mean_dict,
                                        k_units,
                                        **kwargs)
-
-
-
-# Metals power plots
-
-
-
-def plot_side_band_study(zbins,
-                         data,
-                         out_name,
-                         mean_dict,
-                         noise_to_plot,
-                         labelnoise,
-                         k_units,
-                         side_band_legend,
-                         side_band_comp = None,
-                         side_band_fitpolynome = False,
-                         **kwargs):
-
-    kmin = utils.return_key(kwargs,"kmin",None)
-    kmax = utils.return_key(kwargs,"kmax",None)
-    fig3,ax3=plt.subplots(4,1,figsize=(8,10),sharex=True)
-
-    for z,d in zip(zbins,data):
-        ax3[0].plot(d['meank'],d['meanPk_raw'],label=f'{z:.1f}')
-        if(k_units == "A"):
-            ax3[0].set_ylabel('$P_{raw} [\AA]$')
-        elif(k_units == "kms"):
-            ax3[0].set_ylabel('$P_{raw} [km/s]$')
-        ax3[0].legend()
-        ax3[1].plot(d['meank'],d[noise_to_plot],label=f'{z:.1f}')
-        if(k_units == "A"):
-            ax3[1].set_ylabel('$P_{' + labelnoise +'} [\AA]$')
-        elif(k_units == "kms"):
-            ax3[1].set_ylabel('$P_{' + labelnoise +'} [km/s]$')
-        ax3[2].plot(d['meank'],d['meanPk_raw'] - d[noise_to_plot],label=f'{z:.1f}')
-        if(k_units == "A"):
-            ax3[2].set_ylabel('$ (P_{raw} - P_{pipeline}) [\AA]$')
-        elif(k_units == "kms"):
-            ax3[2].set_ylabel('$ (P_{raw} - P_{pipeline}) [km/s]$')
-
-    ax3[3].errorbar(mean_dict["k_array"],mean_dict["meanPk"],mean_dict["errorPk"], fmt = 'o',label=side_band_legend[0])
-    if(k_units == "A"):
-        ax3[3].set_ylabel('$mean_{z}(P_{SB}) [\AA]$')
-    elif(k_units == "kms"):
-        ax3[3].set_ylabel('$mean_{z}(P_{SB}) [km/s]$')
-    if(side_band_fitpolynome):
-        poly = scipy.polyfit(mean_dict["k_array"],mean_dict["meanPk"],6)
-        Poly = np.polynomial.polynomial.Polynomial(np.flip(poly))
-        cont_k_array = np.linspace(np.min(mean_dict["k_array"]),np.max(mean_dict["k_array"]),300)
-        polynome = Poly(cont_k_array)
-        mean_dict["poly"]= polynome
-        mean_dict["k_cont"]=cont_k_array
-        ax3[3].plot(cont_k_array,polynome)
-    if(side_band_comp is not None):
-        yerr =np.sqrt( side_band_comp["error_meanPk_noise"]**2 + side_band_comp["error_meanPk_raw"]**2)
-        ax3[3].errorbar(side_band_comp["k_array"],side_band_comp["meanPk_raw"] - side_band_comp["meanPk_noise"],yerr, fmt = 'o',label=side_band_legend[1])
-        if(side_band_fitpolynome):
-            ax3[3].plot(side_band_comp["k_cont"],side_band_comp["poly"])
-        ax3[3].legend()
-    if(k_units == "A"):
-        ax3[3].set_xlabel('k[1/$\AA$]')
-        place_k_speed_unit_axis(fig3,ax3[0])
-    elif(k_units == "kms"):
-        ax3[3].set_xlabel('k[$s/km$]')
-    if(kmin is not None): ax3[0].set_xlim(kmin,kmax)
-    fig3.tight_layout()
-    fig3.savefig(f"{out_name}_side_band_unit{k_units}.pdf",format="pdf")
-
-
-
-
-
-
-def plot_metal_study(data,
-                     zbins,
-                     out_name,
-                     k_units,
-                     use_diff_noise,
-                     plot_side_band,
-                     side_band_comp=None,
-                     side_band_legend=["SB1","SB2"],
-                     **kwargs):
-
-    mean_dict = return_mean_z_dict(zbins,data)
-    if(use_diff_noise):
-        noise_to_plot,labelnoise = 'meanPk_diff','diff'
-    else:
-        noise_to_plot,labelnoise = 'meanPk_noise','pipeline'
-
-    if(plot_side_band):
-        plot_side_band_study(zbins,
-                             data,
-                             out_name,
-                             mean_dict,
-                             noise_to_plot,
-                             labelnoise,
-                             k_units,
-                             side_band_legend,
-                             side_band_comp=side_band_comp,
-                             **kwargs)
 
 
 # Line plots
