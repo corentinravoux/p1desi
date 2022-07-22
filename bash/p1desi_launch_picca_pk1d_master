@@ -1,0 +1,52 @@
+#!/bin/bash -l
+
+path_in="${1}"
+path_out=${2}
+path_log=${3}
+suffix=${4}
+snr_cut=${5}
+noise_estimate=${6}
+nb_proc=${7}
+
+
+echo "input path for computation:"
+echo $path_in
+echo "output path for computation:"
+echo $path_out
+echo "log path for computation:"
+echo $path_log
+echo "specific suffix:"
+echo $suffix
+echo "SNR cut:"
+echo $snr_cut
+echo "noise estimate for p1d:"
+echo $noise_estimate
+echo "number of processors:"
+echo $nb_proc
+
+
+if [[ ${suffix} == "None" ]]
+then
+suffix_flag=""
+else
+suffix_flag=${suffix}
+fi
+
+
+mkdir -p ${path_log}
+
+mkdir -p ${path_out}/pk1d_SNRcut${snr_cut}${suffix_flag}
+
+
+picca_Pk1D.py \
+--in-dir ${path_in}/Delta \
+--in-format fits \
+--out-dir ${path_out}/pk1d_SNRcut${snr_cut}${suffix_flag} \
+--out-format fits \
+--lambda-obs-min 3750. \
+--noise-estimate ${noise_estimate} \
+--num-processors ${nb_proc} \
+--nb-pixel-masked-max 120 \
+--nb-part 3 \
+--SNR-min ${snr_cut} \
+--num-noise-exp 2500 > ${path_log}/p1d_output_SNRcut${snr_cut}${suffix_flag} 2> ${path_log}/p1d_error_SNRcut${snr_cut}${suffix_flag}
