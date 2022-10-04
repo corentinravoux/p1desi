@@ -16,7 +16,7 @@ def prepare_hcd_correction(zbins,file_correction_hcd):
     A_hcd = {}
     for iz,z in enumerate(zbins):
         A_hcd[z] = np.poly1d(param_hcd[iz])
-    return(A_hcd)
+    return A_hcd
 
 def prepare_lines_correction(zbins,file_correction_lines):
     param_lines = pickle.load(open(file_correction_lines,"rb"))
@@ -46,43 +46,45 @@ def apply_correction(dict_plot,zbins,file_correction,type_correction):
 ################ eBOSS corrections ################
 
 
-    #
-    # lines_eboss = '/global/cfs/cdirs/desi/users/ravouxco/pk1d/eboss_data/LyaSDSS/Data/skl_Rvar_newP_DR12_SR_noBAL.txt'
-    # cont_eboss = '/global/cfs/cdirs/desi/users/ravouxco/pk1d/eboss_data/LyaSDSS/Data/cont_fz.txt'
-    # dla_eboss = '/global/cfs/cdirs/desi/users/ravouxco/pk1d/eboss_data/LyaSDSS/Data/dla_Pasquier_Rvar_newP_DR12_SR_noBAL.txt'
 
-
-
-def prepare_hcd_correction_eboss(hcd_eboss_name):
+def prepare_hcd_correction_eboss(zbins,hcd_eboss_name):
     param_hcd_eboss = np.loadtxt(hcd_eboss_name)
-    return param_hcd_eboss
+    A_hcd = {}
+    for iz,z in enumerate(zbins):
+        A_hcd[z] = np.poly1d(param_hcd_eboss[iz])
+    return A_hcd
 
-def prepare_lines_correction_eboss(lines_eboss_name):
+
+def prepare_lines_correction_eboss(zbins,lines_eboss_name):
     param_lines_eboss = np.loadtxt(lines_eboss_name)
-    return param_lines_eboss
+    A_lines = {}
+    for iz,z in enumerate(zbins):
+        A_lines[z] = np.poly1d(param_lines_eboss[iz])
+    return A_lines
 
-def prepare_cont_correction_eboss(cont_eboss_name):
+
+
+def model_cont_correction_eboss(a0,a1,k):
+    return (a0/k)+a1
+
+
+def prepare_cont_correction_eboss(zbins,cont_eboss_name):
     param_cont_eboss = np.loadtxt(cont_eboss_name)
-    return(A_hcd)
+    A_cont = {}
+    for iz,z in enumerate(zbins):
+        if iz < 6:
+            A_cont[z] = partial(model_cont_correction_eboss,param_cont_eboss[iz][0],param_cont_eboss[iz][1])
+        else:
+            A_cont[z] = np.poly1d(param_cont_eboss[iz])
+    return A_cont
 
 def apply_correction_eboss(dict_plot,zbins,file_correction,type_correction):
     A_corr = eval(f"prepare_{type_correction}_correction_eboss")(zbins,file_correction)
     for iz,z in enumerate(zbins):
-        dict_plot[z]["p_to_plot"] =  dict_plot[z]["p_to_plot"] * A_corr[z](dict_plot[z]["k_to_plot"])
+        k_speed = dict_plot[z]["k_to_plot"]/(utils.speed_light/(1+z)/utils.lambdaLy)
+        dict_plot[z]["p_to_plot"] =  dict_plot[z]["p_to_plot"] * A_corr[z](k_speed)
 
 
-    # if apply_eBOSS_maskcont_corr:
-    #     for iz,z in enumerate(zbins):
-    #         k_speed = dict_plot[z]["k_to_plot"]/(c/(1+z)/lya)
-    #
-    #         f_lines_eboss = np.poly1d(param_lines_eboss[iz])(k_speed)
-    #         f_dla_eboss = np.poly1d(param_dla_eboss[iz])(k_speed)
-    #         if iz < 6 :
-    #             f_cont_eboss = (param_cont_eboss[iz][0]/k_speed)+param_cont_eboss[iz][1]
-    #         else:
-    #             f_cont_eboss = np.poly1d(param_cont_eboss[iz])(k_speed)
-    #         dict_plot[z]["p_to_plot"] =  dict_plot[z]["p_to_plot"] / ( f_lines_eboss  *  f_dla_eboss * f_cont_eboss )
-    #
 
 
 ###################################################
@@ -114,11 +116,13 @@ def subtract_metal(dict_plot,zbins,file_metal,plot_P):
 def prepare_metal_correction_eboss(file_metal_eboss):
     sb_eboss ='/global/cfs/cdirs/desi/users/ravouxco/pk1d/eboss_data/LyaSDSS/Data/Correction_SB_Pk_1270_1380_no_BAL.txt'
     param_sb_eboss = np.loadtxt(sb_eboss)
+    return param_sb_eboss
+
 
 
 
 def subtract_metal_eboss(dict_plot,zbins,file_metal_eboss,plot_P):
-    prepare_metal_correction_eboss(file_metal_eboss)
+    param_sb_eboss = prepare_metal_correction_eboss(file_metal_eboss)
     nbin_eboss=35
     klimInf_eboss=0.000813
     klimSup_eboss=klimInf_eboss + nbin_eboss*0.000542
@@ -203,4 +207,4 @@ def apply_p1d_corections(mean_pk,
     if apply_eBOSS_sb_corr:
         subtract_metal_eboss(dict_plot,zbins,file_metal_eboss,plot_P)
 
-    return(dict_plot)
+    return dict_plot
