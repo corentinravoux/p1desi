@@ -45,3 +45,18 @@ def save_dataframe_to_fits(dataframe, filename, extname="QSO_CAT", clobber=True)
     fits = fitsio.FITS(filename, 'rw', clobber=clobber)
     fits.write(dataframe.to_records(index=False), extname=extname)
     fits.close()
+
+
+
+
+def get_number(catalog, type="QSO",extname=None):
+    if type == "QSO" :
+        if extname is None :
+            extname = "QSO_CAT"
+    if type == "DLA" :
+        if extname is None :
+            extname = "DLACAT"
+    try:
+        print(fitsio.FITS(catalog)[extname].get_nrows())
+    except:
+        print("Probably extname issue, catalog return", fitsio.FITS(catalog))
