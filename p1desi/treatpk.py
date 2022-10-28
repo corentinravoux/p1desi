@@ -16,7 +16,7 @@ import os
 import numpy as np
 import fitsio
 import astropy.table as t
-from p1desi import bookkeeping
+from p1desi import bookkeeping, utils
 from scipy.stats import binned_statistic_2d
 from scipy.stats import binned_statistic
 from bisect import bisect
@@ -209,7 +209,8 @@ def compute_single_means(f,
                     for stats in statsarr:
                         coldir[stats+c]=np.ones((1,len(kbinedges)-1))*np.nan
             else:
-                convfactor=(1215.67*(1+np.mean(dataarr['z'][select])))/3e5
+                # convfactor=(1215.67*(1+np.mean(dataarr['z'][select])))/3e5
+                convfactor=(utils.lambdaLy*(1+dataarr['z'][select]))/utils.speed_light
                 dataarr['k'][select]*=convfactor
                 for c in cols:
                     if 'Pk' in c:
