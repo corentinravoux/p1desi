@@ -63,8 +63,8 @@ echo $use_bookkeeping
 
 if [[ ${region} == "lya" ]]
 then
-lrestmin=1040.0
-lrestmax=1200.0
+lrestmin=1050.0
+lrestmax=1180.0
 elif [[ ${region} == "SB1" ]]
 then
 lrestmin=1270.0
@@ -149,7 +149,7 @@ type = '"${mode}"'
 analysis type = PK 1D
 input directory = '"${path_in}"'
 catalogue = '"${cat}"'
-lambda min = 3500.0
+lambda min = 3600.0
 lambda max = 7600.0
 lambda min rest frame = '"${lrestmin}"'
 lambda max rest frame = '"${lrestmax}"'
@@ -157,9 +157,17 @@ delta lambda = 0.8
 delta lambda rest frame = 2.6666666666666666666666
 lambda abs IGM = LYA
 wave solution = lin
+minimal snr pk1d = 1
 keep surveys = '"${surveys}"'
 use non-coadded spectra = '"${coadd_picca_flag}"'
 '"${bal_flag}"'
+
+[expected flux]
+type = Dr16ExpectedFlux
+iter out prefix = delta_attributes
+num iterations = 7
+use constant weight = '"${use_constant_weight}"'
+order = 0
 
 [corrections]
 num corrections = 0
@@ -169,12 +177,6 @@ num masks = '"${number_mask}"'
 '"${lines_flag1}"'
 '"${dla_flag1}"'
 
-[expected flux]
-type = Dr16ExpectedFlux
-iter out prefix = delta_attributes
-num iterations = 7
-use constant weight = '"${use_constant_weight}"'
-order = 0
 
 '"${lines_flag2}"'
 '"${lines_flag3}"'
