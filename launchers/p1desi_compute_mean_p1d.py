@@ -16,8 +16,9 @@ velunits = bool(str(sys.argv[2]) == "True")
 
 #### COMPUTE PK MEAN ARGS #####
 
-zbins = np.array([ 2.2, 2.4, 2.6 , 2.8, 3.0,3.2,3.4, 3.6, 3.8, 4.0, 4.2, 4.4, 4.6, 4.8, 5.0, 5.2, 5.4, 5.6, 5.8, 6.0])
-
+zbins = np.array([ 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0, 4.2, 4.4, 4.6, 4.8, 5.0, 5.2, 5.4, 5.6, 5.8, 6.0])
+snr_cut_mean = np.array([ 4.1, 3.9, 3.6, 3.2, 2.9, 2.6, 2.2, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0])
+snr_cut_mean = None
 
 rebinfac=1
 pixsize=0.8
@@ -59,4 +60,5 @@ if __name__ == "__main__":
                                              velunits=velunits,
                                              debug=debug,
                                              nomedians=nomedians,
-                                             logsample=logsample)
+                                             logsample=logsample,
+                                             snr_cut_mean=None)

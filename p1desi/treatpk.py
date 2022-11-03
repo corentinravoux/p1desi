@@ -63,7 +63,7 @@ def compute_Pk_means_parallel(data_dir,
         from multiprocessing import Pool
     files = glob.glob(os.path.join(data_dir,f"Pk1D{searchstr}.fits.gz"))
     #generate arrays
-    zbinedges=zbins-args['z_binsize']/2
+    zbinedges=np.array(zbins)-args['z_binsize']/2
     zbinedges=np.concatenate([zbinedges,zbinedges[[-1]]+args['z_binsize']])
     (k_inf,k_sup,k_dist) = define_wavevector_limits(args,velunits)
     print(f"wavenumber range and spacing {(k_inf,k_sup,k_dist)}")
