@@ -122,6 +122,11 @@ def model_SB1_indiv(param_mean,redshift,A,B,k):
     return (A * k + B) * mean_p
 
 
+def model_SB1_indiv_kms(param_mean,A,B,k):
+    mean_p = model_SB1(k,*param_mean)
+    return (A * k + B) * mean_p
+
+
 
 def fit_model_SB1(nb_bins,
                   x,y,dy,
@@ -179,10 +184,12 @@ def fit_model_SB2(nb_bins,
 
 
 def fit_model_SB1_indiv(nb_bins,
-                        param_mean,redshift,
+                        param_mean,
+                        redshift,
                         x,y,dy,
                         xmin=None,
-                        xmax=None):
+                        xmax=None,
+                        velunits=False):
     mask = (~np.isnan(x)) & (~np.isnan(y)) & (~np.isnan(dy))
     x, y, dy  = x[mask], y[mask], dy[mask]
     if(xmin is None):
@@ -191,7 +198,10 @@ def fit_model_SB1_indiv(nb_bins,
         xmax= x.max()
     mask = (x >= xmin) & (x <=xmax)
     def model_to_fit(k,A,B):
-        return model_SB1_indiv(param_mean,redshift,A,B,k)
+        if velunits :
+            return model_SB1_indiv_kms(param_mean,A,B,k)
+        else :
+            return model_SB1_indiv(param_mean,redshift,A,B,k)
     param, cov = curve_fit(model_to_fit,
                            xdata=x[mask],
                            ydata=y[mask],
@@ -205,7 +215,7 @@ def fit_model_SB1_indiv(nb_bins,
 
 
 
-def init_side_band_power(pSB1_name,pSB2_name,zbins):
+def init_side_band_power(pSB1_name,pSB2_name,zbins,velunits=False):
 
     pSB1 = plotpk.read_pk_means(pSB1_name)
     pSB2 = plotpk.read_pk_means(pSB2_name)
@@ -246,11 +256,17 @@ def init_side_band_power(pSB1_name,pSB2_name,zbins):
     dict_redshift["errorpkSB2"] = np.array(errorpkSB2)
     dict_redshift["nSB2"] = np.array(nSB2)
 
+    if velunits :
+        krestSB1 = np.array(kSB1)
+        krestSB2 = np.array(kSB2)
+        krescaleSB1 = np.linspace(np.nanmin(krestSB1),np.nanmax(krestSB1),krestSB1.shape[1])
+        krescaleSB2 = np.linspace(np.nanmin(krestSB2),np.nanmax(krestSB2),krestSB2.shape[1])
+    else :
+        krestSB1 = np.array(krestSB1)
+        krestSB2 = np.array(krestSB2)
+        krescaleSB1 = np.linspace(krestSB1[-1][0],krestSB1[0][-1],krestSB1.shape[1])
+        krescaleSB2 = np.linspace(krestSB2[-1][0],krestSB2[0][-1],krestSB2.shape[1])
 
-    krestSB1 = np.array(krestSB1)
-    krestSB2 = np.array(krestSB2)
-    krescaleSB1 = np.linspace(krestSB1[-1][0],krestSB1[0][-1],krestSB1.shape[1])
-    krescaleSB2 = np.linspace(krestSB2[-1][0],krestSB2[0][-1],krestSB2.shape[1])
     for i in range(len(pkSB1)):
         pkrestSB1.append(np.interp(krescaleSB1, krestSB1[i], pkSB1[i]))
         errorpkrestSB1.append(np.interp(krescaleSB1, krestSB1[i], errorpkSB1[i]))
@@ -273,15 +289,23 @@ def fit_mean_side_band_rest(mean_dict,
                             nb_bins=1000,
                             dkrest = 1.0,
                             kminrest = None,
-                            kmaxrest = 8):
+                            kmaxrest = 8,
+                            velunits = False):
+
+    if velunits :
+        kc4 = utils.kc4_speed
+        ksi4 = utils.ksi4_speed
+    else :
+        kc4 = utils.kc4
+        ksi4 = utils.ksi4
 
     (param_SB1_mean,
      cov_SB1_mean) = fit_model_SB1(nb_bins,
                                    mean_dict["krescaleSB1"],
                                    mean_dict["pkrestSB1"],
                                    mean_dict["errorpkrestSB1"],
-                                   utils.kc4,
-                                   utils.ksi4,
+                                   kc4,
+                                   ksi4,
                                    dkrest,
                                    xmin=kminrest,
                                    xmax=kmaxrest)
@@ -291,7 +315,7 @@ def fit_mean_side_band_rest(mean_dict,
                                    mean_dict["krescaleSB2"],
                                    mean_dict["pkrestSB2"],
                                    mean_dict["errorpkrestSB2"],
-                                   utils.kc4,
+                                   kc4,
                                    dkrest,
                                    xmin=kminrest,
                                    xmax=kmaxrest)
@@ -303,10 +327,10 @@ def fit_indiv_side_band_1(dict_redshift,
                           zbins,
                           param_SB1_mean,
                           nb_bins=1000,
-                          dk = 1.0,
                           kmin = None,
                           kmax = 8,
-                          save_fit = None):
+                          save_fit = None,
+                          velunits=False):
     param_SB1_indiv = []
     cov_SB1_indiv = []
     for i in range(len(zbins)):
@@ -318,7 +342,8 @@ def fit_indiv_side_band_1(dict_redshift,
                                         dict_redshift["pkSB1"][i],
                                         dict_redshift["errorpkSB1"][i],
                                         xmin=kmin,
-                                        xmax=kmax)
+                                        xmax=kmax,
+                                        velunits=velunits)
         param_SB1_indiv.append(param_SB1)
         cov_SB1_indiv.append(cov_SB1)
     if save_fit is not None:
@@ -337,6 +362,7 @@ def plot_side_band_fit(name_out,
                        nb_bins,
                        kmaxrest,
                        kmax,
+                       velunits=False,
                        **kwargs):
 
     style = utils.return_key(kwargs,"style",None)
@@ -351,10 +377,10 @@ def plot_side_band_fit(name_out,
     markersize = utils.return_key(kwargs,"markersize", 8)
 
     ylim = utils.return_key(kwargs,"ylim", [-0.01,0.05] if plot_P else [-0.001,0.02])
-    ylabel_1 = utils.return_key(kwargs,"ylabel_1", r'$P_{\mathrm{SB}}~[\AA]$')
-    ylabel_2 = utils.return_key(kwargs,"ylabel_2", r'$P_{\mathrm{SB1}}~[\AA]$')
-    xlabel_1 = utils.return_key(kwargs,"xlabel_1", r'$k_{\mathrm{rest}}=k_{\mathrm{obs}}(1+z)~[\mathrm{\AA}^{-1}]$')
-    xlabel_2 = utils.return_key(kwargs,"xlabel_2", r'$k_{\mathrm{obs}}~[\mathrm{\AA}^{-1}]$')
+    ylabel_1 = utils.return_key(kwargs,"ylabel_1", r'$P_{\mathrm{SB}}~[\mathrm{km}\cdot\mathrm{s}^{-1}]$' if velunits else r'$P_{\mathrm{SB}}~[\AA]$')
+    ylabel_2 = utils.return_key(kwargs,"ylabel_2", r'$P_{\mathrm{SB1}}~[\mathrm{km}\cdot\mathrm{s}^{-1}]$' if velunits else r'$P_{\mathrm{SB1}}~[\AA]$')
+    xlabel_1 = utils.return_key(kwargs,"xlabel_1", r'$k~[\mathrm{s}\cdot\mathrm{km}^{-1}]$' if velunits else r'$k_{\mathrm{rest}}=k_{\mathrm{obs}}(1+z)~[\mathrm{\AA}^{-1}]$')
+    xlabel_2 = utils.return_key(kwargs,"xlabel_2", r'$k~[\mathrm{s}\cdot\mathrm{km}^{-1}]$' if velunits else r'$k_{\mathrm{obs}}~[\mathrm{\AA}^{-1}]$')
 
     fig,ax=plt.subplots(2,1,figsize=figsize,sharex=False)
 
@@ -403,11 +429,17 @@ def plot_side_band_fit(name_out,
     for i in range(len(zbins)):
 
         k_fit = np.linspace(np.nanmin(dict_redshift["kSB1"][i]),kmax,nb_bins)
-        model_fitted = model_SB1_indiv(param_SB1_mean,
-                                       zbins[i],
-                                       param_SB1_indiv[i][0],
-                                       param_SB1_indiv[i][1],
-                                       k_fit)
+        if velunits :
+            model_fitted = model_SB1_indiv_kms(param_SB1_mean,
+                                               param_SB1_indiv[i][0],
+                                               param_SB1_indiv[i][1],
+                                               k_fit)
+        else :
+            model_fitted = model_SB1_indiv(param_SB1_mean,
+                                           zbins[i],
+                                           param_SB1_indiv[i][0],
+                                           param_SB1_indiv[i][1],
+                                           k_fit)
         if plot_P:
             p_plot = dict_redshift["pkSB1"][i]
             err_plot = dict_redshift["errorpkSB1"][i]
@@ -457,7 +489,6 @@ def plot_side_band_fit(name_out,
 
 
 
-
 def fit_and_plot_side_band(pSB1_name,
                            pSB2_name,
                            name_out,
@@ -466,13 +497,14 @@ def fit_and_plot_side_band(pSB1_name,
                            dkrest,
                            kminrest,
                            kmaxrest,
-                           dk,
                            kmin,
                            kmax,
                            plot_P = True,
                            save_fit = None,
+                           velunits = False,
                            **plt_args):
-    dict_redshift, mean_dict = init_side_band_power(pSB1_name,pSB2_name,zbins)
+
+    dict_redshift, mean_dict = init_side_band_power(pSB1_name,pSB2_name,zbins,velunits=velunits)
 
     (param_SB1_mean,
      param_SB2_mean,
@@ -481,17 +513,18 @@ def fit_and_plot_side_band(pSB1_name,
                                              nb_bins = nb_bins,
                                              dkrest = dkrest,
                                              kminrest = kminrest,
-                                             kmaxrest = kmaxrest)
+                                             kmaxrest = kmaxrest,
+                                             velunits = velunits)
 
     (param_SB1_indiv,
      cov_SB1_indiv) = fit_indiv_side_band_1(dict_redshift,
                                             zbins,
                                             param_SB1_mean,
                                             nb_bins=nb_bins,
-                                            dk = dk,
                                             kmin = kmin,
                                             kmax = kmax,
-                                            save_fit = save_fit)
+                                            save_fit = save_fit,
+                                            velunits=velunits)
 
     plot_side_band_fit(name_out,
                        plot_P,
@@ -504,4 +537,5 @@ def fit_and_plot_side_band(pSB1_name,
                        nb_bins,
                        kmaxrest,
                        kmax,
+                       velunits=velunits,
                        **plt_args)
