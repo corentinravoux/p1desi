@@ -539,3 +539,9 @@ def fit_and_plot_side_band(pSB1_name,
                        kmax,
                        velunits=velunits,
                        **plt_args)
+    return (param_SB1_mean,
+            param_SB2_mean,
+            cov_SB1_mean,
+            cov_SB2_mean,
+            param_SB1_indiv,
+            cov_SB1_indiv)
