@@ -192,32 +192,38 @@ def adjust_fig(fig,ax,ax2,fontt):
 
 
 
-def place_k_speed_unit_axis(fig,ax,fontt=None):
+def place_k_speed_unit_axis(fig,ax,fontsize=None,size=None,pos=0.2):
     #this createss more x-axes to compare things in k[s/km]
     par1 = ax.twiny()
     par2 = ax.twiny()
     par3 = ax.twiny()
     # Offset the right spine of par2.  The ticks and label have already been
     # placed on the right by twinx above.
-    par2.spines["top"].set_position(("axes", 1.3))
-    par3.spines["top"].set_position(("axes", 1.6))
+    par2.spines["top"].set_position(("axes", 1 + 1*pos))
+    par3.spines["top"].set_position(("axes", 1 + 2*pos))
     # Having been created by twinx, par2 has its frame off, so the line of its
     # detached spine is invisible.  First, activate the frame but make the patch
     # and spines invisible.
-    make_patch_spines_invisible(par2)
+    plotpk.make_patch_spines_invisible(par2)
     # Second, show the right spine.
     par2.spines["top"].set_visible(True)
-    par1.set_xlabel(r' k [s/km] @ z=2.2', fontsize = fontt)
-    par2.set_xlabel(r' k [s/km] @ z=2.8', fontsize = fontt)
-    par3.set_xlabel(r' k [s/km] @ z=3.4', fontsize = fontt)
+    par1.set_xlabel(r'$k~[$s$\cdot$km$^{-1}]$ @ z=2.2', fontsize = fontsize)
+    par2.set_xlabel(r'$k~[$s$\cdot$km$^{-1}]$ @ z=3.0', fontsize = fontsize)
+    par3.set_xlabel(r'$k~[$s$\cdot$km$^{-1}]$ @ z=3.8', fontsize = fontsize)
+
+    if size is not None:
+        par1.xaxis.set_tick_params(labelsize=size)
+        par2.xaxis.set_tick_params(labelsize=size)
+        par3.xaxis.set_tick_params(labelsize=size)
 
     par1.set_xlim(*ax.get_xlim())
     par2.set_xlim(*ax.get_xlim())
     par3.set_xlim(*ax.get_xlim())
 
-    par1.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=2.2)))
-    par2.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=2.8)))
-    par3.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=3.4)))
+    par1.xaxis.set_major_formatter(FuncFormatter(partial(plotpk.kAAtokskm,z=2.2)))
+    par2.xaxis.set_major_formatter(FuncFormatter(partial(plotpk.kAAtokskm,z=3.0)))
+    par3.xaxis.set_major_formatter(FuncFormatter(partial(plotpk.kAAtokskm,z=3.8)))
+
 
 
 def place_k_wavelength_unit_axis(fig,ax,z,fontt=None):
