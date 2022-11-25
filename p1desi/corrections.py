@@ -92,18 +92,21 @@ def apply_correction_eboss(dict_plot,zbins,file_correction,type_correction):
 ###################################################
 
 
-def prepare_metal_subtraction(zbins,file_metal):
+def prepare_metal_subtraction(zbins,file_metal,velunits=False):
     (param_SB1_mean,
      param_SB1_indiv)= pickle.load(open(file_metal,"rb"))
     P_metal_m = {}
     for iz,z in enumerate(zbins):
-        P_metal_m[z] = partial(metals.model_SB1_indiv,param_SB1_mean,z,param_SB1_indiv[iz][0],param_SB1_indiv[iz][1])
+        if velunits:
+            P_metal_m[z] = partial(metals.model_SB1_indiv_kms,param_SB1_mean,param_SB1_indiv[iz][0],param_SB1_indiv[iz][1])
+        else:
+            P_metal_m[z] = partial(metals.model_SB1_indiv,param_SB1_mean,z,param_SB1_indiv[iz][0],param_SB1_indiv[iz][1])
     return P_metal_m
 
 
 
-def subtract_metal(dict_plot,zbins,file_metal,plot_P):
-    P_metal_m = prepare_metal_subtraction(zbins,file_metal)
+def subtract_metal(dict_plot,zbins,file_metal,plot_P,velunits=False):
+    P_metal_m = prepare_metal_subtraction(zbins,file_metal,velunits=velunits)
     for iz,z in enumerate(zbins):
         if(plot_P):
             dict_plot[z]["p_to_plot"] = dict_plot[z]["p_to_plot"] - P_metal_m[z](dict_plot[z]["k_to_plot"])
@@ -114,8 +117,7 @@ def subtract_metal(dict_plot,zbins,file_metal,plot_P):
 
 
 def prepare_metal_correction_eboss(file_metal_eboss):
-    sb_eboss ='/global/cfs/cdirs/desi/users/ravouxco/pk1d/eboss_data/LyaSDSS/Data/Correction_SB_Pk_1270_1380_no_BAL.txt'
-    param_sb_eboss = np.loadtxt(sb_eboss)
+    param_sb_eboss = np.loadtxt(file_metal_eboss)
     return param_sb_eboss
 
 
@@ -202,7 +204,7 @@ def apply_p1d_corections(mean_pk,
             apply_correction_eboss(dict_plot,zbins,eval(f"file_correction_{type_correction}_eboss"),type_correction)
 
     if apply_DESI_sb_corr:
-        subtract_metal(dict_plot,zbins,file_metal,plot_P)
+        subtract_metal(dict_plot,zbins,file_metal,plot_P,velunits=velunits)
 
     if apply_eBOSS_sb_corr:
         subtract_metal_eboss(dict_plot,zbins,file_metal_eboss,plot_P)
