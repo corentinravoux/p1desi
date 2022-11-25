@@ -22,8 +22,11 @@ import astropy.table as t
 from p1desi import utils
 
 
-def read_pk_means(pk_means_name):
-    pkmeans = t.Table.read(pk_means_name)
+def read_pk_means(pk_means_name,old_format=False):
+    if old_format:
+        pkmeans = t.Table.read(pk_means_name)
+    else:
+        pkmeans = t.Table.read(pk_means_name, hdu=1)
     return(pkmeans)
 
 
