@@ -1,66 +1,60 @@
-
 [main]
-
-path = ./
-
-use_bookkeeping = False
-
-pk_path = /local/home/cravoux/Documents/P1d_desi_p1d/example_data
-region = lya
-snr_cut = 8
-lines_name = eBOSS
-catalog_name = edmond
-dla_name = None
-bal = None
-suffix_flag = _diff
-noise_estimate = diff
-
-abs_pk_path = /local/home/cravoux/Documents/P1d_desi_p1d/example_data/everest_sv1only_snr4
-abs_pk_path_sb = None
-
-
-velunits = False
 
 compute_mean = True
 plot_power = True
 plot_noise = False
+plot_metals = False
+velunits = False
+logsample = False
+zbins =   2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0, 4.2, 4.4, 4.6, 4.8, 5.0
+#snr_cut_mean = 4.1, 3.9, 3.6, 3.2, 2.9, 2.6, 2.2, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0
+snr_cut_mean = None
+zbins_plot = 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8
+suffix_plot = None
 
 
-[compute mean]
 
-overwrite=False
-debug=False
-nomedians=False
-logsample=False
-searchstr = *
 
-zbins = 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0, 4.2, 4.4, 4.6, 4.8, 5.0, 5.2, 5.4, 5.6, 5.8, 6.0
+[path]
 
-args_k_array =  {"rebinfac" : 1,
-  "z_binsize" : 0.2}
+path = ./
 
-ncpu=8
+use_bookkeeping = True
+
+; Define book keeping variable when use_bookkeeping = True
+pk_path = ./p1d_out
+region = lya
+snr_cut_path = 1, 2, 3, 4, 5, 8
+lines_name = DESIfuji2.5
+catalog_name = fugu_afterburner_nqt_nobal_BI
+dla_name = allcombine20.3
+bal = None
+noise_estimate = pipeline
+suffix = _v6
+
+; Define path and output name of plots when use_bookkeeping = False
+abs_pk_path = None
+abs_pk_path_sb = None
+outname = None
+
 
 
 [plot power]
 
 path_plot = plots
-
-plot_pk = True
-plot_diff_model = True
-
-zbins_plot = 2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4, 3.6
+plot_diff_model = False
 plot_P = False
-model_comparison = Naimmodel_stack
+model_comparison = None
 pk_comparison= None
-comparison_str = Naimmodel_stack
-comparison_model_file = /local/home/cravoux/Documents/Python/Data/p1d_models/models_eBOSS_lowz.fits , /local/home/cravoux/Documents/Python/Data/p1d_models/models_eBOSS_highz.fits
+comparison_str = None
+comparison_model_file = None
 substract_sb = False
 region_sb = None
 pk_means_name_sb = None
-
-plot_args = {"res_label" :  "DESI",
-  "res_label2" : "DESI comparison",
+beta_correction = None
+beta_correction_sb = None
+plot_args = {"res_label" :  "DESI Fugu v3",
+  "res_label2" : "",
   "diff_range" : 0.4,
   "no_errors_diff" : True,
   "marker_size" : 5,
@@ -71,27 +65,12 @@ plot_args = {"res_label" :  "DESI",
   "z_binsize" : 0.2,
   "kmin" : 4e-2,
   "kmax" : 2.5,
-  "ymin" : 0.006,
-  "ymax" : 0.2,
+  "ymin" : 0.01,
+  "ymax" : 0.3,
   "grid" : True,
-  "substract_sb_comparison" : False}
+  "substract_sb_comparison" : False,
+  "figsize": (9,6)}
 
 
-[plot noise]
-
-path_plot_noise = plots_noise_study
-
-use_diff_noise = True
-plot_noise_study = True
-plot_noise_ratio = True
-plot_noise_comparison_mean_k = True
-plot_side_band = False
-plot_noise_comparison_mean_z = True
 
 
-zbins_plot = 2.2, 2.4, 2.6, 2.8, 3.0
-k_units_noise_study = A
-fit_asymptote_ratio = True
-
-plot_args_noise = {"kmin" : 4e-2,
-  "kmax" : 4.0}
