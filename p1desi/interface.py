@@ -2,7 +2,7 @@ import os
 import configparser
 import ast
 import numpy as np
-from p1desi import treatpk,plotpk,bookkeeping
+from p1desi import plotpk, bookkeeping
 
 
 def parse_int_tuple(input):
@@ -96,11 +96,6 @@ def main(input_file):
 
 
     for pk,pk_sb,outname in zip(pks,pk_sbs,outnames):
-        if(main_config.getboolean("compute_mean")):
-            print("Treating path: ",pk)
-            mean_config = config["compute mean"]
-            compute_mean(pk,mean_config,main_config)
-
         velunits = main_config.getboolean("velunits")
         logsample = main_config.getboolean("logsample")
         snr_cut_mean = main_config.gettuplefloat("snr_cut_mean")
@@ -138,21 +133,6 @@ def main(input_file):
             plot_metals(mean_pk,path_plot_metals,plot_metals_config,main_config,outname)
 
 
-
-
-
-def compute_mean(pk,mean_config,main_config):
-    treatpk.compute_Pk_means_parallel(pk,
-                                      mean_config.getdict("args_k_array"),
-                                      np.array(main_config.gettuplefloat("zbins")),
-                                      searchstr=mean_config.getstr("searchstr"),
-                                      ncpu=mean_config.getint("ncpu"),
-                                      overwrite=mean_config.getboolean("overwrite"),
-                                      velunits=main_config.getboolean("velunits"),
-                                      debug=mean_config.getboolean("debug"),
-                                      nomedians=mean_config.getboolean("nomedians"),
-                                      logsample=main_config.getboolean("logsample"),
-                                      snr_cut_mean=main_config.gettuplefloat("snr_cut_mean"))
 
 
 def plot(mean_pk,mean_pk_sb,path_plot,plot_config,main_config,outname):
