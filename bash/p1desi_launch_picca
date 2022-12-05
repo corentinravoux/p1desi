@@ -180,7 +180,7 @@ type = Dr16ExpectedFlux
 iter out prefix = delta_attributes
 num iterations = 7
 use constant weight = '"${use_constant_weight}"'
-order = 0
+order = 1
 
 [corrections]
 num corrections = 0
