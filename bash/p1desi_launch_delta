@@ -17,13 +17,7 @@ dla=${14}
 dla_name=${15}
 bal=${16}
 nb_proc=${17}
-run_delta=${18}
-run_pk=${19}
-use_bookkeeping=${20}
-weights=${21}
-velunits=${22}
-rebinfac=${23}
-meansnrcut=${24}
+use_bookkeeping=${18}
 
 echo "input path for computation:"
 echo $path_in
@@ -59,20 +53,8 @@ echo "bal parameter cut:"
 echo $bal
 echo "number of processors:"
 echo $nb_proc
-echo "running of deltas:"
-echo $run_delta
-echo "running of pk1d:"
-echo $run_pk
 echo "Use of bookkeeping:"
 echo $use_bookkeeping
-echo "Use of a specific weighting for average pk calculation:"
-echo $weights
-echo "Use velocity unit conversion for average pk calculation:"
-echo $velunits
-echo "Rebinning factor for average pk calculation:"
-echo $rebinfac
-echo "Special snr cut for pk calculation:"
-echo $meansnrcut
 
 if [[ ${region} == "lya" ]]
 then
@@ -147,8 +129,6 @@ fi
 path_out=${path_out}/p1d_${folder_name}
 mkdir -p ${path_out}
 
-if [[ ${run_delta} == "True" ]]
-then
 
 echo -e '[general]
 overwrite = True
@@ -199,58 +179,5 @@ num masks = '"${number_mask}"'
 '"${dla_flag4}"'' > ${path_out}/delta_interface_${folder_name}
 
 picca_delta_extraction.py ${path_out}/delta_interface_${folder_name}
-fi
 
 
-if [[ ${run_pk} == "True" ]]
-then
-
-mkdir -p ${path_out}/pk1d_SNRcut${snr_cut}
-
-echo -e 'picca_Pk1D.py \
---in-dir '"${path_out}"'/Delta \
---in-format fits \
---out-dir '"${path_out}"'/pk1d_SNRcut'"${snr_cut}"' \
---out-format fits \
---lambda-obs-min 3750. \
---noise-estimate '"${noise_estimate}"' \
---num-processors '"${nb_proc}"' \
---nb-pixel-masked-max 120 \
---nb-part 3 \
---SNR-min '"${snr_cut}"' \
---num-noise-exp 2500 > '"${path_out}"'/Log/p1d_output_'"${folder_name}"'_SNRcut'"${snr_cut}"' 2> '"${path_out}"'/Log/p1d_error_'"${folder_name}"'_SNRcut'"${snr_cut}"'' > ${path_out}/p1d_command_${folder_name}_SNRcut${snr_cut}
-
-bash ${path_out}/p1d_command_${folder_name}_SNRcut${snr_cut}
-fi
-
-if [[ ${velunits} == "True" ]]
-then
-velunits_flag=""
-else
-velunits_flag="--velunits"
-fi
-
-if [[ ${rebinfac} == "None" ]]
-then
-rebinfac_flag="--rebinfac 1"
-else
-rebinfac_flag="--rebinfac "${rebinfac}
-fi
-
-if [[ ${meansnrcut} == "None" ]]
-then
-meansnrcut_flag=""
-else
-meansnrcut_flag="--apply-mean-snr-cut  --snr-cut-scheme"${meansnrcut}  
-fi
-
-
-
-echo -e 'picca_Pk1D_postprocess.py \
---in-dir '"${path_out}"'/pk1d_SNRcut'"${snr_cut}"' \
---rebinfac 1 \
---weights-method '"${weights}"' \
-'"${velunits_flag}"' '"${rebinfac_flag}"' '"${meansnrcut_flag}"' \
---overwrite' > ${path_out}/mean_p1d_command_${folder_name}_SNRcut${snr_cut}_weights${weights}
-
-bash ${path_out}/mean_p1d_command_${folder_name}_SNRcut${snr_cut}_weights${weights}

@@ -1,0 +1,62 @@
+#!/bin/bash -l
+
+path_in=${1}
+weights=${2}
+velunits=${3}
+rebinfac=${4}
+meansnrcut=${5}
+suffix=${6}
+snr_cut=${7}
+
+echo "input path for computation:"
+echo $path_in
+echo "Use of a specific weighting for average pk calculation:"
+echo $weights
+echo "Use velocity unit conversion for average pk calculation:"
+echo $velunits
+echo "Rebinning factor for average pk calculation:"
+echo $rebinfac
+echo "Special snr cut for pk calculation:"
+echo $meansnrcut
+echo "specific suffix:"
+echo $suffix
+echo "SNR cut:"
+echo $snr_cut
+
+if [[ ${suffix} == "None" ]]
+then
+suffix_flag=""
+else
+suffix_flag=${suffix}
+fi
+
+if [[ ${velunits} == "True" ]]
+then
+velunits_flag=""
+else
+velunits_flag="--velunits"
+fi
+
+if [[ ${rebinfac} == "None" ]]
+then
+rebinfac_flag="--rebinfac 1"
+else
+rebinfac_flag="--rebinfac "${rebinfac}
+fi
+
+if [[ ${meansnrcut} == "None" ]]
+then
+meansnrcut_flag=""
+else
+meansnrcut_flag="--apply-mean-snr-cut  --snr-cut-scheme"${meansnrcut}  
+fi
+
+
+echo -e 'picca_Pk1D_postprocess.py \
+--in-dir '"${path_in}"' \
+--rebinfac 1 \
+--weights-method '"${weights}"' \
+'"${velunits_flag}"' '"${rebinfac_flag}"' '"${meansnrcut_flag}"' \
+--overwrite> '"${path_in}"'/Log/p1d_output_SNRcut'"${snr_cut}"''"${suffix_flag}"' 2> '"${path_in}"'/Log/p1d_error_SNRcut'"${snr_cut}"''"${suffix_flag}"'' > ${path_out}/mean_p1d_command_SNRcut${snr_cut}_weights${weights}
+
+bash ${path_out}/mean_p1d_command_SNRcut${snr_cut}_weights${weights}
