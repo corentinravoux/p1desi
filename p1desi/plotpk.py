@@ -30,222 +30,6 @@ def read_pk_means(pk_means_name,old_format=False):
     return(pkmeans)
 
 
-def return_mean_z_dict(zbins,data):
-    mean_dict = {"meanPk_diff" : [],"meanPk_noise" : [],"meanPk_raw" : [], "error_diffovernoise":[], "error_meanPk_diffoverraw":[], "error_meanPk_noiseoverraw":[],"error_meanPk_raw":[],"k_array":[],"error_meanPk_noise" : [],"errorPk" : [],"meanPk" : []}
-    for z,d in zip(zbins,data):
-        mean_dict["meanPk"].append(d['meanPk'])
-        mean_dict["errorPk"].append(d['errorPk'])
-        mean_dict["meanPk_noise"].append(d['meanPk_noise'])
-        mean_dict["meanPk_raw"].append(d['meanPk_raw'])
-        yerr = (d['errorPk_noise'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_noise'] / d['meanPk_noise'])**2)
-        mean_dict["error_meanPk_noiseoverraw"].append(yerr)
-        mean_dict["k_array"] = d['meank']
-        mean_dict["error_meanPk_raw"].append(d['errorPk_raw'])
-        mean_dict["error_meanPk_noise"].append(d['errorPk_noise'])
-
-        mean_dict["meanPk_diff"].append(d['meanPk_diff'])
-        mean_dict["error_diffovernoise"].append(yerr)
-        yerr = (d['errorPk_diff'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_diff'] / d['meanPk_diff'])**2)
-        mean_dict["error_meanPk_diffoverraw"].append(yerr)
-
-    mean_dict["meanPk_noise"] = np.mean(mean_dict["meanPk_noise"],axis=0)
-    mean_dict["error_meanPk_noiseoverraw"] =np.mean(mean_dict["error_meanPk_noiseoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noiseoverraw"]))
-    mean_dict["meanPk_raw"] = np.mean(mean_dict["meanPk_raw"],axis=0)
-    mean_dict["error_meanPk_raw"] = np.mean(mean_dict['error_meanPk_raw'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_raw"]))
-    mean_dict["meanPk"] = np.mean(mean_dict["meanPk"],axis=0)
-    mean_dict["errorPk"] = np.mean(mean_dict['errorPk'],axis=0)/np.sqrt(len(mean_dict["errorPk"]))
-
-
-    mean_dict["error_meanPk_noise"] = np.mean(mean_dict['error_meanPk_noise'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noise"]))
-    mean_dict["meanPk_diff"] = np.mean(mean_dict["meanPk_diff"],axis=0)
-    mean_dict["error_meanPk_diffoverraw"] = np.mean(mean_dict["error_meanPk_diffoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_diffoverraw"]))
-
-    mean_dict["error_diffovernoise"] = np.mean(mean_dict["error_diffovernoise"],axis=0)/np.sqrt(len(mean_dict["error_diffovernoise"]))
-
-    return(mean_dict)
-
-
-
-
-### P1D plots
-
-def load_model(model,model_file):
-
-    if model == "eBOSSmodel_stack" :
-        eBOSSmodel_lowz=read_in_model(model_file[0])
-        eBOSSmodel_highz=read_in_model(model_file[1])
-        eBOSSmodel_stack=[np.vstack([m,m2]) for m,m2 in zip(eBOSSmodel_lowz, eBOSSmodel_highz)]
-        return(eBOSSmodel_stack)
-    elif model == "Naimmodel_stack":
-        def naim_function4(k,z,k0=0.009,k1=0.053,z0=3,A=0.066,B=3.59,n=-2.685,alpha=-0.22,beta=-0.16):
-            knorm0=k/k0
-            knorm1=k/k1
-            exp1=3+n+alpha*np.log(knorm0)
-            exp2=B+beta*np.log(knorm0)
-            nom=knorm0**exp1
-            denom=1+knorm1**2
-            zfac=(1+z)/(1+z0)
-            return A*nom/denom*zfac**exp2
-
-        Naimmodel={}
-        z_array=np.arange(2.2,4.7,0.2)
-        k_array=np.arange(0.001,0.1,0.0001)
-        Naimmodel['kpk']=naim_function4(k_array[np.newaxis,:],z_array[:,np.newaxis],A=0.084,B=3.64,alpha=-0.155,beta=0.32,k1=0.048,n=-2.655)
-        kk , zz = np.meshgrid(k_array,z_array)
-        Naimmodel['k'] = kk
-        Naimmodel['z'] = zz
-
-        Naimmodel_stack=(np.array(Naimmodel['z']),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
-        return(Naimmodel_stack)
-
-    elif model == "Naimmodel_truth_mocks":
-        def readTrueP1D(fname):
-            file = open(fname, 'rb')
-            nk, nz = struct.unpack('ii', file.read(struct.calcsize('ii')))
-
-            fmt = 'd' * nz
-            data = file.read(struct.calcsize(fmt))
-            z = np.array(struct.unpack(fmt, data), dtype=np.double)
-
-            fmt =  'd' * nk
-            data = file.read(struct.calcsize(fmt))
-            k = np.array(struct.unpack(fmt, data), dtype=np.double)
-
-            fmt =  'd' * nk * nz
-            data = file.read(struct.calcsize(fmt))
-            p1d = np.array(struct.unpack(fmt, data), dtype=np.double).reshape((nz, nk))
-
-            return z, k, p1d
-
-        z, k, p = readTrueP1D(model_file)
-        Naimmodel={}
-        Naimmodel['z']=np.array([[z[i] for j in range(len(k))] for i in range(len(z))])
-        Naimmodel['k']=np.array([k for i in range(len(z))])
-        Naimmodel['kpk']=p * k / np.pi
-        Naimmodel_mock=(np.array(Naimmodel['z']),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
-        return(Naimmodel_mock)
-    else :
-        raise ValueError("Incorrect model")
-
-
-
-
-
-def read_in_model(filename):
-    tab=fitsio.FITS(filename)[1]
-    z=tab['z'][:].reshape(-1,1000)
-    k=tab['k'][:].reshape(-1,1000)
-    kpk=tab['kpk'][:].reshape(-1,1000)
-    return z,k,kpk
-
-
-def kAAtokskm(x, pos=None,z=2.2):
-    kstr=x
-    knew=float(kstr)/(utils.speed_light/(1+z)/utils.lambdaLy)
-    transformed_label='{:.3f}'.format(knew)
-    return transformed_label
-
-def kskmtokAA(x,z=2.2):
-    kstr=x
-    knew=float(kstr)*(utils.speed_light/(1+z)/utils.lambdaLy)
-    transformed_label='{:.3f}'.format(knew)
-    return transformed_label
-
-def convert_data_to_kms(data):
-    scale_fac = (utils.speed_light/(1+data["z"])/utils.lambdaLy)
-    if(data is not None):
-        for key in data.keys():
-            if((key!="rescor")|(key!="z")|(key!="nmodes")):
-                if(key =="k"):
-                    data[key]=np.transpose(np.transpose(data[key])/scale_fac)
-                else :
-                    data[key]=np.transpose(np.transpose(data[key])*scale_fac)
-    return(data)
-
-
-def adjust_fig(fig,ax,ax2,fontt):
-    #this createss more x-axes to compare things in k[s/km]
-    fig.subplots_adjust(top=0.75)
-    par1 = ax.twiny()
-    par2 = ax.twiny()
-    par3 = ax.twiny()
-    # Offset the right spine of par2.  The ticks and label have already been
-    # placed on the right by twinx above.
-    par2.spines["top"].set_position(("axes", 1.2))
-    par3.spines["top"].set_position(("axes", 1.4))
-    # Having been created by twinx, par2 has its frame off, so the line of its
-    # detached spine is invisible.  First, activate the frame but make the patch
-    # and spines invisible.
-    make_patch_spines_invisible(par2)
-    # Second, show the right spine.
-    par2.spines["top"].set_visible(True)
-    par1.set_xlabel(r' k [s/km] @ z=2.2', fontsize = fontt)
-    par2.set_xlabel(r' k [s/km] @ z=2.8', fontsize = fontt)
-    par3.set_xlabel(r' k [s/km] @ z=3.4', fontsize = fontt)
-
-    par1.set_xlim(*ax2.get_xlim())
-    par2.set_xlim(*ax2.get_xlim())
-    par3.set_xlim(*ax2.get_xlim())
-
-    par1.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=2.2)))
-    par2.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=2.8)))
-    par3.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=3.4)))
-
-    return(par1,par2,par3)
-
-
-
-def place_k_speed_unit_axis(fig,ax,fontsize=None,size=None,pos=0.2):
-    #this createss more x-axes to compare things in k[s/km]
-    par1 = ax.twiny()
-    par2 = ax.twiny()
-    par3 = ax.twiny()
-    # Offset the right spine of par2.  The ticks and label have already been
-    # placed on the right by twinx above.
-    par2.spines["top"].set_position(("axes", 1 + 1*pos))
-    par3.spines["top"].set_position(("axes", 1 + 2*pos))
-    # Having been created by twinx, par2 has its frame off, so the line of its
-    # detached spine is invisible.  First, activate the frame but make the patch
-    # and spines invisible.
-    plotpk.make_patch_spines_invisible(par2)
-    # Second, show the right spine.
-    par2.spines["top"].set_visible(True)
-    par1.set_xlabel(r'$k~[$s$\cdot$km$^{-1}]$ @ z=2.2', fontsize = fontsize)
-    par2.set_xlabel(r'$k~[$s$\cdot$km$^{-1}]$ @ z=3.0', fontsize = fontsize)
-    par3.set_xlabel(r'$k~[$s$\cdot$km$^{-1}]$ @ z=3.8', fontsize = fontsize)
-
-    if size is not None:
-        par1.xaxis.set_tick_params(labelsize=size)
-        par2.xaxis.set_tick_params(labelsize=size)
-        par3.xaxis.set_tick_params(labelsize=size)
-
-    par1.set_xlim(*ax.get_xlim())
-    par2.set_xlim(*ax.get_xlim())
-    par3.set_xlim(*ax.get_xlim())
-
-    par1.xaxis.set_major_formatter(FuncFormatter(partial(plotpk.kAAtokskm,z=2.2)))
-    par2.xaxis.set_major_formatter(FuncFormatter(partial(plotpk.kAAtokskm,z=3.0)))
-    par3.xaxis.set_major_formatter(FuncFormatter(partial(plotpk.kAAtokskm,z=3.8)))
-
-
-
-def place_k_wavelength_unit_axis(fig,ax,z,fontt=None):
-    #this createss more x-axes to compare things in k[s/km]
-    par1 = ax.twiny()
-    par1.set_xlabel(r' k [s/km] @ z=2.2', fontsize = fontt)
-    par1.xaxis.set_major_formatter(FuncFormatter(partial(kskmtokAA,z)))
-
-
-
-
-def make_patch_spines_invisible(ax):
-    ax.set_frame_on(True)
-    ax.patch.set_visible(False)
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-
-
-
 
 def prepare_plot_values(data,
                         zbins,
@@ -372,8 +156,228 @@ def prepare_plot_values(data,
         dict_plot[z]["chi_p_to_plot"] = chi_p_to_plot
         dict_plot[z]["diff_err_to_plot"] = diff_err_to_plot
 
-
     return(dict_plot)
+
+
+def return_mean_z_dict(zbins,data):
+    mean_dict = {"meanPk_diff" : [],"meanPk_noise" : [],"meanPk_raw" : [], "error_diffovernoise":[], "error_meanPk_diffoverraw":[], "error_meanPk_noiseoverraw":[],"error_meanPk_raw":[],"k_array":[],"error_meanPk_noise" : [],"errorPk" : [],"meanPk" : []}
+    for z,d in zip(zbins,data):
+        mean_dict["meanPk"].append(d['meanPk'])
+        mean_dict["errorPk"].append(d['errorPk'])
+        mean_dict["meanPk_noise"].append(d['meanPk_noise'])
+        mean_dict["meanPk_raw"].append(d['meanPk_raw'])
+        yerr = (d['errorPk_noise'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_noise'] / d['meanPk_noise'])**2)
+        mean_dict["error_meanPk_noiseoverraw"].append(yerr)
+        mean_dict["k_array"] = d['meank']
+        mean_dict["error_meanPk_raw"].append(d['errorPk_raw'])
+        mean_dict["error_meanPk_noise"].append(d['errorPk_noise'])
+
+        mean_dict["meanPk_diff"].append(d['meanPk_diff'])
+        mean_dict["error_diffovernoise"].append(yerr)
+        yerr = (d['errorPk_diff'] / d['meanPk_raw']) *  np.sqrt((d['errorPk_raw'] / d['meanPk_raw'])**2 + (d['errorPk_diff'] / d['meanPk_diff'])**2)
+        mean_dict["error_meanPk_diffoverraw"].append(yerr)
+
+    mean_dict["meanPk_noise"] = np.mean(mean_dict["meanPk_noise"],axis=0)
+    mean_dict["error_meanPk_noiseoverraw"] =np.mean(mean_dict["error_meanPk_noiseoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noiseoverraw"]))
+    mean_dict["meanPk_raw"] = np.mean(mean_dict["meanPk_raw"],axis=0)
+    mean_dict["error_meanPk_raw"] = np.mean(mean_dict['error_meanPk_raw'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_raw"]))
+    mean_dict["meanPk"] = np.mean(mean_dict["meanPk"],axis=0)
+    mean_dict["errorPk"] = np.mean(mean_dict['errorPk'],axis=0)/np.sqrt(len(mean_dict["errorPk"]))
+
+
+    mean_dict["error_meanPk_noise"] = np.mean(mean_dict['error_meanPk_noise'],axis=0)/np.sqrt(len(mean_dict["error_meanPk_noise"]))
+    mean_dict["meanPk_diff"] = np.mean(mean_dict["meanPk_diff"],axis=0)
+    mean_dict["error_meanPk_diffoverraw"] = np.mean(mean_dict["error_meanPk_diffoverraw"],axis=0)/np.sqrt(len(mean_dict["error_meanPk_diffoverraw"]))
+
+    mean_dict["error_diffovernoise"] = np.mean(mean_dict["error_diffovernoise"],axis=0)/np.sqrt(len(mean_dict["error_diffovernoise"]))
+
+    return(mean_dict)
+
+
+
+
+
+def load_model(model,model_file):
+
+    if model == "eBOSSmodel_stack" :
+        eBOSSmodel_lowz=read_in_model(model_file[0])
+        eBOSSmodel_highz=read_in_model(model_file[1])
+        eBOSSmodel_stack=[np.vstack([m,m2]) for m,m2 in zip(eBOSSmodel_lowz, eBOSSmodel_highz)]
+        return(eBOSSmodel_stack)
+    elif model == "Naimmodel_stack":
+        def naim_function4(k,z,k0=0.009,k1=0.053,z0=3,A=0.066,B=3.59,n=-2.685,alpha=-0.22,beta=-0.16):
+            knorm0=k/k0
+            knorm1=k/k1
+            exp1=3+n+alpha*np.log(knorm0)
+            exp2=B+beta*np.log(knorm0)
+            nom=knorm0**exp1
+            denom=1+knorm1**2
+            zfac=(1+z)/(1+z0)
+            return A*nom/denom*zfac**exp2
+
+        Naimmodel={}
+        z_array=np.arange(2.2,4.7,0.2)
+        k_array=np.arange(0.001,0.1,0.0001)
+        Naimmodel['kpk']=naim_function4(k_array[np.newaxis,:],z_array[:,np.newaxis],A=0.084,B=3.64,alpha=-0.155,beta=0.32,k1=0.048,n=-2.655)
+        kk , zz = np.meshgrid(k_array,z_array)
+        Naimmodel['k'] = kk
+        Naimmodel['z'] = zz
+
+        Naimmodel_stack=(np.array(Naimmodel['z']),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
+        return(Naimmodel_stack)
+
+    elif model == "Naimmodel_truth_mocks":
+        def readTrueP1D(fname):
+            file = open(fname, 'rb')
+            nk, nz = struct.unpack('ii', file.read(struct.calcsize('ii')))
+
+            fmt = 'd' * nz
+            data = file.read(struct.calcsize(fmt))
+            z = np.array(struct.unpack(fmt, data), dtype=np.double)
+
+            fmt =  'd' * nk
+            data = file.read(struct.calcsize(fmt))
+            k = np.array(struct.unpack(fmt, data), dtype=np.double)
+
+            fmt =  'd' * nk * nz
+            data = file.read(struct.calcsize(fmt))
+            p1d = np.array(struct.unpack(fmt, data), dtype=np.double).reshape((nz, nk))
+
+            return z, k, p1d
+
+        z, k, p = readTrueP1D(model_file)
+        Naimmodel={}
+        Naimmodel['z']=np.array([[z[i] for j in range(len(k))] for i in range(len(z))])
+        Naimmodel['k']=np.array([k for i in range(len(z))])
+        Naimmodel['kpk']=p * k / np.pi
+        Naimmodel_mock=(np.array(Naimmodel['z']),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
+        return(Naimmodel_mock)
+    else :
+        raise ValueError("Incorrect model")
+
+
+
+
+
+def read_in_model(filename):
+    tab=fitsio.FITS(filename)[1]
+    z=tab['z'][:].reshape(-1,1000)
+    k=tab['k'][:].reshape(-1,1000)
+    kpk=tab['kpk'][:].reshape(-1,1000)
+    return z,k,kpk
+
+
+
+
+
+
+### P1D plots
+
+def kAAtokskm(x, pos=None,z=2.2):
+    kstr=x
+    knew=float(kstr)/(utils.speed_light/(1+z)/utils.lambdaLy)
+    transformed_label='{:.3f}'.format(knew)
+    return transformed_label
+
+def kskmtokAA(x,z=2.2):
+    kstr=x
+    knew=float(kstr)*(utils.speed_light/(1+z)/utils.lambdaLy)
+    transformed_label='{:.3f}'.format(knew)
+    return transformed_label
+
+def convert_data_to_kms(data):
+    scale_fac = (utils.speed_light/(1+data["z"])/utils.lambdaLy)
+    if(data is not None):
+        for key in data.keys():
+            if((key!="rescor")|(key!="z")|(key!="nmodes")):
+                if(key =="k"):
+                    data[key]=np.transpose(np.transpose(data[key])/scale_fac)
+                else :
+                    data[key]=np.transpose(np.transpose(data[key])*scale_fac)
+    return(data)
+
+
+def adjust_fig(fig,ax,ax2,fontt):
+    #this createss more x-axes to compare things in k[s/km]
+    fig.subplots_adjust(top=0.75)
+    par1 = ax.twiny()
+    par2 = ax.twiny()
+    par3 = ax.twiny()
+    # Offset the right spine of par2.  The ticks and label have already been
+    # placed on the right by twinx above.
+    par2.spines["top"].set_position(("axes", 1.2))
+    par3.spines["top"].set_position(("axes", 1.4))
+    # Having been created by twinx, par2 has its frame off, so the line of its
+    # detached spine is invisible.  First, activate the frame but make the patch
+    # and spines invisible.
+    make_patch_spines_invisible(par2)
+    # Second, show the right spine.
+    par2.spines["top"].set_visible(True)
+    par1.set_xlabel(r' k [s/km] @ z=2.2', fontsize = fontt)
+    par2.set_xlabel(r' k [s/km] @ z=2.8', fontsize = fontt)
+    par3.set_xlabel(r' k [s/km] @ z=3.4', fontsize = fontt)
+
+    par1.set_xlim(*ax2.get_xlim())
+    par2.set_xlim(*ax2.get_xlim())
+    par3.set_xlim(*ax2.get_xlim())
+
+    par1.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=2.2)))
+    par2.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=2.8)))
+    par3.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm,z=3.4)))
+
+    return(par1,par2,par3)
+
+
+
+def place_k_speed_unit_axis(fig,ax,fontsize=None,size=None,pos=0.2):
+    #this createss more x-axes to compare things in k[s/km]
+    par1 = ax.twiny()
+    par2 = ax.twiny()
+    par3 = ax.twiny()
+    # Offset the right spine of par2.  The ticks and label have already been
+    # placed on the right by twinx above.
+    par2.spines["top"].set_position(("axes", 1 + 1*pos))
+    par3.spines["top"].set_position(("axes", 1 + 2*pos))
+    # Having been created by twinx, par2 has its frame off, so the line of its
+    # detached spine is invisible.  First, activate the frame but make the patch
+    # and spines invisible.
+    plotpk.make_patch_spines_invisible(par2)
+    # Second, show the right spine.
+    par2.spines["top"].set_visible(True)
+    par1.set_xlabel(r'$k~[$s$\cdot$km$^{-1}]$ @ z=2.2', fontsize = fontsize)
+    par2.set_xlabel(r'$k~[$s$\cdot$km$^{-1}]$ @ z=3.0', fontsize = fontsize)
+    par3.set_xlabel(r'$k~[$s$\cdot$km$^{-1}]$ @ z=3.8', fontsize = fontsize)
+
+    if size is not None:
+        par1.xaxis.set_tick_params(labelsize=size)
+        par2.xaxis.set_tick_params(labelsize=size)
+        par3.xaxis.set_tick_params(labelsize=size)
+
+    par1.set_xlim(*ax.get_xlim())
+    par2.set_xlim(*ax.get_xlim())
+    par3.set_xlim(*ax.get_xlim())
+
+    par1.xaxis.set_major_formatter(FuncFormatter(partial(plotpk.kAAtokskm,z=2.2)))
+    par2.xaxis.set_major_formatter(FuncFormatter(partial(plotpk.kAAtokskm,z=3.0)))
+    par3.xaxis.set_major_formatter(FuncFormatter(partial(plotpk.kAAtokskm,z=3.8)))
+
+
+
+def place_k_wavelength_unit_axis(fig,ax,z,fontt=None):
+    #this createss more x-axes to compare things in k[s/km]
+    par1 = ax.twiny()
+    par1.set_xlabel(r' k [s/km] @ z=2.2', fontsize = fontt)
+    par1.xaxis.set_major_formatter(FuncFormatter(partial(kskmtokAA,z)))
+
+
+
+
+def make_patch_spines_invisible(ax):
+    ax.set_frame_on(True)
+    ax.patch.set_visible(False)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
 
 
 
