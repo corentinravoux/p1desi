@@ -1,7 +1,7 @@
-import pickle,os,fitsio
+import pickle, os, fitsio, glob
 import numpy as np
 from functools import partial
-from p1desi import plotpk, metals
+from p1desi import metals
 
 
 ###################################################
@@ -160,11 +160,7 @@ def subtract_metal_eboss(dict_plot,zbins,file_metal_eboss,plot_P):
 
 
 
-def apply_p1d_corections(mean_pk,
-                         zbins,
-                         plot_P,
-                         z_binsize,
-                         velunits,
+def apply_p1d_corections(dict_plot,
                          apply_DESI_maskcont_corr,
                          apply_eBOSS_maskcont_corr,
                          apply_DESI_sb_corr,
@@ -178,14 +174,6 @@ def apply_p1d_corections(mean_pk,
                          file_correction_cont_eboss = None,
                          file_metal = None,
                          file_metal_eboss = None):
-
-
-
-    dict_plot = plotpk.prepare_plot_values(mean_pk,
-                                           zbins,
-                                           plot_P=plot_P,
-                                           z_binsize=z_binsize,
-                                           velunits=velunits)
 
 
     if apply_DESI_maskcont_corr & apply_eBOSS_maskcont_corr:
@@ -210,3 +198,47 @@ def apply_p1d_corections(mean_pk,
         subtract_metal_eboss(dict_plot,zbins,file_metal_eboss,plot_P)
 
     return dict_plot
+
+
+
+
+
+###################################################
+################ Noise corrections ################
+###################################################
+
+
+
+def model_noise_correction(SNR,A,g,B):
+    power_law = A * SNR**(-g) + B
+    return(power_law)
+
+
+
+def correct_individual_pk_noise(pk_in,
+                                pk_out,
+                                qsocat,
+                                correction):
+    os.makedirs(pk_out,exist_ok=True)
+    pk_files = glob.glob(os.path.join(pk_in,"Pk1D-*"))
+
+    qso_file = fitsio.FITS(qsocat)["QSO_CAT"]
+    targetid_qso = qso_file["TARGETID"][:]
+    survey_qso = qso_file["SURVEY"][:]
+    for i in range(len(pk_files)):
+        pk_out_name = pk_files[i].split("/")[-1]
+        f_out = fitsio.FITS(os.path.join(pk_out,pk_out_name),'rw',clobber=True)
+        f = fitsio.FITS(pk_files[i])
+        for j in range(1,len(f)):
+            header = dict(f[j].read_header())
+            snr = header["MEANSNR"]
+            id = header["LOS_ID"]
+            survey_id = survey_qso[np.argwhere(targetid_qso == id)[0]][0]
+            p_noise_miss = model(snr,*correction[survey_id])
+            line = f[j].read()
+            new_line = np.zeros(line.size, dtype=[(line.dtype.names[i],line.dtype[i]) for i in range(len(line.dtype))] + [('PK_NOISE_MISS','>f8')])
+            for name in line.dtype.names :
+                new_line[name] = line[name]
+            new_line['PK_NOISE'] = new_line['PK_NOISE'] + p_noise_miss
+            new_line['PK_NOISE_MISS'] = np.full(line.size,p_noise_miss)
+            f_out.write(new_line,header=header,extname=str(id))
