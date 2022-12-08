@@ -2,7 +2,7 @@ import os
 import configparser
 import ast
 import numpy as np
-from p1desi import plotpk, bookkeeping
+from p1desi import plotpk, bookkeeping, noise
 
 
 def parse_int_tuple(input):
@@ -183,7 +183,7 @@ def plot_noise(mean_pk,path_plot_noise,plot_noise_config,main_config,outname):
 
 
     if(plot_noise_config.getboolean("plot_noise_comparison_mean_z")):
-        plotpk.compute_and_plot_mean_z_noise_power(data,
+        noise.compute_and_plot_mean_z_noise_power(data,
                                                    np.array(main_config.gettuplefloat("zbins_plot")),
                                                    outname,
                                                    **plot_noise_config.getdict("plot_args_noise"))
