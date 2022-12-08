@@ -69,11 +69,7 @@ path_to_pk_sb=${path_in}/p1d_${folder_name_sb}/pk1d_${noise_estimate}_noise_esti
 path_plot=${path_plot}/${region}/p1d_${folder_name}_${noise_estimate}_noise_estimate
 
 
-python3 /global/homes/r/ravouxco/2_Software/Python/Packages/p1desi/launchers/p1desi_compute_mean_p1d.py \
-${path_to_pk} \
-${velunits} \
-
-python3 /global/homes/r/ravouxco/2_Software/Python/Packages/p1desi/launchers/p1desi_plot.py \
+p1desi_plot.py \
 ${path_to_pk} \
 ${path_plot} \
 ${region_sb} \
