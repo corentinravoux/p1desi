@@ -7,7 +7,7 @@ Created on Thu Apr 30 09:50:01 2020
 """
 
 import numpy as np
-from p1desi import plotpk
+from p1desi import plotpk, noise
 import sys,os
 
 ### Input
@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
 
     if(plot_noise_comparison_mean_z):
-        plotpk.compute_and_plot_mean_z_noise_power(data,
+        noise.compute_and_plot_mean_z_noise_power(data,
                                                      zbins,
                                                      outname,
                                                      **kwargs_noise2)
