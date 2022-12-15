@@ -329,7 +329,7 @@ def plot_data(data,
 
     if(dict_plot[zbins[0]]["k_to_plot_comparison"] is not None):
         if not velunits:
-            par1,par2,par3 = place_k_speed_unit_axis(fig,ax,ax2,fonttext)
+            par1,par2,par3 = utils.place_k_speed_unit_axis(fig,ax,ax2,fonttext)
 
 
     for iz,z in enumerate(zbins):
