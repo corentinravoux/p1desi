@@ -1,11 +1,10 @@
 from p1desi import plotpk, utils
+import pickle, scipy
 import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 from scipy.optimize import curve_fit
 from matplotlib import cm
 from matplotlib.lines import Line2D
-from functools import partial
 
 
 def plot_side_band_study(zbins,
@@ -63,7 +62,7 @@ def plot_side_band_study(zbins,
         ax[3].legend()
     if(k_units == "A"):
         ax[3].set_xlabel('k[1/$\AA$]')
-        place_k_speed_unit_axis(fig,ax[0])
+        utils.place_k_speed_unit_axis(fig,ax[0])
     elif(k_units == "kms"):
         ax[3].set_xlabel('k[$s/km$]')
     if(kmin is not None): ax[0].set_xlim(kmin,kmax)
