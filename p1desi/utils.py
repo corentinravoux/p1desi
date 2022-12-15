@@ -1,4 +1,6 @@
 import numpy as np
+from matplotlib.ticker import FuncFormatter
+from functools import partial
 
 lambdaLy = 1215.673123130217
 
@@ -31,18 +33,18 @@ def return_key(dictionary,string,default_value):
 
 def kAAtokskm(x, pos=None,z=2.2):
     kstr=x
-    knew=float(kstr)/(utils.speed_light/(1+z)/utils.lambdaLy)
+    knew=float(kstr)/(speed_light/(1+z)/lambdaLy)
     transformed_label='{:.3f}'.format(knew)
     return transformed_label
 
 def kskmtokAA(x,z=2.2):
     kstr=x
-    knew=float(kstr)*(utils.speed_light/(1+z)/utils.lambdaLy)
+    knew=float(kstr)*(speed_light/(1+z)/lambdaLy)
     transformed_label='{:.3f}'.format(knew)
     return transformed_label
 
 def convert_data_to_kms(data):
-    scale_fac = (utils.speed_light/(1+data["z"])/utils.lambdaLy)
+    scale_fac = (speed_light/(1+data["z"])/lambdaLy)
     if(data is not None):
         for key in data.keys():
             if((key!="rescor")|(key!="z")|(key!="nmodes")):
