@@ -18,41 +18,6 @@ def compute_and_plot_mean_z_noise_power(data,
 
 
 
-def compute_mean_z_noise_power(data,zbins,kmin=4e-2,kmax=2.5):
-    velunits = data.meta["VELUNITS"]
-
-    if velunits and kmax==2:
-        kmax=0.035
-    if velunits and kmin==4e-2:
-        kmin=8e-4
-
-    diff_model = {"Pk_diff" : [] ,"Pk_noise" : []}
-    for iz,z in enumerate(zbins):
-        dat=data[iz]
-        select=dat['N']>0
-        k=dat['meank'][select]
-        Pk_noise = dat["meanPk_noise"][select][k<kmax]
-        Pk_diff = dat["meanPk_diff"][select][k<kmax]
-        diff_model["Pk_diff"].append(Pk_diff)
-        diff_model["Pk_noise"].append(Pk_noise)
-
-    dict_noise_diff = {"diff":[],"error_diff" : [],"pipeline" : [],"error_pipeline":[],"diff_over_pipeline":[],"error_diff_over_pipeline":[]}
-    for i in range(len(diff_model["Pk_noise"])):
-        noise_error = scipy.stats.sem(diff_model["Pk_noise"][i],ddof=0)
-        diff_error = scipy.stats.sem(diff_model["Pk_diff"][i],ddof=0)
-        diff_over_noise_error = (np.mean(diff_model["Pk_diff"][i])/np.mean(diff_model["Pk_noise"][i]))*np.sqrt((diff_error/np.mean(diff_model["Pk_diff"][i]))**2 + (noise_error/np.mean(diff_model["Pk_noise"][i]))**2)
-        dict_noise_diff["diff"].append(np.mean(diff_model["Pk_diff"][i]))
-        dict_noise_diff["error_diff"].append(diff_error)
-        dict_noise_diff["pipeline"].append(np.mean(diff_model["Pk_noise"][i]))
-        dict_noise_diff["error_pipeline"].append(noise_error)
-        dict_noise_diff["diff_over_pipeline"].append(np.mean((diff_model["Pk_diff"][i] - diff_model["Pk_noise"][i])/diff_model["Pk_noise"][i]))
-        dict_noise_diff["error_diff_over_pipeline"].append(diff_over_noise_error)
-    dict_noise_diff["zbins"] = zbins
-
-    return(dict_noise_diff)
-
-
-
 
 def plot_mean_z_noise_power(dict_noise_diff,zbins,outname,dreshift = 0.02):
     fig,ax=plt.subplots(2,1,figsize=(8,6),sharex=True)
