@@ -1,7 +1,7 @@
 import pickle, os, fitsio, glob
 import numpy as np
 from functools import partial
-from p1desi import metals
+from p1desi import metals, utils
 
 
 ###################################################
@@ -161,6 +161,9 @@ def subtract_metal_eboss(dict_plot,zbins,file_metal_eboss,plot_P):
 
 
 def apply_p1d_corections(dict_plot,
+                         zbins,
+                         plot_P,
+                         velunits,
                          apply_DESI_maskcont_corr,
                          apply_eBOSS_maskcont_corr,
                          apply_DESI_sb_corr,
@@ -234,7 +237,7 @@ def correct_individual_pk_noise(pk_in,
             snr = header["MEANSNR"]
             id = header["LOS_ID"]
             survey_id = survey_qso[np.argwhere(targetid_qso == id)[0]][0]
-            p_noise_miss = model(snr,*correction[survey_id])
+            p_noise_miss = model_noise_correction(snr,*correction[survey_id])
             line = f[j].read()
             new_line = np.zeros(line.size, dtype=[(line.dtype.names[i],line.dtype[i]) for i in range(len(line.dtype))] + [('PK_NOISE_MISS','>f8')])
             for name in line.dtype.names :
