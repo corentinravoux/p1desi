@@ -225,9 +225,9 @@ fi
 
 if [[ ${velunits} == "True" ]]
 then
-velunits_flag=""
-else
 velunits_flag="--velunits"
+else
+velunits_flag=""
 fi
 
 if [[ ${rebinfac} == "None" ]]
@@ -248,8 +248,7 @@ fi
 
 echo -e 'picca_Pk1D_postprocess.py \
 --in-dir '"${path_out}"'/pk1d_SNRcut'"${snr_cut}"' \
---rebinfac 1 \
---weights-method '"${weights}"' \
+--weight-method '"${weights}"' \
 '"${velunits_flag}"' '"${rebinfac_flag}"' '"${meansnrcut_flag}"' \
 --overwrite' > ${path_out}/mean_p1d_command_${folder_name}_SNRcut${snr_cut}_weights${weights}
 
