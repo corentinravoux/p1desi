@@ -5,16 +5,70 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 
-def compute_and_plot_mean_z_noise_power(data,
-                                        zbins,
-                                        outname,
-                                        **kwargs):
+
+
+def plot_side_band_study(zbins,
+                         data,
+                         out_name,
+                         mean_dict,
+                         noise_to_plot,
+                         labelnoise,
+                         k_units,
+                         side_band_legend,
+                         side_band_comp = None,
+                         side_band_fitpolynome = False,
+                         **kwargs):
 
     kmin = utils.return_key(kwargs,"kmin",None)
     kmax = utils.return_key(kwargs,"kmax",None)
+    fig,ax=plt.subplots(4,1,figsize=(8,10),sharex=True)
 
-    dict_noise_diff=compute_mean_z_noise_power(data,zbins,kmin=kmin,kmax=kmax)
-    plot_mean_z_noise_power(dict_noise_diff,zbins,outname)
+    for z,d in zip(zbins,data):
+        ax[0].plot(d['meank'],d['meanPk_raw'],label=f'{z:.1f}')
+        if(k_units == "A"):
+            ax[0].set_ylabel('$P_{raw} [\AA]$')
+        elif(k_units == "kms"):
+            ax[0].set_ylabel('$P_{raw} [km/s]$')
+        ax[0].legend()
+        ax[1].plot(d['meank'],d[noise_to_plot],label=f'{z:.1f}')
+        if(k_units == "A"):
+            ax[1].set_ylabel('$P_{' + labelnoise +'} [\AA]$')
+        elif(k_units == "kms"):
+            ax[1].set_ylabel('$P_{' + labelnoise +'} [km/s]$')
+        ax[2].plot(d['meank'],d['meanPk_raw'] - d[noise_to_plot],label=f'{z:.1f}')
+        if(k_units == "A"):
+            ax[2].set_ylabel('$ (P_{raw} - P_{pipeline}) [\AA]$')
+        elif(k_units == "kms"):
+            ax[2].set_ylabel('$ (P_{raw} - P_{pipeline}) [km/s]$')
+
+    ax[3].errorbar(mean_dict["k_array"],mean_dict["meanPk"],mean_dict["errorPk"], fmt = 'o',label=side_band_legend[0])
+    if(k_units == "A"):
+        ax[3].set_ylabel('$mean_{z}(P_{SB}) [\AA]$')
+    elif(k_units == "kms"):
+        ax[3].set_ylabel('$mean_{z}(P_{SB}) [km/s]$')
+    if(side_band_fitpolynome):
+        poly = scipy.polyfit(mean_dict["k_array"],mean_dict["meanPk"],6)
+        Poly = np.polynomial.polynomial.Polynomial(np.flip(poly))
+        cont_k_array = np.linspace(np.min(mean_dict["k_array"]),np.max(mean_dict["k_array"]),300)
+        polynome = Poly(cont_k_array)
+        mean_dict["poly"]= polynome
+        mean_dict["k_cont"]=cont_k_array
+        ax[3].plot(cont_k_array,polynome)
+    if(side_band_comp is not None):
+        yerr =np.sqrt( side_band_comp["error_meanPk_noise"]**2 + side_band_comp["error_meanPk_raw"]**2)
+        ax[3].errorbar(side_band_comp["k_array"],side_band_comp["meanPk_raw"] - side_band_comp["meanPk_noise"],yerr, fmt = 'o',label=side_band_legend[1])
+        if(side_band_fitpolynome):
+            ax[3].plot(side_band_comp["k_cont"],side_band_comp["poly"])
+        ax[3].legend()
+    if(k_units == "A"):
+        ax[3].set_xlabel('k[1/$\AA$]')
+        utils.place_k_speed_unit_axis(fig,ax[0])
+    elif(k_units == "kms"):
+        ax[3].set_xlabel('k[$s/km$]')
+    if(kmin is not None): ax[0].set_xlim(kmin,kmax)
+    fig.tight_layout()
+    fig.savefig(f"{out_name}_side_band_unit{k_units}.pdf",format="pdf")
+
 
 
 
