@@ -127,8 +127,7 @@ def model_SB1_indiv_kms(param_mean,A,B,k):
 
 
 
-def fit_model_SB1(nb_bins,
-                  x,y,dy,
+def fit_model_SB1(x,y,dy,
                   k1,k2,dk,
                   xmin=None,
                   xmax=None):
@@ -182,8 +181,7 @@ def fit_model_SB2(nb_bins,
     return param, cov
 
 
-def fit_model_SB1_indiv(nb_bins,
-                        param_mean,
+def fit_model_SB1_indiv(param_mean,
                         redshift,
                         x,y,dy,
                         xmin=None,
@@ -285,7 +283,6 @@ def init_side_band_power(pSB1_name,pSB2_name,zbins,velunits=False):
 
 
 def fit_mean_side_band_rest(mean_dict,
-                            nb_bins=1000,
                             dkrest = 1.0,
                             kminrest = None,
                             kmaxrest = 8,
@@ -299,8 +296,7 @@ def fit_mean_side_band_rest(mean_dict,
         ksi4 = utils.ksi4
 
     (param_SB1_mean,
-     cov_SB1_mean) = fit_model_SB1(nb_bins,
-                                   mean_dict["krescaleSB1"],
+     cov_SB1_mean) = fit_model_SB1(mean_dict["krescaleSB1"],
                                    mean_dict["pkrestSB1"],
                                    mean_dict["errorpkrestSB1"],
                                    kc4,
@@ -310,8 +306,7 @@ def fit_mean_side_band_rest(mean_dict,
                                    xmax=kmaxrest)
 
     (param_SB2_mean,
-     cov_SB2_mean) = fit_model_SB2(nb_bins,
-                                   mean_dict["krescaleSB2"],
+     cov_SB2_mean) = fit_model_SB2(mean_dict["krescaleSB2"],
                                    mean_dict["pkrestSB2"],
                                    mean_dict["errorpkrestSB2"],
                                    kc4,
@@ -334,8 +329,7 @@ def fit_indiv_side_band_1(dict_redshift,
     cov_SB1_indiv = []
     for i in range(len(zbins)):
         (param_SB1,
-         cov_SB1) = fit_model_SB1_indiv(nb_bins,
-                                        param_SB1_mean,
+         cov_SB1) = fit_model_SB1_indiv(param_SB1_mean,
                                         zbins[i],
                                         dict_redshift["kSB1"][i],
                                         dict_redshift["pkSB1"][i],
@@ -395,11 +389,11 @@ def plot_side_band_fit(name_out,
         err_plot_SB2 = mean_dict["errorpkrestSB2"]
         p_plot_fit_SB2 = model_SB2(k_fit_mean_rest,*param_SB2_mean)
     else:
-        p_plot_SB1 = krescaleSB1 * mean_dict["pkrestSB1"] / np.pi
-        err_plot_SB1 = krescaleSB1 * mean_dict["errorpkrestSB1"] / np.pi
+        p_plot_SB1 = mean_dict["krescaleSB1"] * mean_dict["pkrestSB1"] / np.pi
+        err_plot_SB1 = mean_dict["krescaleSB1"] * mean_dict["errorpkrestSB1"] / np.pi
         p_plot_fit_SB1 = k_fit_mean_rest * model_SB1(k_fit_mean_rest,*param_SB1_mean) / np.pi
-        p_plot_SB2 = krescaleSB2 * mean_dict["pkrestSB2"] / np.pi
-        err_plot_SB2 = krescaleSB2 * mean_dict["errorpkrestSB2"] / np.pi
+        p_plot_SB2 = mean_dict["krescaleSB2"] * mean_dict["pkrestSB2"] / np.pi
+        err_plot_SB2 = mean_dict["krescaleSB2"] * mean_dict["errorpkrestSB2"] / np.pi
         p_plot_fit_SB2 = k_fit_mean_rest * model_SB2(k_fit_mean_rest,*param_SB2_mean) / np.pi
 
     ax[0].errorbar(mean_dict["krescaleSB1"],
@@ -444,8 +438,8 @@ def plot_side_band_fit(name_out,
             err_plot = dict_redshift["errorpkSB1"][i]
             p_plot_fit = model_fitted
         else:
-            p_plot = kSB1[i] * dict_redshift["pkSB1"][i] / np.pi
-            err_plot = kSB1[i] * dict_redshift["errorpkSB1"][i] / np.pi
+            p_plot = dict_redshift["kSB1"][i] * dict_redshift["pkSB1"][i] / np.pi
+            err_plot = dict_redshift["kSB1"][i] * dict_redshift["errorpkSB1"][i] / np.pi
             p_plot_fit = k_fit * model_fitted / np.pi
         ax[1].errorbar(dict_redshift["kSB1"][i],
                        p_plot,
@@ -509,7 +503,6 @@ def fit_and_plot_side_band(pSB1_name,
      param_SB2_mean,
      cov_SB1_mean,
      cov_SB2_mean) = fit_mean_side_band_rest(mean_dict,
-                                             nb_bins = nb_bins,
                                              dkrest = dkrest,
                                              kminrest = kminrest,
                                              kmaxrest = kmaxrest,
