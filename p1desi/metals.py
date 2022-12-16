@@ -8,38 +8,6 @@ from matplotlib.lines import Line2D
 
 
 
-def plot_metal_study(data,
-                     zbins,
-                     out_name,
-                     k_units,
-                     use_diff_noise,
-                     plot_side_band,
-                     side_band_comp=None,
-                     side_band_legend=["SB1","SB2"],
-                     **kwargs):
-
-    mean_dict = return_mean_z_dict(zbins,data)
-    if(use_diff_noise):
-        noise_to_plot,labelnoise = 'meanPk_diff','diff'
-    else:
-        noise_to_plot,labelnoise = 'meanPk_noise','pipeline'
-
-    if(plot_side_band):
-        plot_side_band_study(zbins,
-                             data,
-                             out_name,
-                             mean_dict,
-                             noise_to_plot,
-                             labelnoise,
-                             k_units,
-                             side_band_legend,
-                             side_band_comp=side_band_comp,
-                             **kwargs)
-
-
-
-
-
 
 
 def model_SB1(k,A,gamma,B,b,k1,phi1,C,c,k2,phi2):
