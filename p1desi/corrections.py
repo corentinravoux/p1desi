@@ -36,10 +36,13 @@ def prepare_cont_correction(zbins,file_correction_cont):
     return(A_cont)
 
 
-def apply_correction(dict_plot,zbins,file_correction,type_correction):
-    A_corr = eval(f"prepare_{type_correction}_correction")(zbins,file_correction)
-    for iz,z in enumerate(zbins):
-        dict_plot[z]["p_to_plot"] =  dict_plot[z]["p_to_plot"] * A_corr[z](dict_plot[z]["k_to_plot"])
+def apply_correction(pk,file_correction,type_correction):
+    A_corr = eval(f"prepare_{type_correction}_correction")(pk.zbin,file_correction)
+    for z in pk.zbin:
+        pk.p[z] = pk.p[z] * A_corr[z](pk.k[z])
+        pk.norm_p[z] = pk.norm_p[z] * A_corr[z](pk.k[z])
+        pk.err[z] = pk.err[z] * A_corr[z](pk.k[z])
+        pk.norm_err[z] = pk.norm_err[z] * A_corr[z](pk.k[z])
 
 
 
@@ -78,12 +81,13 @@ def prepare_cont_correction_eboss(zbins,cont_eboss_name):
             A_cont[z] = np.poly1d(param_cont_eboss[iz])
     return A_cont
 
-def apply_correction_eboss(dict_plot,zbins,file_correction,type_correction):
-    A_corr = eval(f"prepare_{type_correction}_correction_eboss")(zbins,file_correction)
-    for iz,z in enumerate(zbins):
-        k_speed = dict_plot[z]["k_to_plot"]/(utils.speed_light/(1+z)/utils.lambdaLy)
-        dict_plot[z]["p_to_plot"] =  dict_plot[z]["p_to_plot"] * A_corr[z](k_speed)
-
+def apply_correction_eboss(pk,file_correction,type_correction):
+    A_corr = eval(f"prepare_{type_correction}_correction_eboss")(pk.zbin,file_correction)
+    for z in pk.zbin:
+        pk.p[z] = pk.p[z] * A_corr[z](pk.k[z])
+        pk.norm_p[z] = pk.norm_p[z] * A_corr[z](pk.k[z])
+        pk.err[z] = pk.err[z] * A_corr[z](pk.k[z])
+        pk.norm_err[z] = pk.norm_err[z] * A_corr[z](pk.k[z])
 
 
 
@@ -105,15 +109,11 @@ def prepare_metal_subtraction(zbins,file_metal,velunits=False):
 
 
 
-def subtract_metal(dict_plot,zbins,file_metal,plot_P,velunits=False):
-    P_metal_m = prepare_metal_subtraction(zbins,file_metal,velunits=velunits)
-    for iz,z in enumerate(zbins):
-        if(plot_P):
-            dict_plot[z]["p_to_plot"] = dict_plot[z]["p_to_plot"] - P_metal_m[z](dict_plot[z]["k_to_plot"])
-        else:
-            dict_plot[z]["p_to_plot"] = dict_plot[z]["p_to_plot"] - (dict_plot[z]["k_to_plot"] * P_metal_m[z](dict_plot[z]["k_to_plot"]) / np.pi)
-
-
+def subtract_metal(pk,file_metal):
+    P_metal_m = prepare_metal_subtraction(pk.zbin,file_metal,velunits=pk.velunits)
+    for z in pk.zbin:
+        pk.p[z] = pk.p[z] - P_metal_m[z](pk.k[z])
+        pk.norm_p[z] = pk.norm_p[z]  - (pk.k[z] * P_metal_m[z](pk.k[z]) / np.pi)
 
 
 def prepare_metal_correction_eboss(file_metal_eboss):
@@ -160,10 +160,7 @@ def subtract_metal_eboss(dict_plot,zbins,file_metal_eboss,plot_P):
 
 
 
-def apply_p1d_corections(dict_plot,
-                         zbins,
-                         plot_P,
-                         velunits,
+def apply_p1d_corections(pk,
                          apply_DESI_maskcont_corr,
                          apply_eBOSS_maskcont_corr,
                          apply_DESI_sb_corr,
@@ -188,19 +185,19 @@ def apply_p1d_corections(dict_plot,
 
     if apply_DESI_maskcont_corr:
         for type_correction in correction_to_apply:
-            apply_correction(dict_plot,zbins,eval(f"file_correction_{type_correction}"),type_correction)
+            apply_correction(pk,eval(f"file_correction_{type_correction}"),type_correction)
 
     if apply_eBOSS_maskcont_corr:
         for type_correction in correction_to_apply:
-            apply_correction_eboss(dict_plot,zbins,eval(f"file_correction_{type_correction}_eboss"),type_correction)
+            apply_correction_eboss(pk,eval(f"file_correction_{type_correction}_eboss"),type_correction)
 
     if apply_DESI_sb_corr:
-        subtract_metal(dict_plot,zbins,file_metal,plot_P,velunits=velunits)
+        subtract_metal(pk,file_metal)
 
     if apply_eBOSS_sb_corr:
-        subtract_metal_eboss(dict_plot,zbins,file_metal_eboss,plot_P)
+        subtract_metal_eboss(pk,file_metal_eboss)
 
-    return dict_plot
+    return pk
 
 
 
