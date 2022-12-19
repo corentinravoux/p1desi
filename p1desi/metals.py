@@ -111,7 +111,7 @@ def fit_model_SB1_indiv(param_mean,
 
 
 
-
+# CR - can be improved by loading a class for the mean
 
 def init_side_band_power(pSB1_name,pSB2_name,zmax):
     pSB1 = pk_io.Pk.read_from_picca(pSB1_name)
