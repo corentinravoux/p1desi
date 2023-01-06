@@ -1,15 +1,181 @@
 import pickle, os, fitsio, glob
 import numpy as np
 from functools import partial
-from p1desi import metals, utils
+from p1desi import metals, utils, hcd
+from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+
+
+
+
 
 
 ###################################################
+############## Creating corrections ###############
+###################################################
+
+
+
+def plot_and_compute_ratio_power(pk,
+                                 pk2,
+                                 path_out,
+                                 name_correction,
+                                 suffix,
+                                 model,
+                                 zmax,
+                                 kmin_AA,
+                                 kmin_fit_AA,
+                                 kmax_AA,
+                                 vel,
+                                 model_param=None,
+                                 **plt_args):
+    """
+    plot_and_compute_ratio_power - Plot the ratio of two power spectra and fit a curve to the data
+
+    Inputs:
+
+        pk: object containing the power spectrum data to plot, with attributes k, norm_p, and norm_err for the wave number k, power spectrum P, and error on P respectively
+        pk2: object containing the power spectrum data to divide pk by, with attributes k, norm_p, and norm_err for the wave number k, power spectrum P, and error on P respectively
+        path_out: string specifying the filepath to save the plot
+        name_correction: string specifying the correction applied to the power spectra
+        suffix: string to add to the end of the plot file name
+        model: string specifying the type of curve to fit to the data, either "poly" for a polynomial or "rogers" for a function defined in Rogers et al. (2020)
+        zmax: maximum redshift to plot
+        kmin_AA: minimum wave number in inverse Angstroms to plot
+        kmin_fit_AA: minimum wave number in inverse Angstroms to use for fitting the curve
+        kmax_AA: maximum wave number in inverse Angstroms to plot
+        vel: boolean, if True k is in s/km, if False k is in inverse Angstroms
+        model_param: dictionary of parameters for the fitting function, required if model is "poly" and should contain the key "order_poly" specifying the order of the polynomial
+        **plt_args: additional arguments to be passed to the plot, including:
+            dk: shift in wave number between redshift bins
+            zseparation: redshift at which to split the plot into two subplots
+            ymin: minimum y value for the plot
+            ymax: maximum y value for the plot
+            ylabel: string for the y-axis label
+
+    Outputs:
+
+        fig: figure object for the plot
+        ax: axis object for the plot
+        params: list of arrays of fitted curve parameters for each redshift
+    """    
+    
+    
+    dk = utils.return_key(plt_args,"dk",0.0)
+    zseparation = utils.return_key(plt_args,"zseparation",2.9)
+    ymin = utils.return_key(plt_args,"ymin",0.95)
+    ymax = utils.return_key(plt_args,"ymax",1.05)
+    ylabel = utils.return_key(plt_args,"ylabel", r'$A_{\mathrm{corr}}$')
+    marker_style = utils.return_key(plt_args,"marker_style", ".")
+    marker_size = utils.return_key(plt_args,"marker_size", 7)
+    fontsize = utils.return_key(plt_args,"fontsize", 21)
+    fontsize_y = utils.return_key(plt_args,"fontsize_y", 21)
+    fontlegend = utils.return_key(plt_args,"fontlegend", 18)
+
+    params = []
+
+    fig,ax = plt.subplots(2,1,figsize = (8,8),sharex=True)
+
+    for i,z in enumerate(pk.zbin):
+        if(z < zseparation):
+            axplt = ax[0]
+        else:
+            axplt = ax[1]
+        if(z < zmax):
+            if vel:
+                kmax = float(utils.kAAtokskm(kmax_AA, z = z))
+                kmin = float(utils.kAAtokskm(kmin_AA, z = z))
+                kmin_fit = float(utils.kAAtokskm(kmin_fit_AA, z = z))
+            else:
+                kmax = kmax_AA
+                kmin = kmin_AA      
+                kmin_fit = kmin_fit_AA      
+            k = pk.k[z]
+
+            norm_pk2_interp  = interp1d(pk2.k[z], pk2.norm_p[z], kind='linear',bounds_error=False, fill_value=np.nan)(k)
+            norm_err_pk2_interp  = interp1d(pk2.k[z], pk2.norm_err[z], kind='linear',bounds_error=False, fill_value=np.nan)(k)
+
+            
+            
+            ratio = pk.norm_p[z] / norm_pk2_interp
+            err_ratio = (pk.norm_p[z]/norm_pk2_interp) * np.sqrt((pk.norm_err[z]/pk.norm_p[z])**2 + (norm_err_pk2_interp/norm_pk2_interp)**2)
+
+            mask = np.isnan(k) | np.isnan(ratio) | np.isnan(err_ratio) | (k > kmax)| (k < kmin)
+            k = k[~mask]
+            ratio = ratio[~mask]
+            err_ratio = err_ratio[~mask]
+
+
+            axplt.errorbar(k+i*dk,
+                           ratio,
+                           yerr = err_ratio,
+                           marker = marker_style,
+                           color = f"C{i}",
+                           markersize = marker_size,
+                           linestyle="None",
+                           label =r'$z = ${:1.1f}'.format(z))     
+
+
+            mask_fit = k > kmin_fit
+            
+            if model == "poly": 
+                weights = 1 / err_ratio
+                p = np.polyfit(k[mask_fit], ratio[mask_fit],model_param["order_poly"], w = weights[mask_fit])
+                k_th = np.linspace(np.min(k),np.max(k),2000)
+                axplt.plot(k_th,np.poly1d(p)(k_th),color = f"C{i}",ls="--")
+                params.append(p)
+                
+    
+            if model == "rogers": 
+                func = partial(hcd.rogers,z)
+                popt, pcov = curve_fit(func,
+                                       xdata=k,
+                                       ydata=ratio,
+                                       sigma=err_ratio,
+                                       p0=[0.8633, 0.2943, 7.316, -0.4964, 1.0, 0.01],
+                                       bounds=([0,0,0,-np.inf,0,0], 
+                                               [np.inf,np.inf,np.inf,0,np.inf,np.inf]))
+                k_th = np.linspace(np.min(k),np.max(k),2000)
+                axplt.plot(k_th,func(k_th,*popt),color = f"C{i}")
+                params.append(popt)                
+                
+                
+    if vel:
+        ax[1].set_xlabel(r'$k~[\mathrm{s}$' + r'$\cdot$' + '$\mathrm{km}^{-1}]$', fontsize = fontsize)
+    else:
+        ax[1].set_xlabel(r'$k~[\mathrm{\AA}^{-1}]$', fontsize = fontsize)
+    ax[0].set_ylabel(ylabel, fontsize = fontsize_y)        
+    ax[1].set_ylabel(ylabel, fontsize = fontsize_y)        
+    ax[0].legend(ncol=2,fontsize = fontlegend)
+    ax[1].legend(ncol=2,fontsize = fontlegend)
+    ax[0].set_ylim(ymin,ymax)
+    ax[1].set_ylim(ymin,ymax)
+    ax[0].margins(x=0)
+    fig.tight_layout()
+
+    if vel:
+        fig.savefig(os.path.join(path_out,f"{name_correction}_{suffix}_kms.pdf"))
+        fig.savefig(os.path.join(path_out,f"{name_correction}_{suffix}_kms.png"))
+        pickle.dump(params,open(os.path.join(path_out,f"{name_correction}_{suffix}_kms.pickle"),"wb"))
+    else:
+        fig.savefig(os.path.join(path_out,f"{name_correction}_{suffix}.pdf"))
+        fig.savefig(os.path.join(path_out,f"{name_correction}_{suffix}.png"))
+        pickle.dump(params,open(os.path.join(path_out,f"{name_correction}_{suffix}.pickle"),"wb"))
+
+
+
+
+###################################################
+############## Applying corrections ###############
+###################################################
+
+
+
+
 ######### Corrections masking + continuum #########
-###################################################
 
 
-################ DESI corrections #################
 
 def prepare_hcd_correction(zbins,file_correction_hcd):
     param_hcd = pickle.load(open(file_correction_hcd,"rb"))
@@ -44,10 +210,6 @@ def apply_correction(pk,zmax,file_correction,type_correction):
         pk.norm_p[z] = pk.norm_p[z] * A_corr[z](pk.k[z])
         pk.err[z] = pk.err[z] * A_corr[z](pk.k[z])
         pk.norm_err[z] = pk.norm_err[z] * A_corr[z](pk.k[z])
-
-
-
-################ eBOSS corrections ################
 
 
 
@@ -93,9 +255,8 @@ def apply_correction_eboss(pk,zmax,file_correction,type_correction):
 
 
 
-###################################################
+
 ############## Side band corrections ##############
-###################################################
 
 
 def prepare_metal_subtraction(zbins,file_metal,velunits=False):
@@ -161,6 +322,55 @@ def subtract_metal_eboss(dict_plot,zbins,file_metal_eboss,plot_P):
 
 
 
+
+
+
+################ Noise corrections ################
+
+
+
+def model_noise_correction(SNR,A,g,B):
+    power_law = A * SNR**(-g) + B
+    return(power_law)
+
+
+
+
+
+
+################ Apply corrections ################
+
+
+
+def correct_individual_pk_noise(pk_in,
+                                pk_out,
+                                qsocat,
+                                correction):
+    os.makedirs(pk_out,exist_ok=True)
+    pk_files = glob.glob(os.path.join(pk_in,"Pk1D-*"))
+
+    qso_file = fitsio.FITS(qsocat)["QSO_CAT"]
+    targetid_qso = qso_file["TARGETID"][:]
+    survey_qso = qso_file["SURVEY"][:]
+    for i in range(len(pk_files)):
+        pk_out_name = pk_files[i].split("/")[-1]
+        f_out = fitsio.FITS(os.path.join(pk_out,pk_out_name),'rw',clobber=True)
+        f = fitsio.FITS(pk_files[i])
+        for j in range(1,len(f)):
+            header = dict(f[j].read_header())
+            snr = header["MEANSNR"]
+            id = header["LOS_ID"]
+            survey_id = survey_qso[np.argwhere(targetid_qso == id)[0]][0]
+            p_noise_miss = model_noise_correction(snr,*correction[survey_id])
+            line = f[j].read()
+            new_line = np.zeros(line.size, dtype=[(line.dtype.names[i],line.dtype[i]) for i in range(len(line.dtype))] + [('PK_NOISE_MISS','>f8')])
+            for name in line.dtype.names :
+                new_line[name] = line[name]
+            new_line['PK_NOISE'] = new_line['PK_NOISE'] + p_noise_miss
+            new_line['PK_NOISE_MISS'] = np.full(line.size,p_noise_miss)
+            f_out.write(new_line,header=header,extname=str(id))
+
+
 def apply_p1d_corections(pk,
                          zmax,
                          apply_DESI_maskcont_corr,
@@ -201,46 +411,3 @@ def apply_p1d_corections(pk,
 
     return pk
 
-
-
-
-
-###################################################
-################ Noise corrections ################
-###################################################
-
-
-
-def model_noise_correction(SNR,A,g,B):
-    power_law = A * SNR**(-g) + B
-    return(power_law)
-
-
-
-def correct_individual_pk_noise(pk_in,
-                                pk_out,
-                                qsocat,
-                                correction):
-    os.makedirs(pk_out,exist_ok=True)
-    pk_files = glob.glob(os.path.join(pk_in,"Pk1D-*"))
-
-    qso_file = fitsio.FITS(qsocat)["QSO_CAT"]
-    targetid_qso = qso_file["TARGETID"][:]
-    survey_qso = qso_file["SURVEY"][:]
-    for i in range(len(pk_files)):
-        pk_out_name = pk_files[i].split("/")[-1]
-        f_out = fitsio.FITS(os.path.join(pk_out,pk_out_name),'rw',clobber=True)
-        f = fitsio.FITS(pk_files[i])
-        for j in range(1,len(f)):
-            header = dict(f[j].read_header())
-            snr = header["MEANSNR"]
-            id = header["LOS_ID"]
-            survey_id = survey_qso[np.argwhere(targetid_qso == id)[0]][0]
-            p_noise_miss = model_noise_correction(snr,*correction[survey_id])
-            line = f[j].read()
-            new_line = np.zeros(line.size, dtype=[(line.dtype.names[i],line.dtype[i]) for i in range(len(line.dtype))] + [('PK_NOISE_MISS','>f8')])
-            for name in line.dtype.names :
-                new_line[name] = line[name]
-            new_line['PK_NOISE'] = new_line['PK_NOISE'] + p_noise_miss
-            new_line['PK_NOISE_MISS'] = np.full(line.size,p_noise_miss)
-            f_out.write(new_line,header=header,extname=str(id))
