@@ -35,7 +35,10 @@ class Pk(object):
                       norm_p=None,
                       norm_err=None,
                       minrescor=None,
-                      maxrescor=None):
+                      maxrescor=None,
+                      p_noise_miss=None,
+                      resocor=None,
+                      err_resocor=None):
         self.velunits = velunits
         self.zbin = zbin
         self.number_chunks = number_chunks
@@ -52,6 +55,10 @@ class Pk(object):
         self.norm_err = norm_err
         self.minrescor = minrescor
         self.maxrescor = maxrescor
+        self.p_noise_miss = p_noise_miss
+        self.resocor = resocor
+        self.err_resocor = err_resocor
+
 
 
 
@@ -71,14 +78,20 @@ class Pk(object):
         err_diff = {}
         norm_p = {}
         norm_err = {}
+        p_noise_miss = {}
+        resocor = {}
+        err_resocor = {}
         zbins = []
         
 
         mean_pk = read_pk_means(name_file,hdu=1)
         metadata = read_pk_means(name_file,hdu=2)
 
-        velunits = mean_pk.meta["VELUNITS"]
-
+        # CR - to remove when it is fixed on picca 
+        try:
+            velunits = mean_pk.meta["VELUNITS"]
+        except:
+            velunits = False
 
         minrescor_default=np.inf
         maxrescor_default=0.0
@@ -98,6 +111,14 @@ class Pk(object):
             norm_p[zbin] = np.array(mean_pk[w]['meanDelta2'])
             norm_err[zbin] = np.array(mean_pk[w]['errorDelta2'])
             number_chunks[zbin] = int(metadata[i]['N_chunks'])
+            resocor[zbin] = np.array(mean_pk[w]["meancor_reso"])
+            err_resocor[zbin] = np.array(mean_pk[w]["errorcor_reso"])
+
+
+            if('meanPk_noise_miss' in mean_pk.colnames):
+                p_noise_miss[zbin] = np.array(mean_pk[w]["meanPk_noise_miss"])
+            else:
+                p_noise_miss[zbin] = None
 
             if('rescor' in mean_pk.colnames):
                 try:
@@ -130,7 +151,10 @@ class Pk(object):
                    norm_p=norm_p,
                    norm_err=norm_err,
                    minrescor=minrescor,
-                   maxrescor=maxrescor)
+                   maxrescor=maxrescor,
+                   p_noise_miss = p_noise_miss,
+                   resocor = resocor,
+                   err_resocor = err_resocor)
 
 
 
@@ -152,6 +176,9 @@ class Pk(object):
         err_diff = {}
         norm_p = {}
         norm_err = {}
+        p_noise_miss = {}
+        resocor = {}
+        err_resocor = {}
         
         mean_pk = read_pk_means(name_file)
 
@@ -174,14 +201,25 @@ class Pk(object):
             err_diff[zbin] = np.array(dat['errorPk_diff'][select])
             norm_p[zbin] = np.array(dat['meanDelta2'][select])
             norm_err[zbin] = np.array(dat['errorDelta2'][select])
+            p_noise_miss[zbin] = np.array(dat["meanPk_noise_miss"][select])
+            resocor[zbin] = np.array(dat["meancor_reso"][select])
+            err_resocor[zbin] = np.array(dat["errorcor_reso"][select])
             number_chunks[zbin] = int(dat['N_chunks'])
-            if('rescor' in mean_pk.colnames):
+
+
+
+            if('meanPk_noise_miss' in dat.colnames):
+                p_noise_miss[zbin] = np.array(dat["meanPk_noise_miss"][select])
+            else:
+                p_noise_miss[zbin] = None
+
+            if('rescor' in dat.colnames):
                 try:
                     if np.max(k[zbin])>0:
                         minrescor[zbin]=np.min([minrescor_default,
-                                                np.min(k[zbin][(mean_pk['rescor']<0.1)&(mean_pk['rescor']>0)])])
+                                                np.min(k[zbin][(dat['rescor'][select]<0.1)&(dat['rescor'][select]>0)])])
                         maxrescor[zbin]=np.max([maxrescor_default,
-                                                np.min(k[zbin][(mean_pk['rescor']<0.1)&(mean_pk['rescor']>0)])])
+                                                np.min(k[zbin][(dat['rescor'][select]<0.1)&(dat['rescor'][select]>0)])])
                 except:
                     print('rescor information not computed, skipping')
                     
@@ -209,7 +247,10 @@ class Pk(object):
                    norm_p=norm_p,
                    norm_err=norm_err,
                    minrescor=minrescor,
-                   maxrescor=maxrescor)
+                   maxrescor=maxrescor,
+                   p_noise_miss = p_noise_miss,
+                   resocor = resocor,
+                   err_resocor = err_resocor)
 
 
     def compute_additional_stats(self):
