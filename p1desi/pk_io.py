@@ -4,41 +4,42 @@ import astropy.table as t
 import struct
 
 
-
-def read_pk_means(pk_means_name,hdu=None):
+def read_pk_means(pk_means_name, hdu=None):
     if hdu is None:
         table = t.Table.read(pk_means_name)
     else:
         table = t.Table.read(pk_means_name, hdu=hdu)
-    return(table)
+    return table
 
 
 def load_systematics_file(systematics_file):
-    systematics = pickle.load(open("sytematics_total.pickle","rb"))    
+    systematics = pickle.load(open("sytematics_total.pickle", "rb"))
     return systematics
 
 
-
 class Pk(object):
-    def __init__(self,velunits = False,
-                      zbin = None,
-                      number_chunks=None,
-                      k=None,
-                      p=None,
-                      p_raw=None,
-                      p_noise=None,
-                      p_diff=None,
-                      err=None,
-                      err_raw=None,
-                      err_noise=None,
-                      err_diff=None,
-                      norm_p=None,
-                      norm_err=None,
-                      minrescor=None,
-                      maxrescor=None,
-                      p_noise_miss=None,
-                      resocor=None,
-                      err_resocor=None):
+    def __init__(
+        self,
+        velunits=False,
+        zbin=None,
+        number_chunks=None,
+        k=None,
+        p=None,
+        p_raw=None,
+        p_noise=None,
+        p_diff=None,
+        err=None,
+        err_raw=None,
+        err_noise=None,
+        err_diff=None,
+        norm_p=None,
+        norm_err=None,
+        minrescor=None,
+        maxrescor=None,
+        p_noise_miss=None,
+        resocor=None,
+        err_resocor=None,
+    ):
         self.velunits = velunits
         self.zbin = zbin
         self.number_chunks = number_chunks
@@ -59,11 +60,8 @@ class Pk(object):
         self.resocor = resocor
         self.err_resocor = err_resocor
 
-
-
-
     @classmethod
-    def read_from_picca(cls,name_file):
+    def read_from_picca(cls, name_file):
         minrescor = {}
         maxrescor = {}
         number_chunks = {}
@@ -82,86 +80,100 @@ class Pk(object):
         resocor = {}
         err_resocor = {}
         zbins = []
-        
 
-        mean_pk = read_pk_means(name_file,hdu=1)
-        metadata = read_pk_means(name_file,hdu=2)
+        mean_pk = read_pk_means(name_file, hdu=1)
+        metadata = read_pk_means(name_file, hdu=2)
 
-        # CR - to remove when it is fixed on picca 
+        # CR - to remove when it is fixed on picca
         try:
             velunits = mean_pk.meta["VELUNITS"]
         except:
             velunits = False
 
-        minrescor_default=np.inf
-        maxrescor_default=0.0
+        minrescor_default = np.inf
+        maxrescor_default = 0.0
         for i in range(len(metadata)):
-            w, = np.where(mean_pk['index_zbin']==i)
+            (w,) = np.where(mean_pk["index_zbin"] == i)
             zbin = mean_pk[w]["zbin"][0]
             zbins.append(zbin)
-            k[zbin] = np.array(mean_pk[w]['meank'])
-            p[zbin] = np.array(mean_pk[w]['meanPk'])
-            p_raw[zbin] = np.array(mean_pk[w]['meanPk_raw'])
-            p_noise[zbin] = np.array(mean_pk[w]['meanPk_noise'])
-            p_diff[zbin] = np.array(mean_pk[w]['meanPk_diff'])
-            err[zbin] = np.array(mean_pk[w]['errorPk'])
-            err_raw[zbin] = np.array(mean_pk[w]['errorPk_raw'])
-            err_noise[zbin] = np.array(mean_pk[w]['errorPk_noise'])
-            err_diff[zbin] = np.array(mean_pk[w]['errorPk_diff'])
-            norm_p[zbin] = np.array(mean_pk[w]['meanDelta2'])
-            norm_err[zbin] = np.array(mean_pk[w]['errorDelta2'])
-            number_chunks[zbin] = int(metadata[i]['N_chunks'])
+            k[zbin] = np.array(mean_pk[w]["meank"])
+            p[zbin] = np.array(mean_pk[w]["meanPk"])
+            p_raw[zbin] = np.array(mean_pk[w]["meanPk_raw"])
+            p_noise[zbin] = np.array(mean_pk[w]["meanPk_noise"])
+            p_diff[zbin] = np.array(mean_pk[w]["meanPk_diff"])
+            err[zbin] = np.array(mean_pk[w]["errorPk"])
+            err_raw[zbin] = np.array(mean_pk[w]["errorPk_raw"])
+            err_noise[zbin] = np.array(mean_pk[w]["errorPk_noise"])
+            err_diff[zbin] = np.array(mean_pk[w]["errorPk_diff"])
+            norm_p[zbin] = np.array(mean_pk[w]["meanDelta2"])
+            norm_err[zbin] = np.array(mean_pk[w]["errorDelta2"])
+            number_chunks[zbin] = int(metadata[i]["N_chunks"])
             resocor[zbin] = np.array(mean_pk[w]["meancor_reso"])
             err_resocor[zbin] = np.array(mean_pk[w]["errorcor_reso"])
 
-
-            if('meanPk_noise_miss' in mean_pk.colnames):
+            if "meanPk_noise_miss" in mean_pk.colnames:
                 p_noise_miss[zbin] = np.array(mean_pk[w]["meanPk_noise_miss"])
             else:
                 p_noise_miss[zbin] = None
 
-            if('rescor' in mean_pk.colnames):
+            if "rescor" in mean_pk.colnames:
                 try:
-                    if np.max(k[zbin])>0:
-                        minrescor[zbin]=np.min([minrescor_default,
-                                                np.min(k[zbin][(mean_pk['rescor']<0.1)&(mean_pk['rescor']>0)])])
-                        maxrescor[zbin]=np.max([maxrescor_default,
-                                                np.min(k[zbin][(mean_pk['rescor']<0.1)&(mean_pk['rescor']>0)])])
+                    if np.max(k[zbin]) > 0:
+                        minrescor[zbin] = np.min(
+                            [
+                                minrescor_default,
+                                np.min(
+                                    k[zbin][
+                                        (mean_pk["rescor"] < 0.1)
+                                        & (mean_pk["rescor"] > 0)
+                                    ]
+                                ),
+                            ]
+                        )
+                        maxrescor[zbin] = np.max(
+                            [
+                                maxrescor_default,
+                                np.min(
+                                    k[zbin][
+                                        (mean_pk["rescor"] < 0.1)
+                                        & (mean_pk["rescor"] > 0)
+                                    ]
+                                ),
+                            ]
+                        )
                 except:
-                    print('rescor information not computed, skipping')
-                    
+                    print("rescor information not computed, skipping")
+
                     minrescor[zbin] = minrescor_default
                     maxrescor[zbin] = maxrescor_default
             else:
                 minrescor[zbin] = minrescor_default
                 maxrescor[zbin] = maxrescor_default
 
-        return cls(velunits = velunits,
-                   zbin=np.array(zbins),
-                   number_chunks=number_chunks,
-                   k=k,
-                   p=p,
-                   p_raw=p_raw,
-                   p_noise=p_noise,
-                   p_diff=p_diff,
-                   err=err,
-                   err_raw=err_raw,
-                   err_noise=err_noise,
-                   err_diff=err_diff,
-                   norm_p=norm_p,
-                   norm_err=norm_err,
-                   minrescor=minrescor,
-                   maxrescor=maxrescor,
-                   p_noise_miss = p_noise_miss,
-                   resocor = resocor,
-                   err_resocor = err_resocor)
-
-
-
-
+        return cls(
+            velunits=velunits,
+            zbin=np.array(zbins),
+            number_chunks=number_chunks,
+            k=k,
+            p=p,
+            p_raw=p_raw,
+            p_noise=p_noise,
+            p_diff=p_diff,
+            err=err,
+            err_raw=err_raw,
+            err_noise=err_noise,
+            err_diff=err_diff,
+            norm_p=norm_p,
+            norm_err=norm_err,
+            minrescor=minrescor,
+            maxrescor=maxrescor,
+            p_noise_miss=p_noise_miss,
+            resocor=resocor,
+            err_resocor=err_resocor,
+        )
 
     @classmethod
-    def read_from_p1desi(cls,name_file,zbins):
+    def read_from_p1desi(cls, name_file, zbins):
         minrescor = {}
         maxrescor = {}
         number_chunks = {}
@@ -179,79 +191,93 @@ class Pk(object):
         p_noise_miss = {}
         resocor = {}
         err_resocor = {}
-        
+
         mean_pk = read_pk_means(name_file)
 
         velunits = mean_pk.meta["VELUNITS"]
 
-        minrescor_default=np.inf
-        maxrescor_default=0.0
+        minrescor_default = np.inf
+        maxrescor_default = 0.0
 
         for iz, zbin in enumerate(zbins):
             dat = mean_pk[iz]
-            select = dat['N']>0
-            k[zbin] = np.array(dat['meank'][select])
-            p[zbin] = np.array(dat['meanPk'][select])
-            p_raw[zbin] = np.array(dat['meanPk_raw'][select])
-            p_noise[zbin] = np.array(dat['meanPk_noise'][select])
-            p_diff[zbin] = np.array(dat['meanPk_diff'][select])
-            err[zbin] = np.array(dat['errorPk'][select])
-            err_raw[zbin] = np.array(dat['errorPk_raw'][select])
-            err_noise[zbin] = np.array(dat['errorPk_noise'][select])
-            err_diff[zbin] = np.array(dat['errorPk_diff'][select])
-            norm_p[zbin] = np.array(dat['meanDelta2'][select])
-            norm_err[zbin] = np.array(dat['errorDelta2'][select])
+            select = dat["N"] > 0
+            k[zbin] = np.array(dat["meank"][select])
+            p[zbin] = np.array(dat["meanPk"][select])
+            p_raw[zbin] = np.array(dat["meanPk_raw"][select])
+            p_noise[zbin] = np.array(dat["meanPk_noise"][select])
+            p_diff[zbin] = np.array(dat["meanPk_diff"][select])
+            err[zbin] = np.array(dat["errorPk"][select])
+            err_raw[zbin] = np.array(dat["errorPk_raw"][select])
+            err_noise[zbin] = np.array(dat["errorPk_noise"][select])
+            err_diff[zbin] = np.array(dat["errorPk_diff"][select])
+            norm_p[zbin] = np.array(dat["meanDelta2"][select])
+            norm_err[zbin] = np.array(dat["errorDelta2"][select])
             p_noise_miss[zbin] = np.array(dat["meanPk_noise_miss"][select])
             resocor[zbin] = np.array(dat["meancor_reso"][select])
             err_resocor[zbin] = np.array(dat["errorcor_reso"][select])
-            number_chunks[zbin] = int(dat['N_chunks'])
+            number_chunks[zbin] = int(dat["N_chunks"])
 
-
-
-            if('meanPk_noise_miss' in dat.colnames):
+            if "meanPk_noise_miss" in dat.colnames:
                 p_noise_miss[zbin] = np.array(dat["meanPk_noise_miss"][select])
             else:
                 p_noise_miss[zbin] = None
 
-            if('rescor' in dat.colnames):
+            if "rescor" in dat.colnames:
                 try:
-                    if np.max(k[zbin])>0:
-                        minrescor[zbin]=np.min([minrescor_default,
-                                                np.min(k[zbin][(dat['rescor'][select]<0.1)&(dat['rescor'][select]>0)])])
-                        maxrescor[zbin]=np.max([maxrescor_default,
-                                                np.min(k[zbin][(dat['rescor'][select]<0.1)&(dat['rescor'][select]>0)])])
+                    if np.max(k[zbin]) > 0:
+                        minrescor[zbin] = np.min(
+                            [
+                                minrescor_default,
+                                np.min(
+                                    k[zbin][
+                                        (dat["rescor"][select] < 0.1)
+                                        & (dat["rescor"][select] > 0)
+                                    ]
+                                ),
+                            ]
+                        )
+                        maxrescor[zbin] = np.max(
+                            [
+                                maxrescor_default,
+                                np.min(
+                                    k[zbin][
+                                        (dat["rescor"][select] < 0.1)
+                                        & (dat["rescor"][select] > 0)
+                                    ]
+                                ),
+                            ]
+                        )
                 except:
-                    print('rescor information not computed, skipping')
-                    
+                    print("rescor information not computed, skipping")
+
                     minrescor[zbin] = minrescor_default
                     maxrescor[zbin] = maxrescor_default
             else:
                 minrescor[zbin] = minrescor_default
                 maxrescor[zbin] = maxrescor_default
 
-
-
-
-        return cls(velunits = velunits,
-                   zbin=np.array(zbins),
-                   number_chunks=number_chunks,
-                   k=k,
-                   p=p,
-                   p_raw=p_raw,
-                   p_noise=p_noise,
-                   p_diff=p_diff,
-                   err=err,
-                   err_raw=err_raw,
-                   err_noise=err_noise,
-                   err_diff=err_diff,
-                   norm_p=norm_p,
-                   norm_err=norm_err,
-                   minrescor=minrescor,
-                   maxrescor=maxrescor,
-                   p_noise_miss = p_noise_miss,
-                   resocor = resocor,
-                   err_resocor = err_resocor)
-
+        return cls(
+            velunits=velunits,
+            zbin=np.array(zbins),
+            number_chunks=number_chunks,
+            k=k,
+            p=p,
+            p_raw=p_raw,
+            p_noise=p_noise,
+            p_diff=p_diff,
+            err=err,
+            err_raw=err_raw,
+            err_noise=err_noise,
+            err_diff=err_diff,
+            norm_p=norm_p,
+            norm_err=norm_err,
+            minrescor=minrescor,
+            maxrescor=maxrescor,
+            p_noise_miss=p_noise_miss,
+            resocor=resocor,
+            err_resocor=err_resocor,
+        )
 
     def compute_additional_stats(self):
 
@@ -260,28 +286,38 @@ class Pk(object):
         err_diffovernoise = {}
 
         for z in self.zbin:
-            err_noiseoverraw[z] = (self.p_noise[z] / self.p_raw[z]) * np.sqrt( (self.err_noise[z] / self.p_noise[z])**2  + (self.err_raw[z] / self.p_raw[z])**2)
-            err_diffoverraw[z] = (self.p_diff[z] / self.p_raw[z]) * np.sqrt( (self.err_diff[z] / self.p_diff[z])**2  + (self.err_raw[z] / self.p_raw[z])**2)
-            err_diffovernoise[z] = (self.p_diff[z] / self.p_noise[z]) * np.sqrt( (self.err_noise[z] / self.p_noise[z])**2  + (self.err_diff[z] / self.p_diff[z])**2)
+            err_noiseoverraw[z] = (self.p_noise[z] / self.p_raw[z]) * np.sqrt(
+                (self.err_noise[z] / self.p_noise[z]) ** 2
+                + (self.err_raw[z] / self.p_raw[z]) ** 2
+            )
+            err_diffoverraw[z] = (self.p_diff[z] / self.p_raw[z]) * np.sqrt(
+                (self.err_diff[z] / self.p_diff[z]) ** 2
+                + (self.err_raw[z] / self.p_raw[z]) ** 2
+            )
+            err_diffovernoise[z] = (self.p_diff[z] / self.p_noise[z]) * np.sqrt(
+                (self.err_noise[z] / self.p_noise[z]) ** 2
+                + (self.err_diff[z] / self.p_diff[z]) ** 2
+            )
 
         self.err_noiseoverraw = err_noiseoverraw
         self.err_diffoverraw = err_diffoverraw
         self.err_diffovernoise = err_diffovernoise
 
 
-
 class MeanPkZ(object):
-
-    def __init__(self,velunits=False,
-                      k=None,
-                      p=None,
-                      p_raw=None,
-                      p_noise=None,
-                      p_diff=None,
-                      err=None,
-                      err_raw=None,
-                      err_noise=None,
-                      err_diff=None):
+    def __init__(
+        self,
+        velunits=False,
+        k=None,
+        p=None,
+        p_raw=None,
+        p_noise=None,
+        p_diff=None,
+        err=None,
+        err_raw=None,
+        err_noise=None,
+        err_diff=None,
+    ):
         self.velunits = velunits
         self.k = k
         self.p = p
@@ -293,89 +329,130 @@ class MeanPkZ(object):
         self.err_noise = err_noise
         self.err_diff = err_diff
 
-
-
     @classmethod
-    def init_from_pk(cls,pk,zmax):
+    def init_from_pk(cls, pk, zmax):
         velunits = pk.velunits
 
         nb_z_bins = len(pk.zbin[pk.zbin < zmax])
-        
-        k = np.mean([pk.k[z] for z in pk.zbin if z < zmax],axis=0)
-        p = np.mean([pk.p[z] for z in pk.zbin if z < zmax],axis=0)
-        p_raw = np.mean([pk.p_raw[z] for z in pk.zbin if z < zmax],axis=0)
-        p_noise = np.mean([pk.p_noise[z] for z in pk.zbin if z < zmax],axis=0)
-        p_diff = np.mean([pk.p_diff[z] for z in pk.zbin if z < zmax],axis=0)
-        err = np.mean([pk.err[z] for z in pk.zbin if z < zmax],axis=0)/np.sqrt(nb_z_bins)
-        err_raw = np.mean([pk.err_raw[z] for z in pk.zbin if z < zmax],axis=0)/np.sqrt(nb_z_bins)
-        err_noise = np.mean([pk.err_noise[z] for z in pk.zbin if z < zmax],axis=0)/np.sqrt(nb_z_bins)
-        err_diff = np.mean([pk.err_diff[z] for z in pk.zbin if z < zmax],axis=0)/np.sqrt(nb_z_bins)
 
-        return cls(velunits,
-                   k,
-                   p,
-                   p_raw,
-                   p_noise,
-                   p_diff,
-                   err,
-                   err_raw,
-                   err_noise,
-                   err_diff)
+        k = np.mean([pk.k[z] for z in pk.zbin if z < zmax], axis=0)
+        p = np.mean([pk.p[z] for z in pk.zbin if z < zmax], axis=0)
+        p_raw = np.mean([pk.p_raw[z] for z in pk.zbin if z < zmax], axis=0)
+        p_noise = np.mean([pk.p_noise[z] for z in pk.zbin if z < zmax], axis=0)
+        p_diff = np.mean([pk.p_diff[z] for z in pk.zbin if z < zmax], axis=0)
+        err = np.mean([pk.err[z] for z in pk.zbin if z < zmax], axis=0) / np.sqrt(
+            nb_z_bins
+        )
+        err_raw = np.mean(
+            [pk.err_raw[z] for z in pk.zbin if z < zmax], axis=0
+        ) / np.sqrt(nb_z_bins)
+        err_noise = np.mean(
+            [pk.err_noise[z] for z in pk.zbin if z < zmax], axis=0
+        ) / np.sqrt(nb_z_bins)
+        err_diff = np.mean(
+            [pk.err_diff[z] for z in pk.zbin if z < zmax], axis=0
+        ) / np.sqrt(nb_z_bins)
 
+        return cls(
+            velunits, k, p, p_raw, p_noise, p_diff, err, err_raw, err_noise, err_diff
+        )
 
-
-
-    def compute_additional_stats(self,pk,zmax):
+    def compute_additional_stats(self, pk, zmax):
 
         nb_z_bins = len(pk.zbin[pk.zbin < zmax])
 
-        err_noiseoverraw = np.mean([(pk.p_noise[z] / pk.p_raw[z]) * np.sqrt( (pk.err_noise[z] / pk.p_noise[z])**2  + (pk.err_raw[z] / pk.p_raw[z])**2 )
-                                    for z in pk.zbin if z < zmax],axis=0)/np.sqrt(nb_z_bins)
-        err_diffoverraw = np.mean([(pk.p_diff[z] / pk.p_raw[z]) * np.sqrt( (pk.err_diff[z] / pk.p_diff[z])**2  + (pk.err_raw[z] / pk.p_raw[z])**2 )
-                                    for z in pk.zbin if z < zmax],axis=0)/np.sqrt(nb_z_bins)    
-        err_diffovernoise = np.mean([(pk.p_diff[z] / pk.p_noise[z]) * np.sqrt( (pk.err_noise[z] / pk.p_noise[z])**2  + (pk.err_diff[z] / pk.p_diff[z])**2 )
-                                    for z in pk.zbin if z < zmax],axis=0)/np.sqrt(nb_z_bins)
+        err_noiseoverraw = np.mean(
+            [
+                (pk.p_noise[z] / pk.p_raw[z])
+                * np.sqrt(
+                    (pk.err_noise[z] / pk.p_noise[z]) ** 2
+                    + (pk.err_raw[z] / pk.p_raw[z]) ** 2
+                )
+                for z in pk.zbin
+                if z < zmax
+            ],
+            axis=0,
+        ) / np.sqrt(nb_z_bins)
+        err_diffoverraw = np.mean(
+            [
+                (pk.p_diff[z] / pk.p_raw[z])
+                * np.sqrt(
+                    (pk.err_diff[z] / pk.p_diff[z]) ** 2
+                    + (pk.err_raw[z] / pk.p_raw[z]) ** 2
+                )
+                for z in pk.zbin
+                if z < zmax
+            ],
+            axis=0,
+        ) / np.sqrt(nb_z_bins)
+        err_diffovernoise = np.mean(
+            [
+                (pk.p_diff[z] / pk.p_noise[z])
+                * np.sqrt(
+                    (pk.err_noise[z] / pk.p_noise[z]) ** 2
+                    + (pk.err_diff[z] / pk.p_diff[z]) ** 2
+                )
+                for z in pk.zbin
+                if z < zmax
+            ],
+            axis=0,
+        ) / np.sqrt(nb_z_bins)
 
         self.err_noiseoverraw = err_noiseoverraw
         self.err_diffoverraw = err_diffoverraw
         self.err_diffovernoise = err_diffovernoise
 
 
-
-
-
-def compute_mean_z_noise_power(data,zbins,kmin=4e-2,kmax=2.5):
+def compute_mean_z_noise_power(data, zbins, kmin=4e-2, kmax=2.5):
     velunits = data.meta["VELUNITS"]
 
-    if velunits and kmax==2:
-        kmax=0.035
-    if velunits and kmin==4e-2:
-        kmin=8e-4
+    if velunits and kmax == 2:
+        kmax = 0.035
+    if velunits and kmin == 4e-2:
+        kmin = 8e-4
 
-    diff_model = {"Pk_diff" : [] ,"Pk_noise" : []}
-    for iz,z in enumerate(zbins):
-        dat=data[iz]
-        select=dat['N']>0
-        k=dat['meank'][select]
-        Pk_noise = dat["meanPk_noise"][select][k<kmax]
-        Pk_diff = dat["meanPk_diff"][select][k<kmax]
+    diff_model = {"Pk_diff": [], "Pk_noise": []}
+    for iz, z in enumerate(zbins):
+        dat = data[iz]
+        select = dat["N"] > 0
+        k = dat["meank"][select]
+        Pk_noise = dat["meanPk_noise"][select][k < kmax]
+        Pk_diff = dat["meanPk_diff"][select][k < kmax]
         diff_model["Pk_diff"].append(Pk_diff)
         diff_model["Pk_noise"].append(Pk_noise)
 
-    dict_noise_diff = {"diff":[],"error_diff" : [],"pipeline" : [],"error_pipeline":[],"diff_over_pipeline":[],"error_diff_over_pipeline":[]}
+    dict_noise_diff = {
+        "diff": [],
+        "error_diff": [],
+        "pipeline": [],
+        "error_pipeline": [],
+        "diff_over_pipeline": [],
+        "error_diff_over_pipeline": [],
+    }
     for i in range(len(diff_model["Pk_noise"])):
-        noise_error = scipy.stats.sem(diff_model["Pk_noise"][i],ddof=0)
-        diff_error = scipy.stats.sem(diff_model["Pk_diff"][i],ddof=0)
-        diff_over_noise_error = (np.mean(diff_model["Pk_diff"][i])/np.mean(diff_model["Pk_noise"][i]))*np.sqrt((diff_error/np.mean(diff_model["Pk_diff"][i]))**2 + (noise_error/np.mean(diff_model["Pk_noise"][i]))**2)
+        noise_error = scipy.stats.sem(diff_model["Pk_noise"][i], ddof=0)
+        diff_error = scipy.stats.sem(diff_model["Pk_diff"][i], ddof=0)
+        diff_over_noise_error = (
+            np.mean(diff_model["Pk_diff"][i]) / np.mean(diff_model["Pk_noise"][i])
+        ) * np.sqrt(
+            (diff_error / np.mean(diff_model["Pk_diff"][i])) ** 2
+            + (noise_error / np.mean(diff_model["Pk_noise"][i])) ** 2
+        )
         dict_noise_diff["diff"].append(np.mean(diff_model["Pk_diff"][i]))
         dict_noise_diff["error_diff"].append(diff_error)
         dict_noise_diff["pipeline"].append(np.mean(diff_model["Pk_noise"][i]))
         dict_noise_diff["error_pipeline"].append(noise_error)
-        dict_noise_diff["diff_over_pipeline"].append(np.mean((diff_model["Pk_diff"][i] - diff_model["Pk_noise"][i])/diff_model["Pk_noise"][i]))
+        dict_noise_diff["diff_over_pipeline"].append(
+            np.mean(
+                (diff_model["Pk_diff"][i] - diff_model["Pk_noise"][i])
+                / diff_model["Pk_noise"][i]
+            )
+        )
         dict_noise_diff["error_diff_over_pipeline"].append(diff_over_noise_error)
     dict_noise_diff["zbins"] = zbins
 
-    return(dict_noise_diff)
+    return dict_noise_diff
+
 
 """ 
 class theoretical_models 

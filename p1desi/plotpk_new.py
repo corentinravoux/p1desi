@@ -14,90 +14,96 @@ import pandas
 import scipy
 import astropy.table as t
 
-from p1desi import utils
+from p1desi import utils, uncertainty
 
 
+# CR - once all plotting functions in notebooks are adapted, add them here
 
-# CR - once all plotting functions in notebooks are adapted, add them here
 
-
-def plot(pk,
-         zmax,
-         outname=None,
-         plot_P=False,
-         systematics_file = None,
-         **kwargs):
-
+def plot(
+    pk,
+    zmax,
+    outname=None,
+    plot_P=False,
+    systematics_file=None,
+    **kwargs,
+):
 
     zbins = pk.zbin[pk.zbin < zmax]
 
-    marker_size = utils.return_key(kwargs,"marker_size",7)
-    marker_style = utils.return_key(kwargs,"marker_style",".")
-    fontsize_x = utils.return_key(kwargs,"fontsize_x",16)
-    fontsize_y = utils.return_key(kwargs,"fontsize_y",19)
-    labelsize = utils.return_key(kwargs,"labelsize",14)
-    fontlegend = utils.return_key(kwargs,"fontl",14)
-    color = utils.return_key(kwargs,"color",[f"C{i}" for i in range(len(zbins))])
-    kmin = utils.return_key(kwargs,"kmin",0.145)
-    kmax = utils.return_key(kwargs,"kmax",2.5)
-    ymin = utils.return_key(kwargs,"ymin",0.01)
-    ymax = utils.return_key(kwargs,"ymax",0.2)
-    figsize = utils.return_key(kwargs,"figsize",(11,8.5))
-    place_velaxis = utils.return_key(kwargs,"place_velaxis",True)
+    marker_size = utils.return_key(kwargs, "marker_size", 7)
+    marker_style = utils.return_key(kwargs, "marker_style", ".")
+    fontsize_x = utils.return_key(kwargs, "fontsize_x", 16)
+    fontsize_y = utils.return_key(kwargs, "fontsize_y", 19)
+    labelsize = utils.return_key(kwargs, "labelsize", 14)
+    fontlegend = utils.return_key(kwargs, "fontl", 14)
+    color = utils.return_key(kwargs, "color", [f"C{i}" for i in range(len(zbins))])
+    kmin = utils.return_key(kwargs, "kmin", 0.145)
+    kmax = utils.return_key(kwargs, "kmax", 2.5)
+    ymin = utils.return_key(kwargs, "ymin", 0.01)
+    ymax = utils.return_key(kwargs, "ymax", 0.2)
+    figsize = utils.return_key(kwargs, "figsize", (11, 8.5))
+    place_velaxis = utils.return_key(kwargs, "place_velaxis", True)
 
-    fig,ax = plt.subplots(1,figsize = figsize)
+    fig, ax = plt.subplots(1, figsize=figsize)
 
     if systematics_file is not None:
-        systematics = utils.load_systematics_file(systematics_file)
+        systematics = uncertainty.load_systematics_file(systematics_file)
 
-    for i,z in enumerate(zbins):
+    for i, z in enumerate(zbins):
         if systematics_file is not None:
-            error_bar = np.sqrt(pk.err[z]**2 + systematics[i]**2)
+            error_bar = np.sqrt(pk.err[z] ** 2 + systematics[i] ** 2)
         else:
             error_bar = pk.err[z]
 
         if plot_P:
-            ax.errorbar(pk.k[z],
-                        pk.p[z],
-                        yerr = error_bar,
-                        fmt = marker_style,
-                        color = color[i],
-                        markersize = marker_size,
-                        label =r'$z = ${:1.1f}  ({} chunks)'.format(z,pk.number_chunks[z]))
+            ax.errorbar(
+                pk.k[z],
+                pk.p[z],
+                yerr=error_bar,
+                fmt=marker_style,
+                color=color[i],
+                markersize=marker_size,
+                label=r"$z = ${:1.1f}  ({} chunks)".format(z, pk.number_chunks[z]),
+            )
         else:
-            ax.errorbar(pk.k[z],
-                        pk.norm_p[z],
-                        yerr = pk.k[z] * error_bar / np.pi,
-                        fmt = marker_style,
-                        color = color[i],
-                        markersize = marker_size,
-                        label =r'$z = ${:1.1f}  ({} chunks)'.format(z,pk.number_chunks[z]))
+            ax.errorbar(
+                pk.k[z],
+                pk.norm_p[z],
+                yerr=pk.k[z] * error_bar / np.pi,
+                fmt=marker_style,
+                color=color[i],
+                markersize=marker_size,
+                label=r"$z = ${:1.1f}  ({} chunks)".format(z, pk.number_chunks[z]),
+            )
 
+    ax.set_xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize_x)
+    ax.set_ylabel(
+        r"$\Delta_{1\mathrm{D},\alpha}^{2}$", fontsize=fontsize_y, labelpad=-1
+    )
 
-    ax.set_xlabel(r'$k~[\mathrm{\AA}^{-1}]$', fontsize = fontsize_x)
-    ax.set_ylabel(r'$\Delta_{1\mathrm{D},\alpha}^{2}$', fontsize=fontsize_y, labelpad=-1)
-
-    ax.set_yscale('log')
-    ax.xaxis.set_ticks_position('both')
-    ax.xaxis.set_tick_params(direction='in')
-    ax.yaxis.set_ticks_position('both')
-    ax.yaxis.set_tick_params(direction='in')
+    ax.set_yscale("log")
+    ax.xaxis.set_ticks_position("both")
+    ax.xaxis.set_tick_params(direction="in")
+    ax.yaxis.set_ticks_position("both")
+    ax.yaxis.set_tick_params(direction="in")
     ax.xaxis.set_tick_params(labelsize=labelsize)
     ax.yaxis.set_tick_params(labelsize=labelsize)
-    ax.set_xlim(kmin,kmax)
-    ax.set_ylim(ymin,ymax)
+    ax.set_xlim(kmin, kmax)
+    ax.set_ylim(ymin, ymax)
 
-
-    ax.legend(loc=2, bbox_to_anchor=(1.03, 0.9), borderaxespad=0.,fontsize = fontlegend)
-    fig.subplots_adjust(top=0.75,bottom=0.08,left=0.08,right=0.7,hspace=0.2,wspace=0.2)
+    ax.legend(loc=2, bbox_to_anchor=(1.03, 0.9), borderaxespad=0.0, fontsize=fontlegend)
+    fig.subplots_adjust(
+        top=0.75, bottom=0.08, left=0.08, right=0.7, hspace=0.2, wspace=0.2
+    )
     if pk.velunits is False:
         if place_velaxis:
-            utils.place_k_speed_unit_axis(fig,ax,fontsize=fontsize_x,size=labelsize,pos=0.15)
+            utils.place_k_speed_unit_axis(
+                fig, ax, fontsize=fontsize_x, size=labelsize, pos=0.15
+            )
 
     if outname is not None:
         fig.savefig(outname)
-
-
 
 
 """ def plot_comparison(pk,
@@ -315,26 +321,17 @@ def plot_diff_figure(outname,
 
 # Line plots
 
-def plot_lines_study(multiple_data,
-                     zbins,
-                     out_name,
-                     k_units,
-                     **kwargs):
+
+def plot_lines_study(multiple_data, zbins, out_name, k_units, **kwargs):
     for i in range(len(multiple_data)):
-        mean_dict = return_mean_z_dict(zbins,multiple_data[i])
-        mean_dict["k_array"],mean_dict["meanPk"]
+        mean_dict = return_mean_z_dict(zbins, multiple_data[i])
+        mean_dict["k_array"], mean_dict["meanPk"]
 
-    return()
-
-
-
+    return ()
 
 
 # Uncertainties plots
 
-def plot_uncertainties(data,
-                       zbins,
-                       out_name,
-                       k_units,
-                       **kwargs):
-    return()
+
+def plot_uncertainties(data, zbins, out_name, k_units, **kwargs):
+    return ()
