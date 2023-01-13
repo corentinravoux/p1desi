@@ -23,7 +23,6 @@ def plot_and_compute_ratio_power(
     kmin_AA,
     kmin_fit_AA,
     kmax_AA,
-    vel,
     model_param=None,
     **plt_args,
 ):
@@ -42,7 +41,6 @@ def plot_and_compute_ratio_power(
         kmin_AA: minimum wave number in inverse Angstroms to plot
         kmin_fit_AA: minimum wave number in inverse Angstroms to use for fitting the curve
         kmax_AA: maximum wave number in inverse Angstroms to plot
-        vel: boolean, if True k is in s/km, if False k is in inverse Angstroms
         model_param: dictionary of parameters for the fitting function, required if model is "poly" and should contain the key "order_poly" specifying the order of the polynomial
         **plt_args: additional arguments to be passed to the plot, including:
             dk: shift in wave number between redshift bins
@@ -79,7 +77,7 @@ def plot_and_compute_ratio_power(
         else:
             axplt = ax[1]
         if z < zmax:
-            if vel:
+            if pk.velunits:
                 kmax = float(utils.kAAtokskm(kmax_AA, z=z))
                 kmin = float(utils.kAAtokskm(kmin_AA, z=z))
                 kmin_fit = float(utils.kAAtokskm(kmin_fit_AA, z=z))
@@ -146,7 +144,23 @@ def plot_and_compute_ratio_power(
                 axplt.plot(k_th, np.poly1d(p)(k_th), color=f"C{i}", ls="--")
                 params.append(p)
 
-            if model == "rogers":
+            elif model == "power":
+                popt, pcov = curve_fit(
+                    model_cont_correction,
+                    xdata=k,
+                    ydata=ratio,
+                    sigma=err_ratio,
+                    p0=[1.0, 0.0, 0.0],
+                    bounds=(
+                        [-np.inf, -5, 0],
+                        [np.inf, 5, 5],
+                    ),
+                )
+                k_th = np.linspace(np.min(k), np.max(k), 2000)
+                axplt.plot(k_th, model_cont_correction(k_th, *popt), color=f"C{i}")
+                params.append(popt)
+
+            elif model == "rogers":
                 func = partial(hcd.rogers, z)
                 popt, pcov = curve_fit(
                     func,
@@ -163,7 +177,7 @@ def plot_and_compute_ratio_power(
                 axplt.plot(k_th, func(k_th, *popt), color=f"C{i}")
                 params.append(popt)
 
-    if vel:
+    if pk.velunits:
         ax[1].set_xlabel(
             r"$k~[\mathrm{s}$" + r"$\cdot$" + "$\mathrm{km}^{-1}]$", fontsize=fontsize
         )
@@ -178,7 +192,7 @@ def plot_and_compute_ratio_power(
     ax[0].margins(x=0)
     fig.tight_layout()
 
-    if vel:
+    if pk.velunits:
         fig.savefig(os.path.join(path_out, f"{name_correction}_{suffix}_kms.pdf"))
         fig.savefig(os.path.join(path_out, f"{name_correction}_{suffix}_kms.png"))
         pickle.dump(
@@ -220,8 +234,12 @@ def prepare_lines_correction(zbins, file_correction_lines):
     return A_lines
 
 
-def model_cont_correction(a0, a1, a2, k):
-    return a0 * np.exp(-k / a1) + a2 + 1
+# def model_cont_correction(a0, a1, a2, k):
+#    return a0 * np.exp(-k / a1) + a2 + 1
+
+
+def model_cont_correction(k, a0, a1, a2):
+    return (a0 / k) + a1 + a2 * k
 
 
 def prepare_cont_correction(zbins, file_correction_cont):
@@ -281,10 +299,10 @@ def apply_correction_eboss(pk, zmax, file_correction, type_correction):
     zbins = pk.zbin[pk.zbin < zmax]
     A_corr = eval(f"prepare_{type_correction}_correction_eboss")(zbins, file_correction)
     for z in zbins:
-        pk.p[z] = pk.p[z] * A_corr[z](pk.k[z])
-        pk.norm_p[z] = pk.norm_p[z] * A_corr[z](pk.k[z])
-        pk.err[z] = pk.err[z] * A_corr[z](pk.k[z])
-        pk.norm_err[z] = pk.norm_err[z] * A_corr[z](pk.k[z])
+        pk.p[z] = pk.p[z] / A_corr[z](pk.k[z])
+        pk.norm_p[z] = pk.norm_p[z] / A_corr[z](pk.k[z])
+        pk.err[z] = pk.err[z] / A_corr[z](pk.k[z])
+        pk.norm_err[z] = pk.norm_err[z] / A_corr[z](pk.k[z])
 
 
 ############## Side band corrections ##############
@@ -325,28 +343,27 @@ def prepare_metal_correction_eboss(file_metal_eboss):
     return param_sb_eboss
 
 
-def subtract_metal_eboss(dict_plot, zbins, file_metal_eboss, plot_P):
+def subtract_metal_eboss(pk, zmax, file_metal_eboss):
+    zbins = pk.zbin[pk.zbin < zmax]
     param_sb_eboss = prepare_metal_correction_eboss(file_metal_eboss)
     nbin_eboss = 35
     klimInf_eboss = 0.000813
     klimSup_eboss = klimInf_eboss + nbin_eboss * 0.000542
 
-    for iz, z in enumerate(zbins):
+    for z in zbins:
         mask_sb = param_sb_eboss[:, 0] == z
         k_sb_eboss = param_sb_eboss[:, 1][mask_sb]
         sb_eboss = param_sb_eboss[:, 2][mask_sb]
 
-        k_to_plot = dict_plot[z]["k_to_plot"]
-
         deltak_eboss = (klimSup_eboss - klimInf_eboss) / nbin_eboss
-        ib_eboss = ((k_to_plot - klimInf_eboss) / deltak_eboss).astype(int)
-        cor_sb = np.zeros(k_to_plot.shape)
-        slope_eboss = np.zeros(k_to_plot.shape)
+        ib_eboss = ((k_sb_eboss - klimInf_eboss) / deltak_eboss).astype(int)
+        cor_sb = np.zeros(k_sb_eboss.shape)
+        slope_eboss = np.zeros(k_sb_eboss.shape)
 
-        mask_k_sb_1 = k_to_plot < klimInf_eboss
+        mask_k_sb_1 = k_sb_eboss < klimInf_eboss
         slope_eboss[mask_k_sb_1] = (sb_eboss[1] - sb_eboss[0]) / deltak_eboss
         cor_sb[mask_k_sb_1] = sb_eboss[0] + slope_eboss[mask_k_sb_1] * (
-            k_to_plot[mask_k_sb_1] - deltak_eboss / 2 - klimInf_eboss
+            k_sb_eboss[mask_k_sb_1] - deltak_eboss / 2 - klimInf_eboss
         )
 
         mask_k_sb_2 = (ib_eboss < nbin_eboss - 1) & (~mask_k_sb_1)
@@ -356,7 +373,7 @@ def subtract_metal_eboss(dict_plot, zbins, file_metal_eboss, plot_P):
         cor_sb[mask_k_sb_2] = sb_eboss[ib_eboss[mask_k_sb_2]] + slope_eboss[
             mask_k_sb_2
         ] * (
-            k_to_plot[mask_k_sb_2]
+            k_sb_eboss[mask_k_sb_2]
             - deltak_eboss / 2
             - (klimInf_eboss + ib_eboss[mask_k_sb_2] * deltak_eboss)
         )
@@ -364,15 +381,11 @@ def subtract_metal_eboss(dict_plot, zbins, file_metal_eboss, plot_P):
         mask_k_sb_3 = (~mask_k_sb_2) & (~mask_k_sb_1)
         slope_eboss[mask_k_sb_3] = (sb_eboss[-1] - sb_eboss[-2]) / deltak_eboss
         cor_sb[mask_k_sb_3] = sb_eboss[-1] + slope_eboss[mask_k_sb_3] * (
-            k_to_plot[mask_k_sb_3] - deltak_eboss / 2 - (klimSup_eboss - deltak_eboss)
+            k_sb_eboss[mask_k_sb_3] - deltak_eboss / 2 - (klimSup_eboss - deltak_eboss)
         )
 
-        if plot_P:
-            dict_plot[z]["p_to_plot"] = dict_plot[z]["p_to_plot"] - cor_sb
-        else:
-            dict_plot[z]["p_to_plot"] = (
-                dict_plot[z]["p_to_plot"] - dict_plot[z]["k_to_plot"] * cor_sb / np.pi
-            )
+        pk.p[z] = pk.p[z] - cor_sb
+        pk.norm_p[z] = pk.norm_p[z] - (pk.k[z] * cor_sb / np.pi)
 
 
 ################ Noise corrections ################
