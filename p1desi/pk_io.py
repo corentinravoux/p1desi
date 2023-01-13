@@ -2,6 +2,7 @@ import numpy as np
 import pickle, scipy
 import astropy.table as t
 import struct
+from scipy.interpolate import interp2d
 
 
 def read_pk_means(pk_means_name, hdu=None):
@@ -213,7 +214,6 @@ class Pk(object):
             err_diff[zbin] = np.array(dat["errorPk_diff"][select])
             norm_p[zbin] = np.array(dat["meanDelta2"][select])
             norm_err[zbin] = np.array(dat["errorDelta2"][select])
-            p_noise_miss[zbin] = np.array(dat["meanPk_noise_miss"][select])
             resocor[zbin] = np.array(dat["meancor_reso"][select])
             err_resocor[zbin] = np.array(dat["errorcor_reso"][select])
             number_chunks[zbin] = int(dat["N_chunks"])
@@ -302,6 +302,173 @@ class Pk(object):
         self.err_noiseoverraw = err_noiseoverraw
         self.err_diffoverraw = err_diffoverraw
         self.err_diffovernoise = err_diffovernoise
+
+
+class PkEboss(Pk):
+    def __init__(
+        self,
+        zbin=None,
+        k=None,
+        p=None,
+        p_noise=None,
+        err=None,
+        norm_p=None,
+        norm_err=None,
+    ):
+        super(PkEboss, self).__init__(
+            velunits=True,
+            zbin=zbin,
+            number_chunks=None,
+            k=k,
+            p=p,
+            p_noise=p_noise,
+            err=err,
+            norm_p=norm_p,
+            norm_err=norm_err,
+        )
+
+    @classmethod
+    def read_from_file(cls, name_file):
+
+        k = {}
+        p = {}
+        p_noise = {}
+        err = {}
+        norm_p = {}
+        norm_err = {}
+        file_eboss = np.loadtxt(name_file)
+        zbins = np.unique(file_eboss[:, 0])
+        for zbin in zbins:
+            mask = file_eboss[:, 0] == zbin
+            k[zbin] = np.array(file_eboss[:, 1][mask])
+            p[zbin] = np.array(file_eboss[:, 2][mask])
+            norm_p[zbin] = np.array(k[zbin] * p[zbin] / np.pi)
+            p_noise[zbin] = np.array(file_eboss[:, 4][mask])
+            err_stat = file_eboss[:, 3][mask]
+            err_syst = file_eboss[:, 6][mask]
+            err_tot = np.sqrt(np.array(err_stat) ** 2 + np.array(err_syst) ** 2)
+            err[zbin] = err_tot
+            norm_err[zbin] = k[zbin] * err[zbin] / np.pi
+
+        return cls(
+            zbin=np.array(zbins),
+            k=k,
+            p=p,
+            p_noise=p_noise,
+            err=err,
+            norm_p=norm_p,
+            norm_err=norm_err,
+        )
+
+
+class PkHR(Pk):
+    def __init__(
+        self,
+        zbin=None,
+        k=None,
+        p=None,
+        err=None,
+        norm_p=None,
+        norm_err=None,
+    ):
+        super(PkHR, self).__init__(
+            velunits=True,
+            zbin=zbin,
+            number_chunks=None,
+            k=k,
+            p=p,
+            err=err,
+            norm_p=norm_p,
+            norm_err=norm_err,
+        )
+
+    @classmethod
+    def read_from_file(cls, name_file):
+
+        k = {}
+        p = {}
+        err = {}
+        norm_p = {}
+        norm_err = {}
+        file_hr = np.loadtxt(name_file, delimiter="|", skiprows=1, usecols=(1, 2, 3, 4))
+        zbins = np.unique(file_hr[:, 0])
+        for zbin in zbins:
+            mask = file_hr[:, 0] == zbin
+            k[zbin] = np.array(file_hr[:, 1][mask])
+            p[zbin] = np.array(file_hr[:, 2][mask])
+            norm_p[zbin] = np.array(k[zbin] * p[zbin] / np.pi)
+            err[zbin] = np.array(file_hr[:, 3][mask])
+            norm_err[zbin] = np.array(k[zbin] * err[zbin] / np.pi)
+
+        return cls(
+            zbin=np.array(zbins),
+            k=k,
+            p=p,
+            err=err,
+            norm_p=norm_p,
+            norm_err=norm_err,
+        )
+
+
+class PkTrueOhioMock(Pk):
+    def __init__(
+        self,
+        zbin=None,
+        k=None,
+        p=None,
+        err=None,
+        norm_p=None,
+        norm_err=None,
+    ):
+        super(PkTrueOhioMock, self).__init__(
+            velunits=True,
+            zbin=zbin,
+            number_chunks=None,
+            k=k,
+            p=p,
+            err=err,
+            norm_p=norm_p,
+            norm_err=norm_err,
+        )
+
+    @classmethod
+    def read_from_file(cls, name_file, zbins_input, k_input):
+
+        k = {}
+        p = {}
+        err = {}
+        norm_p = {}
+        norm_err = {}
+
+        file = open(name_file, "rb")
+
+        nk, nz = struct.unpack("ii", file.read(struct.calcsize("ii")))
+        fmt = "d" * nz
+        data = file.read(struct.calcsize(fmt))
+        z_file = np.array(struct.unpack(fmt, data), dtype=np.double)
+        fmt = "d" * nk
+        data = file.read(struct.calcsize(fmt))
+        k_file = np.array(struct.unpack(fmt, data), dtype=np.double)
+        fmt = "d" * nk * nz
+        data = file.read(struct.calcsize(fmt))
+        p_file = np.array(struct.unpack(fmt, data), dtype=np.double).reshape((nz, nk))
+        intp_p = interp2d(k_file, z_file, p_file)
+
+        for zbin in zbins_input:
+            k[zbin] = k_input[zbin]
+            p[zbin] = intp_p(k_input[zbin], zbin)
+            norm_p[zbin] = intp_p(k_input[zbin], zbin) * k_input[zbin] / np.pi
+            err[zbin] = np.zeros(k_input[zbin].shape)
+            norm_err[zbin] = np.zeros(k_input[zbin].shape)
+
+        return cls(
+            zbin=zbins_input,
+            k=k,
+            p=p,
+            err=err,
+            norm_p=norm_p,
+            norm_err=norm_err,
+        )
 
 
 class MeanPkZ(object):
