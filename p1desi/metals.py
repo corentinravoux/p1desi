@@ -1,5 +1,6 @@
 from p1desi import utils, pk_io
 import pickle
+import scipy
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
@@ -152,16 +153,17 @@ def init_side_band_power(pSB1_name, pSB2_name, zmax):
     if velunits:
         krestSB1 = np.array(kSB1)
         krestSB2 = np.array(kSB2)
+
     else:
         krestSB1 = np.array(krestSB1)
         krestSB2 = np.array(krestSB2)
+        
     krescaleSB1 = np.linspace(
             np.nanmin(krestSB1), np.nanmax(krestSB1), krestSB1.shape[1]
         )
     krescaleSB2 = np.linspace(
             np.nanmin(krestSB2), np.nanmax(krestSB2), krestSB2.shape[1]
         )
-
     for i, z in enumerate(pSB1.zbin):
         if z < zmax:
             pkrestSB1.append(np.interp(krescaleSB1, krestSB1[i], pSB1.p[z]))
