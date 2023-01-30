@@ -157,7 +157,7 @@ def plot_and_compute_ratio_power(
                     ),
                 )
                 k_th = np.linspace(np.min(k), np.max(k), 2000)
-                axplt.plot(k_th, model_cont_correction(k_th, *popt), color=f"C{i}")
+                axplt.plot(k_th, model_cont_correction(k_th, *popt), color=f"C{i}", ls="--")
                 params.append(popt)
 
             elif model == "rogers":
@@ -174,7 +174,7 @@ def plot_and_compute_ratio_power(
                     ),
                 )
                 k_th = np.linspace(np.min(k), np.max(k), 2000)
-                axplt.plot(k_th, func(k_th, *popt), color=f"C{i}")
+                axplt.plot(k_th, func(k_th, *popt), color=f"C{i}", ls="--")
                 params.append(popt)
 
     if pk.velunits:
@@ -246,7 +246,9 @@ def prepare_cont_correction(zbins, file_correction_cont):
     param_cont = pickle.load(open(file_correction_cont, "rb"))
     A_cont = {}
     for iz, z in enumerate(zbins):
-        A_cont[z] = partial(model_cont_correction, *param_cont[iz])
+        def model_cont_correction_z(k):
+            return model_cont_correction(k, param_cont[iz][0], param_cont[iz][1], param_cont[iz][2])
+        A_cont[z] = model_cont_correction_z
     return A_cont
 
 
