@@ -24,6 +24,9 @@ class Pk(object):
         velunits=False,
         zbin=None,
         number_chunks=None,
+        number_qso=None,
+        mean_snr=None,
+        mean_z=None,
         k=None,
         p=None,
         p_raw=None,
@@ -44,6 +47,9 @@ class Pk(object):
         self.velunits = velunits
         self.zbin = zbin
         self.number_chunks = number_chunks
+        self.number_qso = number_qso
+        self.mean_snr = mean_snr
+        self.mean_z = mean_z
         self.k = k
         self.p = p
         self.p_raw = p_raw
@@ -66,6 +72,8 @@ class Pk(object):
         minrescor = {}
         maxrescor = {}
         number_chunks = {}
+        mean_snr = {}
+        mean_z = {}
         k = {}
         p = {}
         p_raw = {}
@@ -85,11 +93,12 @@ class Pk(object):
         mean_pk = read_pk_means(name_file, hdu=1)
         metadata = read_pk_means(name_file, hdu=2)
 
-        # CR - to remove when it is fixed on picca
         try:
-            velunits = mean_pk.meta["VELUNITS"]
+            velunits = metadata.meta["VELUNITS"]
+            number_qso = metadata.meta["NQSO"]
         except:
             velunits = False
+            number_qso = 0
 
         minrescor_default = np.inf
         maxrescor_default = 0.0
@@ -109,6 +118,8 @@ class Pk(object):
             norm_p[zbin] = np.array(mean_pk[w]["meanDelta2"])
             norm_err[zbin] = np.array(mean_pk[w]["errorDelta2"])
             number_chunks[zbin] = int(metadata[i]["N_chunks"])
+            mean_snr[zbin] = np.mean(mean_pk[w]["meanforest_snr"])
+            mean_z[zbin] = np.mean(mean_pk[w]["meanforest_z"])
             resocor[zbin] = np.array(mean_pk[w]["meancor_reso"])
             err_resocor[zbin] = np.array(mean_pk[w]["errorcor_reso"])
 
@@ -155,6 +166,9 @@ class Pk(object):
             velunits=velunits,
             zbin=np.array(zbins),
             number_chunks=number_chunks,
+            number_qso=number_qso,
+            mean_snr=mean_snr,
+            mean_z=mean_z,
             k=k,
             p=p,
             p_raw=p_raw,
@@ -178,6 +192,8 @@ class Pk(object):
         minrescor = {}
         maxrescor = {}
         number_chunks = {}
+        mean_snr = {}
+        mean_z = {}
         k = {}
         p = {}
         p_raw = {}
@@ -195,7 +211,12 @@ class Pk(object):
 
         mean_pk = read_pk_means(name_file)
 
-        velunits = mean_pk.meta["VELUNITS"]
+        try:
+            velunits = mean_pk.meta["VELUNITS"]
+            number_qso = mean_pk.meta["NQSO"]
+        except:
+            velunits = False
+            number_qso = 0
 
         minrescor_default = np.inf
         maxrescor_default = 0.0
@@ -217,6 +238,8 @@ class Pk(object):
             resocor[zbin] = np.array(dat["meancor_reso"][select])
             err_resocor[zbin] = np.array(dat["errorcor_reso"][select])
             number_chunks[zbin] = int(dat["N_chunks"])
+            mean_snr[zbin] = dat["meansnr"]
+            mean_z[zbin] = dat["meansnr"]
 
             if "meanPk_noise_miss" in dat.colnames:
                 p_noise_miss[zbin] = np.array(dat["meanPk_noise_miss"][select])
@@ -261,6 +284,9 @@ class Pk(object):
             velunits=velunits,
             zbin=np.array(zbins),
             number_chunks=number_chunks,
+            number_qso=number_qso,
+            mean_snr=mean_snr,
+            mean_z=mean_z,
             k=k,
             p=p,
             p_raw=p_raw,
