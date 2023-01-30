@@ -1,6 +1,11 @@
 import os, itertools
 
 
+def get_params(file_name):
+    f = tuple(open(file_name,"r").read().strip().split("\n"))
+    version, noise_estimate, catalog_name, lines_name, dla_name, bal = f[0], f[1], f[2], f[3], f[4], f[5]
+    return version, noise_estimate, catalog_name, lines_name, dla_name, bal
+
 def return_folder_name(
     region, lines_name, catalog_name, dla_name, bal, noise_estimate, suffix
 ):
