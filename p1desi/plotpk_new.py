@@ -118,6 +118,7 @@ def plot(
             )
 
     if outname is not None:
+        plt.tight_layout()
         fig.savefig(outname)
 
     if outpoints is not None:
@@ -176,6 +177,7 @@ def plot_comparison(
     ymin_ratio = utils.return_key(plot_args, "ymin_ratio", 0.85)
     ymax_ratio = utils.return_key(plot_args, "ymax_ratio", 1.15)
     apply_mask_comp = utils.return_key(plot_args, "apply_mask_comp", True)
+    zmax_comp = utils.return_key(plot_args, "zmax_comp", None)
 
     fig, ax = plt.subplots(
         2, 1, figsize=figsize, gridspec_kw=dict(height_ratios=[3, 1]), sharex=True
@@ -297,23 +299,32 @@ def plot_comparison(
         err_ratio = (p / p2_interp) * np.sqrt(
             (err / p) ** 2 + (err_p2_interp / p2_interp) ** 2
         )
-        if plot_error_ratio:
-            ax[1].errorbar(
-                k,
-                ratio,
-                err_ratio,
-                marker=marker_style,
-                color=color[i],
-                markersize=marker_size,
-            )
+        if zmax_comp is not None:
+            if z > zmax_comp:
+                plot_ratio = False
+            else:
+                plot_ratio = True
+
         else:
-            ax[1].plot(
-                k,
-                ratio,
-                marker=marker_style,
-                color=color[i],
-                markersize=marker_size,
-            )
+            plot_ratio = True
+        if plot_ratio:
+            if plot_error_ratio:
+                ax[1].errorbar(
+                    k,
+                    ratio,
+                    err_ratio,
+                    marker=marker_style,
+                    color=color[i],
+                    markersize=marker_size,
+                )
+            else:
+                ax[1].plot(
+                    k,
+                    ratio,
+                    marker=marker_style,
+                    color=color[i],
+                    markersize=marker_size,
+                )
 
         if z == z_plot_middle_ratio_error:
 
@@ -353,6 +364,8 @@ def plot_comparison(
     ax[0].set_ylim(ymin, ymax)
     ax[1].set_ylabel(f"{label}/{label2}", fontsize=fontsize_y)
     ax[1].set_ylim(ymin_ratio, ymax_ratio)
+    ax[1].xaxis.set_tick_params(labelsize=labelsize)
+    ax[1].yaxis.set_tick_params(labelsize=labelsize)
 
     legend_elements = [
         Line2D(
@@ -415,7 +428,7 @@ def plot_comparison(
             mpatches.Patch(
                 color="k",
                 alpha=0.4,
-                label=f"Error for z = {z_plot_middle_ratio_error}",
+                label=f"Error for \n z = {z_plot_middle_ratio_error}",
                 hatch="///",
             ),
         ]
@@ -438,6 +451,7 @@ def plot_comparison(
             )
 
     if outname is not None:
+        plt.tight_layout()
         fig.savefig(outname + ".pdf")
         fig.savefig(outname + ".png")
 
