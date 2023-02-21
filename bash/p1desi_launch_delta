@@ -140,6 +140,7 @@ num processors = '"${nb_proc}"'
 [data]
 type = '"${mode}"'
 analysis type = PK 1D
+save format = BinTableHDU
 input directory = '"${path_in}"'
 catalogue = '"${cat}"'
 lambda min = 3600.0
