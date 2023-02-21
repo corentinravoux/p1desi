@@ -12,11 +12,9 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 from scipy.interpolate import interp1d
+from scipy.stats import binned_statistic
 
 from p1desi import utils, uncertainty
-
-
-# CR - once all plotting functions in notebooks are adapted, add them here
 
 
 def plot(
@@ -178,6 +176,7 @@ def plot_comparison(
     ymax_ratio = utils.return_key(plot_args, "ymax_ratio", 1.15)
     apply_mask_comp = utils.return_key(plot_args, "apply_mask_comp", True)
     zmax_comp = utils.return_key(plot_args, "zmax_comp", None)
+    resample_pk = utils.return_key(plot_args, "resample_pk", False)
 
     fig, ax = plt.subplots(
         2, 1, figsize=figsize, gridspec_kw=dict(height_ratios=[3, 1]), sharex=True
@@ -223,6 +222,17 @@ def plot_comparison(
             err = (pk.k[z] * error_bar / np.pi)[mask_k]
             p2 = pk2.norm_p[z][mask_k2]
             err2 = pk2.norm_err[z][mask_k2]
+        if resample_pk:
+            k2_edges = np.zeros(len(k2) + 1)
+            k2_edges[1:-1] = (k2[:-1] + k2[1:]) / 2
+            k2_edges[0] = k2[0] - (k2[1] - k2[0]) / 2
+            k2_edges[-1] = k2[-1] + ((k2[-1] - k2[-2]) / 2)
+            means = binned_statistic(k, p, bins=k2_edges, statistic="mean")
+            means_error = binned_statistic(k, err, bins=k2_edges, statistic="mean")
+            number = binned_statistic(k, k, bins=k2_edges, statistic="count")
+            p = means.statistic
+            err = means_error.statistic / np.sqrt(number.statistic)
+            k = (means.bin_edges[:-1] + means.bin_edges[1:]) / 2.0
 
         zarr.append(np.array([z for j in range(len(k))]))
         karr.append(k)
@@ -471,62 +481,3 @@ def plot_comparison(
         np.savetxt(outpoints + "_2.txt", np.transpose(text_file2))
 
     return (fig, ax)
-
-
-"""
-def plot_diff_figure(outname, zbins, dict_plot, kmax, colors, reslabel, reslabel2):
-    diff_data_model = []
-    chi_data_model = []
-    mask_k = dict_plot[zbins[0]]["diff_k_to_plot"] < kmax
-    for iz, z in enumerate(zbins):
-        diff_data_model.append(dict_plot[z]["diff_p_to_plot"][mask_k])
-        chi_data_model.append(dict_plot[z]["chi_p_to_plot"][mask_k])
-    plt.figure()
-    sns.violinplot(
-        data=pandas.DataFrame(np.array(diff_data_model).T, None, zbins),
-        inner=None,
-        orient="v",
-        palette=colors,
-        scale="width",
-    )
-    for i, d in enumerate(diff_data_model):
-        plt.errorbar(i, np.mean(d), scipy.stats.sem(d, ddof=0), color="0.3", marker=".")
-    plt.xlabel("z")
-    plt.ylabel("$(P-P_{model})/P$")
-    plt.tight_layout()
-    plt.savefig(
-        outname
-        + f"_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}_diff.pdf"
-    )
-    plt.figure()
-    sns.violinplot(
-        data=pandas.DataFrame(np.array(chi_data_model).T, None, zbins),
-        inner=None,
-        orient="v",
-        palette=colors,
-        scale="width",
-    )
-    for i, d in enumerate(chi_data_model):
-        plt.errorbar(i, np.mean(d), scipy.stats.sem(d, ddof=0), color="0.3", marker=".")
-    plt.xlabel("z")
-    plt.ylabel("$(P-P_{model})/\sigma_P}$")
-    plt.tight_layout()
-    plt.savefig(
-        outname
-        + f"_kmax_{kmax}_{reslabel.replace(' ','-').replace('(','').replace(')','')}_{reslabel2.replace(' ','-').replace('(','').replace(')','')}_chi.pdf"
-    )
-
-
-
-# Line plots
-
-
-def plot_lines_study(multiple_data, zbins, out_name, k_units, **plot_args):
-    for i in range(len(multiple_data)):
-        mean_dict = return_mean_z_dict(zbins, multiple_data[i])
-        mean_dict["k_array"], mean_dict["meanPk"]
-
-    return ()
-
-
- """
