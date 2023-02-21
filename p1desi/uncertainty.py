@@ -45,14 +45,19 @@ def plot_stat_uncertainties(mean_pk, outname, zmax, **plot_args):
             mask = (mean_pk.k[z] > kmin) & (mean_pk.k[z] < kmax)
             plt.gca().semilogy(
                 mean_pk.k[z][mask],
-                mean_pk.err[z][mask],
+                mean_pk.err[z][mask] / mean_pk.p[z][mask],
                 label=r"$z = ${:1.1f}".format(z),
             )
 
     if mean_pk.velunits:
-        plt.gca().set_ylabel(r"$\sigma_{\mathrm{stat}}$", fontsize=fontsize_y)
+        plt.gca().set_xlabel(
+            r"$k~[\mathrm{s}$" + r"$\cdot$" + "$\mathrm{km}^{-1}]$", fontsize=fontsize_x
+        )
+    else:
+        plt.gca().set_xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize_x)
+
+    plt.gca().set_ylabel(r"$\sigma_{\mathrm{stat}}$", fontsize=fontsize_y)
     plt.gca().yaxis.set_tick_params(labelsize=labelsize)
-    plt.gca().set_xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize_x)
     plt.gca().xaxis.set_tick_params(labelsize=labelsize)
 
     plt.legend(loc="upper center", ncol=2, fontsize=fontlegend)
