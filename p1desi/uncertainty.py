@@ -28,9 +28,11 @@ def plot_stat_uncertainties(mean_pk, outname, zmax, **plot_args):
     kmax_AA = utils.return_key(plot_args, "kmax_AA", 2.5)
     ymin = utils.return_key(plot_args, "ymin", 0.0018)
     ymax = utils.return_key(plot_args, "ymax", 0.07)
-    figsize = utils.return_key(plot_args, "figsize", (9, 6))
+    ymin2 = utils.return_key(plot_args, "ymin2", 0.01)
+    ymax2 = utils.return_key(plot_args, "ymax2", 0.2)
+    figsize = utils.return_key(plot_args, "figsize", (16, 6))
 
-    plt.figure(figsize=figsize)
+    fig, ax = plt.subplots(1, 2, figsize=figsize)
 
     for z in mean_pk.zbin:
         if z < zmax:
@@ -43,29 +45,44 @@ def plot_stat_uncertainties(mean_pk, outname, zmax, **plot_args):
                 kmin = kmin_AA
 
             mask = (mean_pk.k[z] > kmin) & (mean_pk.k[z] < kmax)
-            plt.gca().semilogy(
+            ax[0].semilogy(
+                mean_pk.k[z][mask],
+                mean_pk.err[z][mask],
+                label=r"$z = ${:1.1f}".format(z),
+            )
+            ax[1].semilogy(
                 mean_pk.k[z][mask],
                 mean_pk.err[z][mask] / mean_pk.p[z][mask],
                 label=r"$z = ${:1.1f}".format(z),
             )
-
     if mean_pk.velunits:
-        plt.gca().set_xlabel(
+        ax[0].set_xlabel(
+            r"$k~[\mathrm{s}$" + r"$\cdot$" + "$\mathrm{km}^{-1}]$", fontsize=fontsize_x
+        )
+        ax[1].set_xlabel(
             r"$k~[\mathrm{s}$" + r"$\cdot$" + "$\mathrm{km}^{-1}]$", fontsize=fontsize_x
         )
     else:
-        plt.gca().set_xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize_x)
+        ax[0].set_xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize_x)
+        ax[1].set_xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize_x)
 
-    plt.gca().set_ylabel(r"$\sigma_{\mathrm{stat}}$", fontsize=fontsize_y)
-    plt.gca().yaxis.set_tick_params(labelsize=labelsize)
-    plt.gca().xaxis.set_tick_params(labelsize=labelsize)
+    ax[0].legend(loc="upper center", ncol=2, fontsize=fontlegend)
+    ax[0].set_ylabel(r"$\sigma_{\mathrm{stat}}$", fontsize=fontsize_y)
+    ax[0].yaxis.set_tick_params(labelsize=labelsize)
+    ax[0].xaxis.set_tick_params(labelsize=labelsize)
+    ax[0].set_xlim(kmin, kmax)
+    ax[0].set_ylim(ymin, ymax)
 
-    plt.legend(loc="upper center", ncol=2, fontsize=fontlegend)
-    plt.gca().set_xlim(kmin, kmax)
-    plt.gca().set_ylim(ymin, ymax)
-    plt.tight_layout()
-    plt.savefig(f"{outname}.pdf")
-    plt.savefig(f"{outname}.png")
+    ax[1].set_ylabel(
+        r"$\sigma_{\mathrm{stat}}/P_{1\mathrm{D},\alpha}$", fontsize=fontsize_y
+    )
+    ax[1].yaxis.set_tick_params(labelsize=labelsize)
+    ax[1].xaxis.set_tick_params(labelsize=labelsize)
+    ax[1].set_xlim(kmin, kmax)
+    ax[1].set_ylim(ymin2, ymax2)
+    fig.tight_layout()
+    fig.savefig(f"{outname}.pdf")
+    fig.savefig(f"{outname}.png")
 
 
 """ 
