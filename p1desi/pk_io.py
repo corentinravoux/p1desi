@@ -13,11 +13,6 @@ def read_pk_means(pk_means_name, hdu=None):
     return table
 
 
-def load_systematics_file(systematics_file):
-    systematics = pickle.load(open("sytematics_total.pickle", "rb"))
-    return systematics
-
-
 class Pk(object):
     def __init__(
         self,
