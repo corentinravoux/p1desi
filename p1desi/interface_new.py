@@ -127,6 +127,19 @@ def main(input_file):
         #     )
 
 
+def plot_pk():
+
+    plotpk_new.plot(
+        pk,
+        zmax,
+        outname=outname,
+        outpoints=outpoints,
+        plot_P=plot_P,
+        systematics_file=systematics_file,
+        **plot_args,
+    )
+
+
 def plot_resolution(
     pk, path_plot_resolution, config_plot_resolution, main_config, outname
 ):
@@ -134,11 +147,11 @@ def plot_resolution(
 
     resolution.plot_mean_resolution(
         pk,
-        config_plot_resolution.getfloat("zmax"),
-        f"{outname}_mean_resolution.pdf",
-        f"{outname}_mean_resolution.txt",
-        kmax_line=config_plot_resolution.getfloat("kmax_line"),
-        **config_plot_resolution.getdict("plot_args_resolution"),
+        zmax,
+        outfig,
+        outpoints,
+        kmax_line=kmax_line,
+        **plt_args,
     )
     resolution.fit_resolution_redshift(
         pk,
