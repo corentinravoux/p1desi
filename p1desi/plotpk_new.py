@@ -295,14 +295,14 @@ def plot_comparison(
             p2,
             kind="linear",
             bounds_error=False,
-            fill_value=np.nan,
+            fill_value="extrapolate",
         )(k)
         err_p2_interp = interp1d(
             k2,
             err2,
             kind="linear",
             bounds_error=False,
-            fill_value=np.nan,
+            fill_value="extrapolate",
         )(k)
 
         ratio = p / p2_interp

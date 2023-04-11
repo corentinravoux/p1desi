@@ -98,14 +98,14 @@ def plot_and_compute_ratio_power(
                 pk2.norm_p[z],
                 kind="linear",
                 bounds_error=False,
-                fill_value=np.nan,
+                fill_value="extrapolate",
             )(k)
             norm_err_pk2_interp = interp1d(
                 pk2.k[z],
                 pk2.norm_err[z],
                 kind="linear",
                 bounds_error=False,
-                fill_value=np.nan,
+                fill_value="extrapolate",
             )(k)
 
             ratio = pk.norm_p[z] / norm_pk2_interp
@@ -152,7 +152,7 @@ def plot_and_compute_ratio_power(
 
             elif model == "power":
                 popt, pcov = curve_fit(
-                    model_cont_correction,
+                    model_residual_correction,
                     xdata=k,
                     ydata=ratio,
                     sigma=err_ratio,
@@ -163,7 +163,7 @@ def plot_and_compute_ratio_power(
                     ),
                 )
                 k_th = np.linspace(np.min(k), np.max(k), 2000)
-                axplt.plot(k_th, model_cont_correction(k_th, *popt), color=colors[i], ls="--")
+                axplt.plot(k_th, model_residual_correction(k_th, *popt), color=colors[i], ls="--")
                 params.append(popt)
 
             elif model == "rogers":
@@ -239,19 +239,40 @@ def prepare_lines_correction(zbins, file_correction_lines):
         A_lines[z] = np.poly1d(param_lines[iz])
     return A_lines
 
-
-def model_cont_correction(k, a0, a1, a2):
-    return (a0 / k) + a1 + a2 * k
-
-
 def prepare_cont_correction(zbins, file_correction_cont):
     param_cont = pickle.load(open(file_correction_cont, "rb"))
     A_cont = {}
     for iz, z in enumerate(zbins):
-        def model_cont_correction_z(k):
-            return model_cont_correction(k, param_cont[iz][0], param_cont[iz][1], param_cont[iz][2])
-        A_cont[z] = model_cont_correction_z
+        A_cont[z] = np.poly1d(param_cont[iz])
     return A_cont
+
+
+def prepare_resolution_correction(zbins, file_correction_resolution):
+    param_cont = pickle.load(open(file_correction_resolution, "rb"))
+    A_resolution = {}
+    for _, z in enumerate(zbins):
+        A_resolution[z] = np.poly1d(param_cont)
+    return A_resolution
+
+
+
+
+### CR - unused in the latest version of EDR paper
+def model_residual_correction(k, a0, a1, a2):
+    return (a0 / k) + a1 + a2 * k
+
+def prepare_residual_correction(zbins, file_correction_residual):
+    """ obsolete : unused in the latest version of EDR paper""" 
+    param_residual = pickle.load(open(file_correction_residual, "rb"))
+    A_residual = {}
+    for iz, z in enumerate(zbins):
+        def model_residual_correction_z(k):
+            return model_residual_correction(k, param_residual[iz][0], param_residual[iz][1], param_residual[iz][2])
+        A_residual[z] = model_residual_correction_z
+    return A_residual
+
+
+
 
 
 def apply_correction(pk, zmax, file_correction, type_correction):
@@ -449,6 +470,7 @@ def apply_p1d_corections(
     file_correction_lines_eboss=None,
     file_correction_cont=None,
     file_correction_cont_eboss=None,
+    file_correction_resolution=None,
     file_metal=None,
     file_metal_eboss=None,
 ):
