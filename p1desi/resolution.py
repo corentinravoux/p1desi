@@ -22,6 +22,7 @@ def plot_mean_resolution(
     size_legend = utils.return_key(kwargs, "size_legend", 14)
     size_font_x = utils.return_key(kwargs, "size_font_x", 14)
     size_font_y = utils.return_key(kwargs, "size_font_y", 16)
+    plot_pixelization = utils.return_key(kwargs, "plot_pixelization", False)
 
     plt.figure(figsize=figsize)
 
@@ -39,9 +40,10 @@ def plot_mean_resolution(
     mean_pixelization = np.mean(mean_pixelization, axis=0)
 
     plt.plot(mean_k, mean_reso, marker=".", linestyle="None")
-    plt.plot(mean_k, mean_pixelization)
-    plt.legend(["Resolution & Pixelization", "Pixelization only"], fontsize=size_legend)
-
+    if plot_pixelization :
+        plt.plot(mean_k, mean_pixelization)
+        plt.legend(["Resolution & Pixelization", "Pixelization only"], fontsize=size_legend)
+        
     for z in pk.zbin:
         if z < zmax:
             plt.plot(
@@ -57,12 +59,12 @@ def plot_mean_resolution(
         plt.axvline(kmax_line, color="k")
     plt.fill_between(np.linspace(0, np.max(mean_k), 10), 0.0, 0.2, alpha=0.2, color="k")
     if pk.velunits:
-        plt.xlabel(r"$k~[\AA^{-1}]$", fontsize=size_font_x)
-    else:
         plt.xlabel(
             r"$k~[\mathrm{s}$" + r"$\cdot$" + "$\mathrm{km}^{-1}]$",
             fontsize=size_font_x,
         )
+    else:
+        plt.xlabel(r"$k~[\AA^{-1}]$", fontsize=size_font_x)
 
     plt.ylabel("Average correction", fontsize=size_font_y)
 
