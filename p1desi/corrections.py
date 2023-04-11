@@ -5,6 +5,7 @@ from p1desi import metals, utils, hcd
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
+from matplotlib import cm
 
 
 ###################################################
@@ -66,6 +67,11 @@ def plot_and_compute_ratio_power(
     fontsize = utils.return_key(plt_args, "fontsize", 21)
     fontsize_y = utils.return_key(plt_args, "fontsize_y", 21)
     fontlegend = utils.return_key(plt_args, "fontlegend", 18)
+    color_map = utils.return_key(plt_args, "color_map", "default")
+    if color_map == "default":
+        colors = [f"C{i}" for i, z in enumerate(pk.zbin) if z < zmax]
+    elif color_map == "rainbow":
+        colors = cm.rainbow(np.linspace(0, 1, len(pk.zbin[pk.zbin < zmax])))
 
     params = []
 
@@ -124,7 +130,7 @@ def plot_and_compute_ratio_power(
                 ratio,
                 yerr=err_ratio,
                 marker=marker_style,
-                color=f"C{i}",
+                color=colors[i],
                 markersize=marker_size,
                 linestyle="None",
                 label=r"$z = ${:1.1f}".format(z),
@@ -141,7 +147,7 @@ def plot_and_compute_ratio_power(
                     w=weights[mask_fit],
                 )
                 k_th = np.linspace(np.min(k), np.max(k), 2000)
-                axplt.plot(k_th, np.poly1d(p)(k_th), color=f"C{i}", ls="--")
+                axplt.plot(k_th, np.poly1d(p)(k_th), color=colors[i], ls="--")
                 params.append(p)
 
             elif model == "power":
@@ -157,7 +163,7 @@ def plot_and_compute_ratio_power(
                     ),
                 )
                 k_th = np.linspace(np.min(k), np.max(k), 2000)
-                axplt.plot(k_th, model_cont_correction(k_th, *popt), color=f"C{i}", ls="--")
+                axplt.plot(k_th, model_cont_correction(k_th, *popt), color=colors[i], ls="--")
                 params.append(popt)
 
             elif model == "rogers":
@@ -174,7 +180,7 @@ def plot_and_compute_ratio_power(
                     ),
                 )
                 k_th = np.linspace(np.min(k), np.max(k), 2000)
-                axplt.plot(k_th, func(k_th, *popt), color=f"C{i}", ls="--")
+                axplt.plot(k_th, func(k_th, *popt), color=colors[i], ls="--")
                 params.append(popt)
 
     if pk.velunits:
@@ -232,10 +238,6 @@ def prepare_lines_correction(zbins, file_correction_lines):
     for iz, z in enumerate(zbins):
         A_lines[z] = np.poly1d(param_lines[iz])
     return A_lines
-
-
-# def model_cont_correction(a0, a1, a2, k):
-#    return a0 * np.exp(-k / a1) + a2 + 1
 
 
 def model_cont_correction(k, a0, a1, a2):
