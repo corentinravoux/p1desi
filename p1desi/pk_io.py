@@ -3,7 +3,7 @@ import pickle, scipy
 import astropy.table as t
 import struct
 from scipy.interpolate import interp2d
-
+from p1desi import utils
 
 def read_pk_means(pk_means_name, hdu=None):
     if hdu is None:
@@ -440,9 +440,10 @@ class PkTrueOhioMock(Pk):
         err=None,
         norm_p=None,
         norm_err=None,
+        velunits=None,
     ):
         super(PkTrueOhioMock, self).__init__(
-            velunits=True,
+            velunits = velunits,
             zbin=zbin,
             number_chunks=None,
             k=k,
@@ -453,7 +454,7 @@ class PkTrueOhioMock(Pk):
         )
 
     @classmethod
-    def read_from_file(cls, name_file, zbins_input, k_input):
+    def read_from_file(cls, name_file, zbins_input, k_input, velunits=True):
 
         k = {}
         p = {}
@@ -474,15 +475,23 @@ class PkTrueOhioMock(Pk):
         data = file.read(struct.calcsize(fmt))
         p_file = np.array(struct.unpack(fmt, data), dtype=np.double).reshape((nz, nk))
         intp_p = interp2d(k_file, z_file, p_file)
-
-        for zbin in zbins_input:
-            k[zbin] = k_input[zbin]
-            p[zbin] = intp_p(k_input[zbin], zbin)
-            norm_p[zbin] = intp_p(k_input[zbin], zbin) * k_input[zbin] / np.pi
-            err[zbin] = np.zeros(k_input[zbin].shape)
-            norm_err[zbin] = np.zeros(k_input[zbin].shape)
-
+        if velunits:
+            for zbin in zbins_input:
+                k[zbin] = k_input[zbin]
+                p[zbin] = intp_p(k_input[zbin], zbin)
+                norm_p[zbin] = intp_p(k_input[zbin], zbin) * k_input[zbin] / np.pi
+                err[zbin] = np.zeros(k_input[zbin].shape)
+                norm_err[zbin] = np.zeros(k_input[zbin].shape)
+        else:
+            for zbin in zbins_input:
+                k_vel = utils.kAAtokskm(k_input[zbin], z=zbin)
+                k[zbin] = k_input[zbin]
+                p[zbin] = utils.kskmtokAA(intp_p(k_vel, zbin), z=zbin)
+                norm_p[zbin] = intp_p(k_vel, zbin) * k_vel / np.pi
+                err[zbin] = np.zeros(k_input[zbin].shape)
+                norm_err[zbin] = np.zeros(k_input[zbin].shape)            
         return cls(
+            velunits=velunits,
             zbin=zbins_input,
             k=k,
             p=p,
