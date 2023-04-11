@@ -27,30 +27,27 @@ def return_key(dictionary, string, default_value):
     return dictionary[string] if string in dictionary.keys() else default_value
 
 
-def kAAtokskm(x, pos=None, z=2.2):
+def kAAtokskm(x, z=2.2):
+    return x / (speed_light / (1 + z) / lambdaLy)
+
+def kskmtokAA(x, z=2.2):
+    return x * (speed_light / (1 + z) / lambdaLy)
+
+
+def kAAtokskm_label(x, z=2.2):
     kstr = x
     knew = float(kstr) / (speed_light / (1 + z) / lambdaLy)
     transformed_label = "{:.3f}".format(knew)
     return transformed_label
 
 
-def kskmtokAA(x, z=2.2):
+def kskmtokAA_label(x, z=2.2):
     kstr = x
     knew = float(kstr) * (speed_light / (1 + z) / lambdaLy)
     transformed_label = "{:.3f}".format(knew)
     return transformed_label
 
 
-def convert_data_to_kms(data):
-    scale_fac = speed_light / (1 + data["z"]) / lambdaLy
-    if data is not None:
-        for key in data.keys():
-            if (key != "rescor") | (key != "z") | (key != "nmodes"):
-                if key == "k":
-                    data[key] = np.transpose(np.transpose(data[key]) / scale_fac)
-                else:
-                    data[key] = np.transpose(np.transpose(data[key]) * scale_fac)
-    return data
 
 
 def place_k_speed_unit_axis(fig, ax, fontsize=None, size=None, pos=0.2):
@@ -81,16 +78,16 @@ def place_k_speed_unit_axis(fig, ax, fontsize=None, size=None, pos=0.2):
     par2.set_xlim(*ax.get_xlim())
     par3.set_xlim(*ax.get_xlim())
 
-    par1.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm, z=2.2)))
-    par2.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm, z=3.0)))
-    par3.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm, z=3.8)))
+    par1.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm_label, z=2.2)))
+    par2.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm_label, z=3.0)))
+    par3.xaxis.set_major_formatter(FuncFormatter(partial(kAAtokskm_label, z=3.8)))
 
 
 def place_k_wavelength_unit_axis(fig, ax, z, fontt=None):
     # this createss more x-axes to compare things in k[s/km]
     par1 = ax.twiny()
     par1.set_xlabel(r" k [s/km] @ z=2.2", fontsize=fontt)
-    par1.xaxis.set_major_formatter(FuncFormatter(partial(kskmtokAA, z)))
+    par1.xaxis.set_major_formatter(FuncFormatter(partial(kskmtokAA_label, z)))
 
 
 def make_patch_spines_invisible(ax):
