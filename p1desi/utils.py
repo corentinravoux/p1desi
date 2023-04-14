@@ -34,14 +34,14 @@ def kskmtokAA(x, z=2.2):
     return x * (speed_light / (1 + z) / lambdaLy)
 
 
-def kAAtokskm_label(x, z=2.2):
+def kAAtokskm_label(x, pos=None, z=2.2):
     kstr = x
     knew = float(kstr) / (speed_light / (1 + z) / lambdaLy)
     transformed_label = "{:.3f}".format(knew)
     return transformed_label
 
 
-def kskmtokAA_label(x, z=2.2):
+def kskmtokAA_label(x, pos=None, z=2.2):
     kstr = x
     knew = float(kstr) * (speed_light / (1 + z) / lambdaLy)
     transformed_label = "{:.3f}".format(knew)
