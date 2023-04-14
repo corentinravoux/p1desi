@@ -23,6 +23,7 @@ def plot_mean_resolution(
     size_font_x = utils.return_key(kwargs, "size_font_x", 14)
     size_font_y = utils.return_key(kwargs, "size_font_y", 16)
     plot_pixelization = utils.return_key(kwargs, "plot_pixelization", False)
+    alpha_indiv_redshift = utils.return_key(kwargs, "alpha_indiv_redshift", 0.5)
 
     plt.figure(figsize=figsize)
 
@@ -40,10 +41,12 @@ def plot_mean_resolution(
     mean_pixelization = np.mean(mean_pixelization, axis=0)
 
     plt.plot(mean_k, mean_reso, marker=".", linestyle="None")
-    if plot_pixelization :
+    if plot_pixelization:
         plt.plot(mean_k, mean_pixelization)
-        plt.legend(["Resolution & Pixelization", "Pixelization only"], fontsize=size_legend)
-        
+        plt.legend(
+            ["Resolution & Pixelization", "Pixelization only"], fontsize=size_legend
+        )
+
     for z in pk.zbin:
         if z < zmax:
             plt.plot(
@@ -52,7 +55,7 @@ def plot_mean_resolution(
                 marker="None",
                 linestyle="--",
                 color="k",
-                alpha=0.2,
+                alpha=alpha_indiv_redshift,
             )
 
     if kmax_line is not None:
@@ -94,7 +97,7 @@ def model_resolution(k, dl):
     return resolution
 
 
-def fit_model_resolution(nb_bins, x, y, dy):
+def fit_model_resolution(x, y, dy):
     mask = (~np.isnan(x)) & (~np.isnan(y)) & (~np.isnan(dy))
     x, y, dy = x[mask], y[mask], dy[mask]
     popt, _ = curve_fit(
@@ -105,22 +108,19 @@ def fit_model_resolution(nb_bins, x, y, dy):
         p0=[0.8],
         bounds=([-np.inf], [np.inf]),
     )
-    x_fit = np.linspace(x.min(), x.max(), nb_bins)
-
-    def model_fit(x):
-        return model_resolution(x, *popt)
-
-    return (x_fit, model_fit, popt)
+    return popt
 
 
-def fit_resolution_redshift(pk, zmax, outfile):
+def fit_resolution_redshift(pk, zmax, outfile, kmin=None, kmax=None):
     delta_l = []
-
     for i, z in enumerate(pk.zbin):
         if z < zmax:
-            x_fit, m_fit, popt = fit_model_resolution(
-                500, pk.k[z], pk.resocor[z], pk.err_resocor[z]
+            if (kmin is not None) & (kmax is not None):
+                mask = (pk.k[z] > kmin) & (pk.k[z] < kmax)
+            else:
+                mask = np.full(pk.k[z].shape, True)
+            popt = fit_model_resolution(
+                pk.k[z][mask], pk.resocor[z][mask], pk.err_resocor[z][mask]
             )
             delta_l.append(popt[0])
-
     pickle.dump(delta_l, open(outfile, "wb"))
