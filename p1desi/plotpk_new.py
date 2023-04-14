@@ -13,6 +13,7 @@ import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 from scipy.interpolate import interp1d
 from scipy.stats import binned_statistic
+from matplotlib import cm
 
 from p1desi import utils, uncertainty
 
@@ -35,13 +36,17 @@ def plot(
     fontsize_y = utils.return_key(plot_args, "fontsize_y", 19)
     labelsize = utils.return_key(plot_args, "labelsize", 14)
     fontlegend = utils.return_key(plot_args, "fontl", 14)
-    color = utils.return_key(plot_args, "color", [f"C{i}" for i in range(len(zbins))])
     kmin_AA = utils.return_key(plot_args, "kmin_AA", 0.145)
     kmax_AA = utils.return_key(plot_args, "kmax_AA", 2.5)
     ymin = utils.return_key(plot_args, "ymin", 0.01)
     ymax = utils.return_key(plot_args, "ymax", 0.2)
     figsize = utils.return_key(plot_args, "figsize", (11, 8.5))
     place_velaxis = utils.return_key(plot_args, "place_velaxis", True)
+    color_map = utils.return_key(plot_args, "color_map", "default")
+    if color_map == "default":
+        color = [f"C{i}" for i, z in enumerate(pk.zbin) if z < zmax]
+    elif color_map == "rainbow":
+        color = cm.rainbow(np.linspace(0, 1, len(pk.zbin[pk.zbin < zmax])))
 
     fig, ax = plt.subplots(1, figsize=figsize)
 
@@ -153,7 +158,6 @@ def plot_comparison(
     fontsize_y = utils.return_key(plot_args, "fontsize_y", 19)
     labelsize = utils.return_key(plot_args, "labelsize", 14)
     fontlegend = utils.return_key(plot_args, "fontl", 14)
-    color = utils.return_key(plot_args, "color", [f"C{i}" for i in range(len(zbins))])
     kmin_AA = utils.return_key(plot_args, "kmin_AA", 0.145)
     kmax_AA = utils.return_key(plot_args, "kmax_AA", 2.5)
     ymin = utils.return_key(plot_args, "ymin", 0.01)
@@ -165,6 +169,7 @@ def plot_comparison(
     alpha_comp = utils.return_key(plot_args, "alpha_comp", 0.4)
     marker_comp = utils.return_key(plot_args, "marker_comp", None)
     linestyle_comp = utils.return_key(plot_args, "linestyle_comp", None)
+    extrapolate_ratio = utils.return_key(plot_args, "extrapolate_ratio", False)
     plot_error_ratio = utils.return_key(plot_args, "plot_error_ratio", False)
     plot_middle_error_ratio = utils.return_key(
         plot_args, "plot_middle_error_ratio", False
@@ -177,6 +182,11 @@ def plot_comparison(
     apply_mask_comp = utils.return_key(plot_args, "apply_mask_comp", True)
     zmax_comp = utils.return_key(plot_args, "zmax_comp", None)
     resample_pk = utils.return_key(plot_args, "resample_pk", False)
+    color_map = utils.return_key(plot_args, "color_map", "default")
+    if color_map == "default":
+        color = [f"C{i}" for i, z in enumerate(pk.zbin) if z < zmax]
+    elif color_map == "rainbow":
+        color = cm.rainbow(np.linspace(0, 1, len(pk.zbin[pk.zbin < zmax])))
 
     fig, ax = plt.subplots(
         2, 1, figsize=figsize, gridspec_kw=dict(height_ratios=[3, 1]), sharex=True
@@ -289,20 +299,23 @@ def plot_comparison(
                 markersize=marker_size,
                 alpha=alpha_comp,
             )
-
+        if extrapolate_ratio:
+            fill_value = "extrapolate"
+        else:
+            fill_value = np.nan
         p2_interp = interp1d(
             k2,
             p2,
             kind="linear",
             bounds_error=False,
-            fill_value="extrapolate",
+            fill_value=fill_value,
         )(k)
         err_p2_interp = interp1d(
             k2,
             err2,
             kind="linear",
             bounds_error=False,
-            fill_value="extrapolate",
+            fill_value=fill_value,
         )(k)
 
         ratio = p / p2_interp

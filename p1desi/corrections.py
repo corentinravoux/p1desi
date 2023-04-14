@@ -67,6 +67,7 @@ def plot_and_compute_ratio_power(
     fontsize = utils.return_key(plt_args, "fontsize", 21)
     fontsize_y = utils.return_key(plt_args, "fontsize_y", 21)
     fontlegend = utils.return_key(plt_args, "fontlegend", 18)
+    fontticks = utils.return_key(plt_args, "fontticks", 19)
     color_map = utils.return_key(plt_args, "color_map", "default")
     if color_map == "default":
         colors = [f"C{i}" for i, z in enumerate(pk.zbin) if z < zmax]
@@ -163,7 +164,12 @@ def plot_and_compute_ratio_power(
                     ),
                 )
                 k_th = np.linspace(np.min(k), np.max(k), 2000)
-                axplt.plot(k_th, model_residual_correction(k_th, *popt), color=colors[i], ls="--")
+                axplt.plot(
+                    k_th,
+                    model_residual_correction(k_th, *popt),
+                    color=colors[i],
+                    ls="--",
+                )
                 params.append(popt)
 
             elif model == "rogers":
@@ -191,6 +197,10 @@ def plot_and_compute_ratio_power(
         ax[1].set_xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize)
     ax[0].set_ylabel(ylabel, fontsize=fontsize_y)
     ax[1].set_ylabel(ylabel, fontsize=fontsize_y)
+    ax[0].xaxis.set_tick_params(labelsize=fontticks)
+    ax[0].yaxis.set_tick_params(labelsize=fontticks)
+    ax[1].xaxis.set_tick_params(labelsize=fontticks)
+    ax[1].yaxis.set_tick_params(labelsize=fontticks)
     ax[0].legend(ncol=2, fontsize=fontlegend)
     ax[1].legend(ncol=2, fontsize=fontlegend)
     ax[0].set_ylim(ymin, ymax)
@@ -239,6 +249,7 @@ def prepare_lines_correction(zbins, file_correction_lines):
         A_lines[z] = np.poly1d(param_lines[iz])
     return A_lines
 
+
 def prepare_cont_correction(zbins, file_correction_cont):
     param_cont = pickle.load(open(file_correction_cont, "rb"))
     A_cont = {}
@@ -255,24 +266,24 @@ def prepare_resolution_correction(zbins, file_correction_resolution):
     return A_resolution
 
 
-
-
 ### CR - unused in the latest version of EDR paper
 def model_residual_correction(k, a0, a1, a2):
     return (a0 / k) + a1 + a2 * k
 
+
 def prepare_residual_correction(zbins, file_correction_residual):
-    """ obsolete : unused in the latest version of EDR paper""" 
+    """obsolete : unused in the latest version of EDR paper"""
     param_residual = pickle.load(open(file_correction_residual, "rb"))
     A_residual = {}
     for iz, z in enumerate(zbins):
+
         def model_residual_correction_z(k):
-            return model_residual_correction(k, param_residual[iz][0], param_residual[iz][1], param_residual[iz][2])
+            return model_residual_correction(
+                k, param_residual[iz][0], param_residual[iz][1], param_residual[iz][2]
+            )
+
         A_residual[z] = model_residual_correction_z
     return A_residual
-
-
-
 
 
 def apply_correction(pk, zmax, file_correction, type_correction):
