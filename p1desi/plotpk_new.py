@@ -51,17 +51,19 @@ def plot(
     fig, ax = plt.subplots(1, figsize=figsize)
 
     if systematics_file is not None:
-        systematics = uncertainty.prepare_uncertainty_systematics(
-            zbins, systematics_file
-        )
+        (
+            syste_tot,
+            list_systematics,
+            list_systematics_name,
+        ) = uncertainty.prepare_uncertainty_systematics(zbins, systematics_file)
 
     zarr, karr, pkarr, errarr = [], [], [], []
-    for i, z in enumerate(zbins):
-        if systematics_file is not None:
-            error_bar = np.sqrt(pk.err[z] ** 2 + systematics[z] ** 2)
-        else:
-            error_bar = pk.err[z]
 
+    if systematics_file is not None:
+        statarr, systarr = [], []
+        systindivarr = [[] for i in range(len(list_systematics))]
+
+    for i, z in enumerate(zbins):
         if pk.velunits:
             kmax = float(utils.kAAtokskm(kmax_AA, z=z))
             kmin = float(utils.kAAtokskm(kmin_AA, z=z))
@@ -72,22 +74,43 @@ def plot(
         mask_k = (pk.k[z] < kmax) & (pk.k[z] > kmin)
         k = pk.k[z][mask_k]
 
+        list_systematics_z = []
         if plot_P:
             p = pk.p[z][mask_k]
-            err = error_bar[mask_k]
+            stat = pk.err[z][mask_k]
+
+            if systematics_file is not None:
+                syst = syste_tot[z][mask_k]
+                for syst_indiv in list_systematics:
+                    list_systematics_z.append(syst_indiv[z][mask_k])
 
         else:
             p = pk.norm_p[z][mask_k]
-            err = (pk.k[z] * error_bar / np.pi)[mask_k]
+            stat = pk.norm_err[z][mask_k]
+            if systematics_file is not None:
+                syst = (pk.k[z] * syste_tot[z] / np.pi)[mask_k]
+                for syst_indiv in list_systematics:
+                    list_systematics_z.append((pk.k[z] * syst_indiv[z] / np.pi)[mask_k])
+
+        if systematics_file is not None:
+            error_bar = np.sqrt(stat**2 + syst**2)
+        else:
+            error_bar = stat
 
         zarr.append(np.array([z for j in range(len(k))]))
         karr.append(k)
         pkarr.append(p)
-        errarr.append(err)
+        errarr.append(error_bar)
+        if systematics_file is not None:
+            statarr.append(stat)
+            systarr.append(syst)
+            for j in range(len(list_systematics_z)):
+                systindivarr[j].append(list_systematics_z[j])
+
         ax.errorbar(
             k,
             p,
-            yerr=err,
+            yerr=error_bar,
             fmt=marker_style,
             color=color[i],
             markersize=marker_size,
@@ -125,12 +148,21 @@ def plot(
         fig.savefig(outname)
 
     if outpoints is not None:
-        zarr = np.around(np.concatenate(zarr, axis=0), 3)
-        karr = np.concatenate(karr, axis=0)
-        pkarr = np.concatenate(pkarr, axis=0)
-        errarr = np.concatenate(errarr, axis=0)
-        text_file = np.vstack([zarr, karr, pkarr, errarr])
-        np.savetxt(outpoints, np.transpose(text_file))
+        if systematics_file is not None:
+            return_outpoints(
+                outpoints,
+                zarr,
+                karr,
+                pkarr,
+                errarr,
+                plot_P=plot_P,
+                statarr=statarr,
+                systarr=systarr,
+                systindivarr=systindivarr,
+                systindivname=list_systematics_name,
+            )
+        else:
+            return_outpoints(outpoints, zarr, karr, pkarr, errarr, plot_P=plot_P)
 
     return (fig, ax)
 
@@ -193,17 +225,20 @@ def plot_comparison(
     )
 
     if systematics_file is not None:
-        systematics = uncertainty.prepare_uncertainty_systematics(
-            zbins, systematics_file
-        )
+        (
+            syste_tot,
+            list_systematics,
+            list_systematics_name,
+        ) = uncertainty.prepare_uncertainty_systematics(zbins, systematics_file)
 
     zarr, karr, pkarr, errarr = [], [], [], []
     zarr2, karr2, pkarr2, errarr2 = [], [], [], []
+
+    if systematics_file is not None:
+        statarr, systarr = [], []
+        systindivarr = [[] for i in range(len(list_systematics))]
+
     for i, z in enumerate(zbins):
-        if systematics_file is not None:
-            error_bar = np.sqrt(pk.err[z] ** 2 + systematics[z] ** 2)
-        else:
-            error_bar = pk.err[z]
 
         if pk.velunits:
             kmax = float(utils.kAAtokskm(kmax_AA, z=z))
@@ -220,43 +255,82 @@ def plot_comparison(
         else:
             mask_k2 = np.full(pk2.k[z].shape, True)
         k2 = pk2.k[z][mask_k2]
-
+        list_systematics_z = []
         if plot_P:
             p = pk.p[z][mask_k]
-            err = error_bar[mask_k]
+            stat = pk.err[z][mask_k]
+
+            if systematics_file is not None:
+                syst = syste_tot[z][mask_k]
+                for syst_indiv in list_systematics:
+                    list_systematics_z.append(syst_indiv[z][mask_k])
+
             p2 = pk2.p[z][mask_k2]
-            err2 = pk2.err[z][mask_k2]
+            error_bar2 = pk2.err[z][mask_k2]
 
         else:
             p = pk.norm_p[z][mask_k]
-            err = (pk.k[z] * error_bar / np.pi)[mask_k]
+            stat = pk.norm_err[z][mask_k]
+            if systematics_file is not None:
+                syst = (pk.k[z] * syste_tot[z] / np.pi)[mask_k]
+                for syst_indiv in list_systematics:
+                    list_systematics_z.append((pk.k[z] * syst_indiv[z] / np.pi)[mask_k])
+
             p2 = pk2.norm_p[z][mask_k2]
-            err2 = pk2.norm_err[z][mask_k2]
+            error_bar2 = pk2.norm_err[z][mask_k2]
+
         if resample_pk:
             k2_edges = np.zeros(len(k2) + 1)
             k2_edges[1:-1] = (k2[:-1] + k2[1:]) / 2
             k2_edges[0] = k2[0] - (k2[1] - k2[0]) / 2
             k2_edges[-1] = k2[-1] + ((k2[-1] - k2[-2]) / 2)
-            means = binned_statistic(k, p, bins=k2_edges, statistic="mean")
-            means_error = binned_statistic(k, err, bins=k2_edges, statistic="mean")
+
             number = binned_statistic(k, k, bins=k2_edges, statistic="count")
+
+            means = binned_statistic(k, p, bins=k2_edges, statistic="mean")
             p = means.statistic
-            err = means_error.statistic / np.sqrt(number.statistic)
+
+            means_stat = binned_statistic(k, stat, bins=k2_edges, statistic="mean")
+            stat = means_stat.statistic / np.sqrt(number.statistic)
+
+            if systematics_file is not None:
+                means_syst = binned_statistic(k, syst, bins=k2_edges, statistic="mean")
+                syst = means_syst.statistic / np.sqrt(number.statistic)
+
+                for j in range(len(list_systematics_z)):
+                    means_syst_indiv = binned_statistic(
+                        k, list_systematics_z[j], bins=k2_edges, statistic="mean"
+                    )
+                    list_systematics_z[j] = means_syst_indiv.statistic / np.sqrt(
+                        number.statistic
+                    )
+
             k = (means.bin_edges[:-1] + means.bin_edges[1:]) / 2.0
+
+        if systematics_file is not None:
+            error_bar = np.sqrt(stat**2 + syst**2)
+        else:
+            error_bar = stat
 
         zarr.append(np.array([z for j in range(len(k))]))
         karr.append(k)
         pkarr.append(p)
-        errarr.append(err)
+        errarr.append(error_bar)
+        if systematics_file is not None:
+            statarr.append(stat)
+            systarr.append(syst)
+            for j in range(len(list_systematics_z)):
+                systindivarr[j].append(list_systematics_z[j])
 
         zarr2.append(np.array([z for j in range(len(k2))]))
         karr2.append(k2)
         pkarr2.append(p2)
-        errarr2.append(err2)
+        errarr2.append(error_bar2)
+
         ax[0].errorbar(
             k,
             p,
-            yerr=err,
+            yerr=error_bar,
             marker=marker_style,
             linestyle="None",
             color=color[i],
@@ -266,7 +340,7 @@ def plot_comparison(
             ax[0].errorbar(
                 k2,
                 p2,
-                err2,
+                error_bar2,
                 marker=marker_comp,
                 linestyle="None",
                 color=color[i],
@@ -284,8 +358,8 @@ def plot_comparison(
         else:
             ax[0].fill_between(
                 k2,
-                p2 - err2,
-                p2 + err2,
+                p2 - error_bar2,
+                p2 + error_bar2,
                 color=color[i],
                 alpha=alpha_comp,
             )
@@ -293,7 +367,7 @@ def plot_comparison(
             ax[0].errorbar(
                 k2,
                 p2,
-                err2,
+                error_bar2,
                 marker="None",
                 color=color[i],
                 markersize=marker_size,
@@ -312,7 +386,7 @@ def plot_comparison(
         )(k)
         err_p2_interp = interp1d(
             k2,
-            err2,
+            error_bar2,
             kind="linear",
             bounds_error=False,
             fill_value=fill_value,
@@ -320,7 +394,7 @@ def plot_comparison(
 
         ratio = p / p2_interp
         err_ratio = (p / p2_interp) * np.sqrt(
-            (err / p) ** 2 + (err_p2_interp / p2_interp) ** 2
+            (error_bar / p) ** 2 + (err_p2_interp / p2_interp) ** 2
         )
         if zmax_comp is not None:
             if z > zmax_comp:
@@ -479,18 +553,59 @@ def plot_comparison(
         fig.savefig(outname + ".png")
 
     if outpoints is not None:
-        zarr = np.around(np.concatenate(zarr, axis=0), 3)
-        karr = np.concatenate(karr, axis=0)
-        pkarr = np.concatenate(pkarr, axis=0)
-        errarr = np.concatenate(errarr, axis=0)
-        text_file = np.vstack([zarr, karr, pkarr, errarr])
-        np.savetxt(outpoints + ".txt", np.transpose(text_file))
+        if systematics_file is not None:
+            return_outpoints(
+                outpoints,
+                zarr,
+                karr,
+                pkarr,
+                errarr,
+                plot_P=plot_P,
+                statarr=statarr,
+                systarr=systarr,
+                systindivarr=systindivarr,
+                systindivname=list_systematics_name,
+            )
+        else:
+            return_outpoints(outpoints, zarr, karr, pkarr, errarr, plot_P=plot_P)
 
-        zarr2 = np.around(np.concatenate(zarr2, axis=0), 3)
-        karr2 = np.concatenate(karr2, axis=0)
-        pkarr2 = np.concatenate(pkarr2, axis=0)
-        errarr2 = np.concatenate(errarr2, axis=0)
-        text_file2 = np.vstack([zarr2, karr2, pkarr2, errarr2])
-        np.savetxt(outpoints + "_2.txt", np.transpose(text_file2))
-
+        return_outpoints(outpoints + "_2", zarr2, karr2, pkarr2, errarr2, plot_P=plot_P)
     return (fig, ax)
+
+
+def return_outpoints(
+    outpoints,
+    zarr,
+    karr,
+    pkarr,
+    errarr,
+    plot_P=False,
+    statarr=None,
+    systarr=None,
+    systindivarr=None,
+    systindivname=None,
+):
+
+    stack = []
+    header = "Z,   K,   "
+    if plot_P:
+        header = header + "PK,   "
+        header = header + "ERR,   "
+    else:
+        header = header + "K*PK/PI,   "
+        header = header + "K*ERR/PI,   "
+    stack.append(np.around(np.concatenate(zarr, axis=0), 3))
+    stack.append(np.concatenate(karr, axis=0))
+    stack.append(np.concatenate(pkarr, axis=0))
+    stack.append(np.concatenate(errarr, axis=0))
+    if statarr is not None:
+        header = header + "STAT,   SYST_TOT,   "
+
+        stack.append(np.concatenate(statarr, axis=0))
+        stack.append(np.concatenate(systarr, axis=0))
+        for i in range(len(systindivarr)):
+            header = header + f"SYST_{systindivname[i]},   "
+            stack.append(np.concatenate(systindivarr[i], axis=0))
+
+    text_file = np.vstack(stack)
+    np.savetxt(outpoints + ".txt", np.transpose(text_file), header=header)

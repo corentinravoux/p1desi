@@ -5,19 +5,70 @@ from matplotlib import cm
 import numpy as np
 
 
-def create_uncertainty_systematics(total_systematics, name):
-    pickle.dump(total_systematics, open(name, "wb"))
+def create_uncertainty_systematics(
+    syste_noise,
+    syste_reso,
+    syste_resocorrection,
+    syste_sb,
+    syste_lines,
+    syste_hcd,
+    syste_continuum,
+    syste_dla_completeness,
+    syste_tot,
+    name,
+):
+    pickle.dump(
+        (
+            syste_noise,
+            syste_reso,
+            syste_resocorrection,
+            syste_sb,
+            syste_lines,
+            syste_hcd,
+            syste_continuum,
+            syste_dla_completeness,
+            syste_tot,
+        ),
+        open(name, "wb"),
+    )
 
 
 def prepare_uncertainty_systematics(
     zbins,
     file_systematics,
 ):
-    param_syst = pickle.load(open(file_systematics, "rb"))
-    err_systematics = {}
-    for iz, z in enumerate(zbins):
-        err_systematics[z] = param_syst[iz]
-    return err_systematics
+    (
+        syste_noise,
+        syste_reso,
+        syste_resocorrection,
+        syste_sb,
+        syste_lines,
+        syste_hcd,
+        syste_continuum,
+        syste_dla_completeness,
+        syste_tot,
+    ) = pickle.load(open(file_systematics, "rb"))
+    list_systematics = [
+        syste_noise,
+        syste_reso,
+        syste_resocorrection,
+        syste_sb,
+        syste_lines,
+        syste_hcd,
+        syste_continuum,
+        syste_dla_completeness,
+    ]
+    list_systematics_name = [
+        "Noise",
+        "PSF",
+        "Resolution",
+        "Side band",
+        "Lines",
+        "DLA",
+        "Continuum",
+        "DLA completeness",
+    ]
+    return syste_tot, list_systematics, list_systematics_name
 
 
 def plot_stat_uncertainties(pk, outname, zmax, **plot_args):
@@ -131,32 +182,46 @@ def plot_syst_uncertainties(
 
     fig, ax = plt.subplots(n_subplots, 2, figsize=figsize, sharex=True)
 
-    syste_tot = [[] for i in range(len(pk.zbin[pk.zbin < zmax]))]
+    (
+        syste_noise,
+        syste_reso,
+        syste_resocorrection,
+        syste_sb,
+        syste_lines,
+        syste_hcd,
+        syste_continuum,
+        syste_dla_completeness,
+        syste_tot,
+    ) = ({}, {}, {}, {}, {}, {}, {}, {}, {})
 
     for iz, z in enumerate(pk.zbin):
         if z < zmax:
-            syste_noise = 0.3 * (pk.p_noise_miss[z] / pk.resocor[z])
-            syste_tot[iz].append(syste_noise**2)
-            ax[0][1].plot(pk.k[z], syste_noise / pk.err[z], color=colors[iz])
-            ax[0][0].plot(pk.k[z], syste_noise, color=colors[iz])
+            syste_tot[z] = []
+
+            syste_noise[z] = 0.3 * (pk.p_noise_miss[z] / pk.resocor[z])
+            syste_tot[z].append(syste_noise[z] ** 2)
+            ax[0][1].plot(pk.k[z], syste_noise[z] / pk.err[z], color=colors[iz])
+            ax[0][0].plot(pk.k[z], syste_noise[z], color=colors[iz])
             ax[0][0].set_title(
                 "Noise estimation", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
-            syste_reso = 2 * pk.k[z] ** 2 * delta_l[iz] * delta_delta_l[iz] * pk.p[z]
-            syste_tot[iz].append(syste_reso**2)
-            ax[1][1].plot(pk.k[z], syste_reso / pk.err[z], color=colors[iz])
-            ax[1][0].plot(pk.k[z], syste_reso, color=colors[iz])
+            syste_reso[z] = 2 * pk.k[z] ** 2 * delta_l[iz] * delta_delta_l[iz] * pk.p[z]
+            syste_tot[z].append(syste_reso[z] ** 2)
+            ax[1][1].plot(pk.k[z], syste_reso[z] / pk.err[z], color=colors[iz])
+            ax[1][0].plot(pk.k[z], syste_reso[z], color=colors[iz])
             ax[1][0].set_title(
                 "Resolution", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
-            syste_resocorrection = (
+            syste_resocorrection[z] = (
                 0.3 * np.abs(np.poly1d(resolution_coeff_fit)(pk.k[z]) - 1) * pk.p[z]
             )
-            syste_tot[iz].append(syste_resocorrection**2)
-            ax[2][1].plot(pk.k[z], syste_resocorrection / pk.err[z], color=colors[iz])
-            ax[2][0].plot(pk.k[z], syste_resocorrection, color=colors[iz])
+            syste_tot[z].append(syste_resocorrection[z] ** 2)
+            ax[2][1].plot(
+                pk.k[z], syste_resocorrection[z] / pk.err[z], color=colors[iz]
+            )
+            ax[2][0].plot(pk.k[z], syste_resocorrection[z], color=colors[iz])
             ax[2][0].set_title(
                 "Resolution Correction",
                 x=title_shift,
@@ -164,68 +229,61 @@ def plot_syst_uncertainties(
                 fontsize=title_size,
             )
 
-            syste_sb = 0.3 * pk_sb.err[z]
-            syste_tot[iz].append(syste_sb**2)
-            ax[3][1].plot(pk.k[z], syste_sb / pk.err[z], color=colors[iz])
-            ax[3][0].plot(pk.k[z], syste_sb, color=colors[iz])
+            syste_sb[z] = pk_sb.err[z]
+            syste_tot[z].append(syste_sb[z] ** 2)
+            ax[3][1].plot(pk.k[z], syste_sb[z] / pk.err[z], color=colors[iz])
+            ax[3][0].plot(pk.k[z], syste_sb[z], color=colors[iz])
             ax[3][0].set_title(
                 "Side band", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
-            syste_lines = (
+            syste_lines[z] = (
                 0.3 * np.abs(np.poly1d(lines_coeff_fit[iz])(pk.k[z]) - 1) * pk.p[z]
             )
-            syste_tot[iz].append(syste_lines**2)
+            syste_tot[z].append(syste_lines[z] ** 2)
             ax[4][1].plot(
                 pk.k[z],
-                syste_lines / pk.err[z],
+                syste_lines[z] / pk.err[z],
                 label=r"$z = ${:1.1f}".format(z),
                 color=colors[iz],
             )
-            ax[4][0].plot(pk.k[z], syste_lines, color=colors[iz])
+            ax[4][0].plot(pk.k[z], syste_lines[z], color=colors[iz])
             ax[4][0].set_title(
                 "Line masking", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
-            syste_hcd = 0.3 * np.abs(hcd_coeff_fit[iz] - 1) * pk.p[z]
-            syste_tot[iz].append(syste_hcd**2)
-            ax[5][1].plot(pk.k[z], syste_hcd / pk.err[z], color=colors[iz])
-            ax[5][0].plot(pk.k[z], syste_hcd, color=colors[iz])
+            syste_hcd[z] = 0.3 * np.abs(hcd_coeff_fit[iz] - 1) * pk.p[z]
+            syste_tot[z].append(syste_hcd[z] ** 2)
+            ax[5][1].plot(pk.k[z], syste_hcd[z] / pk.err[z], color=colors[iz])
+            ax[5][0].plot(pk.k[z], syste_hcd[z], color=colors[iz])
             ax[5][0].set_title(
                 "DLA masking", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
-            syste_continuum = (
+            syste_continuum[z] = (
                 0.3 * np.abs(np.poly1d(continuum_coeff_fit[iz])(pk.k[z]) - 1) * pk.p[z]
             )
-            syste_tot[iz].append(syste_continuum**2)
-            ax[6][1].plot(pk.k[z], syste_continuum / pk.err[z], color=colors[iz])
-            ax[6][0].plot(pk.k[z], syste_continuum, color=colors[iz])
+            syste_tot[z].append(syste_continuum[z] ** 2)
+            ax[6][1].plot(pk.k[z], syste_continuum[z] / pk.err[z], color=colors[iz])
+            ax[6][0].plot(pk.k[z], syste_continuum[z], color=colors[iz])
             ax[6][0].set_title(
                 "Continuum fitting", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
             A_dla_completeness = hcd.rogers(z, pk.k[z], *dla_completeness_coef[iz])
-            syste_dla_completeness = 0.2 * np.abs(A_dla_completeness - 1) * pk.p[z]
-            syste_tot[iz].append(syste_dla_completeness**2)
-            ax[7][1].plot(pk.k[z], syste_dla_completeness / pk.err[z], color=colors[iz])
-            ax[7][0].plot(pk.k[z], syste_dla_completeness, color=colors[iz])
+            syste_dla_completeness[z] = 0.2 * np.abs(A_dla_completeness - 1) * pk.p[z]
+            syste_tot[z].append(syste_dla_completeness[z] ** 2)
+            ax[7][1].plot(
+                pk.k[z], syste_dla_completeness[z] / pk.err[z], color=colors[iz]
+            )
+            ax[7][0].plot(pk.k[z], syste_dla_completeness[z], color=colors[iz])
             ax[7][0].set_title(
                 "DLA completeness", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
-            A_dla_completeness = hcd.rogers(z, pk.k[z], *dla_completeness_coef[iz])
-            syste_dla_completeness = 0.2 * np.abs(A_dla_completeness - 1) * pk.p[z]
-            syste_tot[iz].append(syste_dla_completeness**2)
-            ax[7][1].plot(pk.k[z], syste_dla_completeness / pk.err[z], color=colors[iz])
-            ax[7][0].plot(pk.k[z], syste_dla_completeness, color=colors[iz])
-            ax[7][0].set_title(
-                "DLA completeness", x=title_shift, y=title_yshift, fontsize=title_size
-            )
-
-            syste_tot[iz] = np.sqrt(np.sum(syste_tot[iz], axis=0))
-            ax[8][1].plot(pk.k[z], syste_tot[iz] / pk.err[z], color=colors[iz])
-            ax[8][0].plot(pk.k[z], syste_tot[iz], color=colors[iz])
+            syste_tot[z] = np.sqrt(np.sum(syste_tot[z], axis=0))
+            ax[8][1].plot(pk.k[z], syste_tot[z] / pk.err[z], color=colors[iz])
+            ax[8][0].plot(pk.k[z], syste_tot[z], color=colors[iz])
             ax[8][0].set_title(
                 "Total", x=title_shift, y=title_yshift, fontsize=title_size
             )
@@ -271,7 +329,19 @@ def plot_syst_uncertainties(
     fig.subplots_adjust(wspace=0.2, hspace=0.45, right=0.85)
     if pk.velunits:
         plt.savefig(f"{outname}_kms.pdf")
-        pickle.dump(syste_tot, open(f"{outname}_kms.pickle", "wb"))
+        name_file = f"{outname}_kms.pickle"
     else:
         plt.savefig(f"{outname}.pdf")
-        pickle.dump(syste_tot, open(f"{outname}.pickle", "wb"))
+        name_file = f"{outname}.pickle"
+    create_uncertainty_systematics(
+        syste_noise,
+        syste_reso,
+        syste_resocorrection,
+        syste_sb,
+        syste_lines,
+        syste_hcd,
+        syste_continuum,
+        syste_dla_completeness,
+        syste_tot,
+        name_file,
+    )
