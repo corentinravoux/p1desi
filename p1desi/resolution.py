@@ -80,8 +80,20 @@ def plot_mean_resolution(
     if outfig is not None:
         plt.savefig(outfig)
     if outpoints is not None:
-        text_file = np.vstack([mean_k, mean_reso, mean_pixelization])
-        np.savetxt(outpoints + ".txt", np.transpose(text_file))
+        if plot_pixelization:
+            text_file = np.vstack([mean_k, mean_reso, mean_pixelization])
+            np.savetxt(
+                outpoints + ".txt",
+                np.transpose(text_file),
+                header=f"WAVENUMBER [Ang^-1] & MEAN RESOLUTION & MEAN PIXELISATION",
+            )
+        else:
+            text_file = np.vstack([mean_k, mean_reso])
+            np.savetxt(
+                outpoints + ".txt",
+                np.transpose(text_file),
+                header="WAVENUMBER [Ang^-1] & MEAN RESOLUTION",
+            )
 
     mask_k_90 = mean_reso < 0.1
     mask_k_95 = mean_reso < 0.05
