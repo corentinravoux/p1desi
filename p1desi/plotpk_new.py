@@ -587,24 +587,24 @@ def return_outpoints(
 ):
 
     stack = []
-    header = "Z,   K,   "
+    header = "Z & K & "
     if plot_P:
-        header = header + "PK,   "
-        header = header + "ERR,   "
+        header = header + "PK & "
+        header = header + "ERR & "
     else:
-        header = header + "K*PK/PI,   "
-        header = header + "K*ERR/PI,   "
+        header = header + "K*PK/PI & "
+        header = header + "K*ERR/PI & "
     stack.append(np.around(np.concatenate(zarr, axis=0), 3))
     stack.append(np.concatenate(karr, axis=0))
     stack.append(np.concatenate(pkarr, axis=0))
     stack.append(np.concatenate(errarr, axis=0))
     if statarr is not None:
-        header = header + "STAT,   SYST_TOT,   "
+        header = header + "STAT & SYST_TOT & "
 
         stack.append(np.concatenate(statarr, axis=0))
         stack.append(np.concatenate(systarr, axis=0))
         for i in range(len(systindivarr)):
-            header = header + f"SYST_{systindivname[i]},   "
+            header = header + f"SYST_{systindivname[i]} & "
             stack.append(np.concatenate(systindivarr[i], axis=0))
 
     text_file = np.vstack(stack)
