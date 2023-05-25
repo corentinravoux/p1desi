@@ -7,6 +7,8 @@ rebinfac=${4}
 meansnrcut=${5}
 suffix=${6}
 snr_cut=${7}
+compute_cov=${8}
+nbboot=${9}
 
 echo "input path for computation:"
 echo $path_in
@@ -22,6 +24,10 @@ echo "specific suffix:"
 echo $suffix
 echo "SNR cut:"
 echo $snr_cut
+echo "Compute covariance and bootstrap covariance:"
+echo $compute_cov
+echo "Number of bootstrap iterations:"
+echo $nbboot
 
 if [[ ${suffix} == "None" ]]
 then
@@ -48,15 +54,22 @@ if [[ ${meansnrcut} == "None" ]]
 then
 meansnrcut_flag=""
 else
-meansnrcut_flag="--apply-mean-snr-cut  --snr-cut-scheme"${meansnrcut}  
+meansnrcut_flag="--apply-mean-snr-cut  --snr-cut-scheme "${meansnrcut}  
 fi
 
+if [[ ${computecov} == "True" ]]
+then
+cov_flag="--covariance --bootstrap --nbootstrap "${nbboot}
+else
+cov_flag=""
+fi
 
 echo -e 'picca_Pk1D_postprocess.py \
 --in-dir '"${path_in}"' \
 --rebinfac 1 \
 --weights-method '"${weights}"' \
 '"${velunits_flag}"' '"${rebinfac_flag}"' '"${meansnrcut_flag}"' \
+'"${cov_flag}"' \
 --overwrite> '"${path_in}"'/Log/p1d_output_SNRcut'"${snr_cut}"''"${suffix_flag}"' 2> '"${path_in}"'/Log/p1d_error_SNRcut'"${snr_cut}"''"${suffix_flag}"'' > ${path_out}/mean_p1d_command_SNRcut${snr_cut}_weights${weights}
 
 bash ${path_out}/mean_p1d_command_SNRcut${snr_cut}_weights${weights}

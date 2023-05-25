@@ -24,6 +24,8 @@ weights=${21}
 velunits=${22}
 rebinfac=${23}
 meansnrcut=${24}
+compute_cov=${25}
+nbboot=${26}
 
 echo "input path for computation:"
 echo $path_in
@@ -73,6 +75,10 @@ echo "Rebinning factor for average pk calculation:"
 echo $rebinfac
 echo "Special snr cut for pk calculation:"
 echo $meansnrcut
+echo "Compute covariance and bootstrap covariance:"
+echo $compute_cov
+echo "Number of bootstrap iterations:"
+echo $nbboot
 
 if [[ ${region} == "lya" ]]
 then
@@ -242,7 +248,14 @@ if [[ ${meansnrcut} == "None" ]]
 then
 meansnrcut_flag=""
 else
-meansnrcut_flag="--apply-mean-snr-cut  --snr-cut-scheme"${meansnrcut}  
+meansnrcut_flag="--apply-mean-snr-cut  --snr-cut-scheme "${meansnrcut}  
+fi
+
+if [[ ${computecov} == "True" ]]
+then
+cov_flag="--covariance --bootstrap --nbootstrap "${nbboot}
+else
+cov_flag=""
 fi
 
 
@@ -251,6 +264,7 @@ echo -e 'picca_Pk1D_postprocess.py \
 --in-dir '"${path_out}"'/pk1d_SNRcut'"${snr_cut}"' \
 --weight-method '"${weights}"' \
 '"${velunits_flag}"' '"${rebinfac_flag}"' '"${meansnrcut_flag}"' \
+'"${cov_flag}"' \
 --overwrite' > ${path_out}/mean_p1d_command_${folder_name}_SNRcut${snr_cut}_weights${weights}
 
 bash ${path_out}/mean_p1d_command_${folder_name}_SNRcut${snr_cut}_weights${weights}
