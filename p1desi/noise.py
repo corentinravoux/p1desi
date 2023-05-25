@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+# CR - all routine must be rewritten to follow pk_io formalism
 
 def plot_metal_study(
     data,
