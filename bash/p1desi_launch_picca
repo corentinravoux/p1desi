@@ -251,7 +251,7 @@ else
 meansnrcut_flag="--apply-mean-snr-cut  --snr-cut-scheme "${meansnrcut}  
 fi
 
-if [[ ${computecov} == "True" ]]
+if [[ ${compute_cov} == "True" ]]
 then
 cov_flag="--covariance --bootstrap --nbootstrap "${nbboot}
 else
