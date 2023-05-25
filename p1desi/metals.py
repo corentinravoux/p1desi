@@ -254,6 +254,7 @@ def plot_side_band_fit(
     nb_bins,
     kmaxrest,
     kmax,
+    save_txt = None,
     **kwargs,
 ):
 
@@ -345,6 +346,7 @@ def plot_side_band_fit(
 
     color = cm.rainbow(np.linspace(0, 1, len(pSB1.zbin[pSB1.zbin < zmax])))
 
+    z_arr, k_arr, p_arr, err_arr = [], [], [], []
     for i, z in enumerate(pSB1.zbin):
         if z < zmax:
             k_fit = np.linspace(np.nanmin(pSB1.k[z]), kmax, nb_bins)
@@ -380,6 +382,13 @@ def plot_side_band_fit(
             )
             ax[1].plot(k_fit, p_plot_fit, color=color[i])
 
+            z_arr.append([z for i in range(len(pSB1.k[z]))])
+            k_arr.append(pSB1.k[z])
+            p_arr.append(p_plot)
+            err_arr.append(err_plot)
+
+    z_arr, k_arr, p_arr, err_arr = np.concatenate(z_arr), np.concatenate(k_arr), np.concatenate(p_arr), np.concatenate(err_arr)
+
     ax[1].set_ylim(ylim)
     ax[0].set_ylim(ylim)
     ax[1].set_xlim([0, kmax])
@@ -405,6 +414,21 @@ def plot_side_band_fit(
     plt.tight_layout()
     plt.savefig(name_out)
 
+    if save_txt is not None:
+        np.savetxt(f'{save_txt}_1.txt',
+                np.transpose(np.stack([mean_dict["krescaleSB1"],p_plot_SB1,err_plot_SB1])),
+                header='SB1 WAVENUMBER [Ang^-1] & SB1 POWER SPECTRUM & SB1 ERROR')
+        
+        np.savetxt(f'{save_txt}_2.txt',
+                np.transpose(np.stack([mean_dict["krescaleSB2"],p_plot_SB2,err_plot_SB2])),
+                header='SB2 WAVENUMBER [Ang^-1] & SB2 POWER SPECTRUM & SB2 ERROR')
+
+        np.savetxt(f'{save_txt}_3.txt',
+                np.transpose(np.stack([z_arr, k_arr, p_arr, err_arr])),
+                header='REDSHIFT & SB1 INDIV WAVENUMBER [Ang^-1] & SB1 INDIV POWER SPECTRUM & SB1 INDIV ERROR')
+
+
+
 
 def fit_and_plot_side_band(
     pSB1_name,
@@ -419,6 +443,7 @@ def fit_and_plot_side_band(
     kmax,
     plot_P=True,
     save_fit=None,
+    save_txt=None,
     **plt_args,
 ):
 
@@ -453,6 +478,7 @@ def fit_and_plot_side_band(
         nb_bins,
         kmaxrest,
         kmax,
+        save_txt = save_txt,
         **plt_args,
     )
     return (

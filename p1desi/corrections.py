@@ -78,6 +78,7 @@ def plot_and_compute_ratio_power(
 
     fig, ax = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
 
+    z_arr, k_arr, ratio_arr, err_arr = [], [], [], []
     for i, z in enumerate(pk.zbin):
         if z < zseparation:
             axplt = ax[0]
@@ -136,6 +137,11 @@ def plot_and_compute_ratio_power(
                 linestyle="None",
                 label=r"$z = ${:1.1f}".format(z),
             )
+            z_arr.append([z for i in range(len(k))])
+            k_arr.append(k)
+            ratio_arr.append(ratio)
+            err_arr.append(err_ratio)
+
 
             mask_fit = k > kmin_fit
 
@@ -189,6 +195,8 @@ def plot_and_compute_ratio_power(
                 axplt.plot(k_th, func(k_th, *popt), color=colors[i], ls="--")
                 params.append(popt)
 
+    z_arr, k_arr, ratio_arr, err_arr = np.concatenate(z_arr), np.concatenate(k_arr), np.concatenate(ratio_arr), np.concatenate(err_arr)
+
     if pk.velunits:
         ax[1].set_xlabel(
             r"$k~[\mathrm{s}$" + r"$\cdot$" + "$\mathrm{km}^{-1}]$", fontsize=fontsize
@@ -217,6 +225,9 @@ def plot_and_compute_ratio_power(
                 os.path.join(path_out, f"{name_correction}_{suffix}_kms.pickle"), "wb"
             ),
         )
+        np.savetxt(os.path.join(path_out, f"{name_correction}_{suffix}_kms.txt"),
+                np.transpose(np.stack([z_arr, k_arr, ratio_arr, err_arr])),
+                header='REDSHIFT & WAVENUMBER [s.km^-1] & RATIO POWER SPECTRA & ERROR RATIO')
     else:
         fig.savefig(os.path.join(path_out, f"{name_correction}_{suffix}.pdf"))
         fig.savefig(os.path.join(path_out, f"{name_correction}_{suffix}.png"))
@@ -224,6 +235,9 @@ def plot_and_compute_ratio_power(
             params,
             open(os.path.join(path_out, f"{name_correction}_{suffix}.pickle"), "wb"),
         )
+        np.savetxt(os.path.join(path_out, f"{name_correction}_{suffix}.txt"),
+                np.transpose(np.stack([z_arr, k_arr, ratio_arr, err_arr])),
+                header='REDSHIFT & WAVENUMBER [Ang^-1] & RATIO POWER SPECTRA & ERROR RATIO')
 
 
 ###################################################
