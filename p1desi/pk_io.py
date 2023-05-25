@@ -1,5 +1,5 @@
 import numpy as np
-import pickle, scipy
+import scipy, fitsio
 import astropy.table as t
 import struct
 from scipy.interpolate import interp2d
@@ -651,97 +651,134 @@ def compute_mean_z_noise_power(data, zbins, kmin=4e-2, kmax=2.5):
     return dict_noise_diff
 
 
-""" 
-class theoretical_models 
+class TheoreticalPk(object):
+    def __init__(
+        self,
+        k=None,
+        p=None,
+    ):
+        self.k = k
+        self.p = p
+    
+    # if comparison_model is not None:
+    #     zmodel,kmodel,kpkmodel = load_model(comparison_model,comparison_model_file)
 
 
-    if comparison_model is not None:
-        zmodel,kmodel,kpkmodel = load_model(comparison_model,comparison_model_file)
-
-
-        if comparison_model is not None:
-            izmodel=np.abs((zmodel-z))<z_binsize/2
-            izmodel=izmodel.nonzero()[0][0]
-            if velunits:
-                convfactor=1
-            else:
-                convfactor=3e5/(1215.67*(1+zmodel[izmodel,0]))
-            if plot_P:
-                k_to_plot_comparison = kmodel[izmodel,:]*convfactor
-                p_to_plot_comparison = (1/convfactor)*kpkmodel[izmodel,:]/kmodel[izmodel,:]*np.pi
-            else:
-                k_to_plot_comparison = kmodel[izmodel,:]*convfactor
-                p_to_plot_comparison = kpkmodel[izmodel,:]
-            err_to_plot_comparison = None
+    #     if comparison_model is not None:
+    #         izmodel=np.abs((zmodel-z))<z_binsize/2
+    #         izmodel=izmodel.nonzero()[0][0]
+    #         if velunits:
+    #             convfactor=1
+    #         else:
+    #             convfactor=3e5/(1215.67*(1+zmodel[izmodel,0]))
+    #         if plot_P:
+    #             k_to_plot_comparison = kmodel[izmodel,:]*convfactor
+    #             p_to_plot_comparison = (1/convfactor)*kpkmodel[izmodel,:]/kmodel[izmodel,:]*np.pi
+    #         else:
+    #             k_to_plot_comparison = kmodel[izmodel,:]*convfactor
+    #             p_to_plot_comparison = kpkmodel[izmodel,:]
+    #         err_to_plot_comparison = None
 
 
 
 
 
+def load_model(model, model_file):
 
-def load_model(model,model_file):
-
-    if model == "eBOSSmodel_stack" :
-        eBOSSmodel_lowz=read_in_model(model_file[0])
-        eBOSSmodel_highz=read_in_model(model_file[1])
-        eBOSSmodel_stack=[np.vstack([m,m2]) for m,m2 in zip(eBOSSmodel_lowz, eBOSSmodel_highz)]
-        return(eBOSSmodel_stack)
+    if model == "eBOSSmodel_stack":
+        eBOSSmodel_lowz = read_in_model(model_file[0])
+        eBOSSmodel_highz = read_in_model(model_file[1])
+        eBOSSmodel_stack = [
+            np.vstack([m, m2]) for m, m2 in zip(eBOSSmodel_lowz, eBOSSmodel_highz)
+        ]
+        return eBOSSmodel_stack
     elif model == "Naimmodel_stack":
-        def naim_function4(k,z,k0=0.009,k1=0.053,z0=3,A=0.066,B=3.59,n=-2.685,alpha=-0.22,beta=-0.16):
-            knorm0=k/k0
-            knorm1=k/k1
-            exp1=3+n+alpha*np.log(knorm0)
-            exp2=B+beta*np.log(knorm0)
-            nom=knorm0**exp1
-            denom=1+knorm1**2
-            zfac=(1+z)/(1+z0)
-            return A*nom/denom*zfac**exp2
 
-        Naimmodel={}
-        z_array=np.arange(2.2,4.7,0.2)
-        k_array=np.arange(0.001,0.1,0.0001)
-        Naimmodel['kpk']=naim_function4(k_array[np.newaxis,:],z_array[:,np.newaxis],A=0.084,B=3.64,alpha=-0.155,beta=0.32,k1=0.048,n=-2.655)
-        kk , zz = np.meshgrid(k_array,z_array)
-        Naimmodel['k'] = kk
-        Naimmodel['z'] = zz
+        def naim_function4(
+            k,
+            z,
+            k0=0.009,
+            k1=0.053,
+            z0=3,
+            A=0.066,
+            B=3.59,
+            n=-2.685,
+            alpha=-0.22,
+            beta=-0.16,
+        ):
+            knorm0 = k / k0
+            knorm1 = k / k1
+            exp1 = 3 + n + alpha * np.log(knorm0)
+            exp2 = B + beta * np.log(knorm0)
+            nom = knorm0**exp1
+            denom = 1 + knorm1**2
+            zfac = (1 + z) / (1 + z0)
+            return A * nom / denom * zfac**exp2
 
-        Naimmodel_stack=(np.array(Naimmodel['z']),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
-        return(Naimmodel_stack)
+        Naimmodel = {}
+        z_array = np.arange(2.2, 4.7, 0.2)
+        k_array = np.arange(0.001, 0.1, 0.0001)
+        Naimmodel["kpk"] = naim_function4(
+            k_array[np.newaxis, :],
+            z_array[:, np.newaxis],
+            A=0.084,
+            B=3.64,
+            alpha=-0.155,
+            beta=0.32,
+            k1=0.048,
+            n=-2.655,
+        )
+        kk, zz = np.meshgrid(k_array, z_array)
+        Naimmodel["k"] = kk
+        Naimmodel["z"] = zz
+
+        Naimmodel_stack = (
+            np.array(Naimmodel["z"]),
+            np.array(Naimmodel["k"]),
+            np.array(Naimmodel["kpk"]),
+        )
+        return Naimmodel_stack
 
     elif model == "Naimmodel_truth_mocks":
-        def readTrueP1D(fname):
-            file = open(fname, 'rb')
-            nk, nz = struct.unpack('ii', file.read(struct.calcsize('ii')))
 
-            fmt = 'd' * nz
+        def readTrueP1D(fname):
+            file = open(fname, "rb")
+            nk, nz = struct.unpack("ii", file.read(struct.calcsize("ii")))
+
+            fmt = "d" * nz
             data = file.read(struct.calcsize(fmt))
             z = np.array(struct.unpack(fmt, data), dtype=np.double)
 
-            fmt =  'd' * nk
+            fmt = "d" * nk
             data = file.read(struct.calcsize(fmt))
             k = np.array(struct.unpack(fmt, data), dtype=np.double)
 
-            fmt =  'd' * nk * nz
+            fmt = "d" * nk * nz
             data = file.read(struct.calcsize(fmt))
             p1d = np.array(struct.unpack(fmt, data), dtype=np.double).reshape((nz, nk))
 
             return z, k, p1d
 
         z, k, p = readTrueP1D(model_file)
-        Naimmodel={}
-        Naimmodel['z']=np.array([[z[i] for j in range(len(k))] for i in range(len(z))])
-        Naimmodel['k']=np.array([k for i in range(len(z))])
-        Naimmodel['kpk']=p * k / np.pi
-        Naimmodel_mock=(np.array(Naimmodel['z']),np.array(Naimmodel['k']),np.array(Naimmodel['kpk']))
-        return(Naimmodel_mock)
-    else :
+        Naimmodel = {}
+        Naimmodel["z"] = np.array(
+            [[z[i] for j in range(len(k))] for i in range(len(z))]
+        )
+        Naimmodel["k"] = np.array([k for i in range(len(z))])
+        Naimmodel["kpk"] = p * k / np.pi
+        Naimmodel_mock = (
+            np.array(Naimmodel["z"]),
+            np.array(Naimmodel["k"]),
+            np.array(Naimmodel["kpk"]),
+        )
+        return Naimmodel_mock
+    else:
         raise ValueError("Incorrect model")
 
 
 def read_in_model(filename):
-    tab=fitsio.FITS(filename)[1]
-    z=tab['z'][:].reshape(-1,1000)
-    k=tab['k'][:].reshape(-1,1000)
-    kpk=tab['kpk'][:].reshape(-1,1000)
-    return z,k,kpk
- """
+    tab = fitsio.FITS(filename)[1]
+    z = tab["z"][:].reshape(-1, 1000)
+    k = tab["k"][:].reshape(-1, 1000)
+    kpk = tab["kpk"][:].reshape(-1, 1000)
+    return z, k, kpk
