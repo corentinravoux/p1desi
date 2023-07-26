@@ -142,7 +142,6 @@ def plot_and_compute_ratio_power(
             ratio_arr.append(ratio)
             err_arr.append(err_ratio)
 
-
             mask_fit = k > kmin_fit
 
             if model == "poly":
@@ -180,22 +179,31 @@ def plot_and_compute_ratio_power(
 
             elif model == "rogers":
                 func = partial(hcd.rogers, z)
+                if pk.velunits:
+                    b0_rogers = 429.58
+                else:
+                    b0_rogers = 7.316
                 popt, pcov = curve_fit(
                     func,
                     xdata=k,
                     ydata=ratio,
                     sigma=err_ratio,
-                    p0=[0.8633, 0.2943, 7.316, -0.4964, 1.0, 0.01],
+                    p0=[0.8633, 0.2943, b0_rogers, -0.4964, 1.0, 0.01],
                     bounds=(
                         [0, 0, 0, -np.inf, 0, 0],
                         [np.inf, np.inf, np.inf, 0, np.inf, np.inf],
                     ),
                 )
                 k_th = np.linspace(np.min(k), np.max(k), 2000)
-                axplt.plot(k_th, func(k_th, *popt), color=colors[i], ls="--")
+                axplt.plot(k_th, func(k_th, *popt), color=f"C{i}")
                 params.append(popt)
 
-    z_arr, k_arr, ratio_arr, err_arr = np.concatenate(z_arr), np.concatenate(k_arr), np.concatenate(ratio_arr), np.concatenate(err_arr)
+    z_arr, k_arr, ratio_arr, err_arr = (
+        np.concatenate(z_arr),
+        np.concatenate(k_arr),
+        np.concatenate(ratio_arr),
+        np.concatenate(err_arr),
+    )
 
     if pk.velunits:
         ax[1].set_xlabel(
@@ -225,9 +233,11 @@ def plot_and_compute_ratio_power(
                 os.path.join(path_out, f"{name_correction}_{suffix}_kms.pickle"), "wb"
             ),
         )
-        np.savetxt(os.path.join(path_out, f"{name_correction}_{suffix}_kms.txt"),
-                np.transpose(np.stack([z_arr, k_arr, ratio_arr, err_arr])),
-                header='REDSHIFT & WAVENUMBER [s.km^-1] & RATIO POWER SPECTRA & ERROR RATIO')
+        np.savetxt(
+            os.path.join(path_out, f"{name_correction}_{suffix}_kms.txt"),
+            np.transpose(np.stack([z_arr, k_arr, ratio_arr, err_arr])),
+            header="REDSHIFT & WAVENUMBER [s.km^-1] & RATIO POWER SPECTRA & ERROR RATIO",
+        )
     else:
         fig.savefig(os.path.join(path_out, f"{name_correction}_{suffix}.pdf"))
         fig.savefig(os.path.join(path_out, f"{name_correction}_{suffix}.png"))
@@ -235,9 +245,125 @@ def plot_and_compute_ratio_power(
             params,
             open(os.path.join(path_out, f"{name_correction}_{suffix}.pickle"), "wb"),
         )
-        np.savetxt(os.path.join(path_out, f"{name_correction}_{suffix}.txt"),
-                np.transpose(np.stack([z_arr, k_arr, ratio_arr, err_arr])),
-                header='REDSHIFT & WAVENUMBER [Ang^-1] & RATIO POWER SPECTRA & ERROR RATIO')
+        np.savetxt(
+            os.path.join(path_out, f"{name_correction}_{suffix}.txt"),
+            np.transpose(np.stack([z_arr, k_arr, ratio_arr, err_arr])),
+            header="REDSHIFT & WAVENUMBER [Ang^-1] & RATIO POWER SPECTRA & ERROR RATIO",
+        )
+
+
+def plot_and_compute_average_ratio_power(
+    pk,
+    pk2,
+    path_out,
+    name_correction,
+    suffix,
+    zmax,
+    kmin_AA,
+    kmax_AA,
+    **plt_args,
+):
+    k_tot, ratio_tot, err_tot = [], [], []
+    labelsize = utils.return_key(plt_args, "labelsize", 18)
+    fontsize_x = utils.return_key(plt_args, "fontsize_x", 21)
+    fontsize_y = utils.return_key(plt_args, "fontsize_y", 22)
+    ymin = utils.return_key(plt_args, "ymin", 0.9)
+    ymax = utils.return_key(plt_args, "ymax", 1.02)
+
+    plt.figure(figsize=(8, 5))
+
+    for z in pk.zbin[1:]:
+        if z < zmax:
+            if pk.velunits:
+                kmax = float(utils.kAAtokskm(kmax_AA, z=z))
+                kmin = float(utils.kAAtokskm(kmin_AA, z=z))
+            else:
+                kmax = kmax_AA
+                kmin = kmin_AA
+
+            k = pk.k[z]
+            ratio = pk.norm_p[z] / pk2.norm_p[z]
+            err_ratio = (pk.norm_p[z] / pk2.norm_p[z]) * np.sqrt(
+                (pk.norm_err[z] / pk.norm_p[z]) ** 2
+                + (pk2.norm_err[z] / pk2.norm_p[z]) ** 2
+            )
+            mask = (
+                np.isnan(k)
+                | np.isnan(ratio)
+                | np.isnan(err_ratio)
+                | (k > kmax)
+                | (k < kmin)
+            )
+
+            k[mask] = np.nan
+            ratio[mask] = np.nan
+            err_ratio[mask] = np.nan
+
+            plt.plot(k, ratio, alpha=0.5, ls=":", color=f"k")
+
+            k_tot.append(k)
+            ratio_tot.append(ratio)
+            err_tot.append(err_ratio)
+
+    k_tot = np.nanmean(k_tot, axis=0)
+    ratio_tot = np.nanmean(ratio_tot, axis=0)
+    err_tot = np.nanmean(err_tot, axis=0)
+    mask = np.isnan(k_tot) | np.isnan(ratio_tot) | np.isnan(err_tot)
+    k_tot = k_tot[~mask]
+    ratio_tot = ratio_tot[~mask]
+    err_tot = err_tot[~mask]
+
+    plt.errorbar(
+        k_tot, ratio_tot, err_tot, marker=".", markersize=10, ls="None", color="C0"
+    )
+
+    func = lambda k, a, b, c: a * k**2 + b * k + c
+    param = curve_fit(func, k_tot, ratio_tot, sigma=err_tot, p0=[0, 0, 0])[0]
+    k = np.linspace(np.min(k_tot), np.max(k_tot), 1000)
+    plt.plot(k, np.poly1d(param)(k))
+
+    plt.ylabel(
+        r"$\langle P_{1\mathrm{D},\alpha,\mathrm{RAW}} / P_{1\mathrm{D},\alpha,\mathrm{CCD}} \rangle_z$",
+        fontsize=fontsize_y,
+    )
+    if pk.velunits:
+        plt.xlabel(
+            r"$k~[\mathrm{s}$" + r"$\cdot$" + "$\mathrm{km}^{-1}]$", fontsize=fontsize_x
+        )
+    else:
+        plt.xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize_x)
+    plt.ylim(ymin, ymax, 1.02)
+
+    plt.gca().xaxis.set_tick_params(labelsize=labelsize)
+    plt.gca().yaxis.set_tick_params(labelsize=labelsize)
+    plt.tight_layout()
+
+    if pk.velunits:
+        plt.savefig(os.path.join(path_out, f"{name_correction}_{suffix}_kms.pdf"))
+        plt.savefig(os.path.join(path_out, f"{name_correction}_{suffix}_kms.png"))
+        pickle.dump(
+            param,
+            open(
+                os.path.join(path_out, f"{name_correction}_{suffix}_kms.pickle"), "wb"
+            ),
+        )
+        np.savetxt(
+            os.path.join(path_out, f"{name_correction}_{suffix}_kms.txt"),
+            np.transpose(np.stack([k_tot, ratio_tot, err_tot])),
+            header="WAVENUMBER [s.km^-1] & MEAN POWER SPECTRUM RATIO & ERROR RATIO",
+        )
+    else:
+        plt.savefig(os.path.join(path_out, f"{name_correction}_{suffix}.pdf"))
+        plt.savefig(os.path.join(path_out, f"{name_correction}_{suffix}.png"))
+        pickle.dump(
+            param,
+            open(os.path.join(path_out, f"{name_correction}_{suffix}.pickle"), "wb"),
+        )
+        np.savetxt(
+            os.path.join(path_out, f"{name_correction}_{suffix}.txt"),
+            np.transpose(np.stack([k_tot, ratio_tot, err_tot])),
+            header="WAVENUMBER [Ang^-1] & MEAN POWER SPECTRUM RATIO & ERROR RATIO",
+        )
 
 
 ###################################################
@@ -499,7 +625,6 @@ def apply_p1d_corections(
     file_metal=None,
     file_metal_eboss=None,
 ):
-
     if apply_DESI_maskcont_corr & apply_eBOSS_maskcont_corr:
         return KeyError("Same type of correction is applied two times")
 
