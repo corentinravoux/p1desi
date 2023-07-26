@@ -2,17 +2,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
 import pickle
-from p1desi import utils
+from p1desi import utils, pk_io
 
 
 def plot_mean_resolution(
-    pk,
+    file_pk,
     zmax,
     outfig,
     outpoints,
     kmax_line=None,
     **kwargs,
 ):
+    pk = pk_io.Pk.read_from_picca(file_pk)
 
     style = utils.return_key(kwargs, "style", None)
     if style is not None:
@@ -123,7 +124,8 @@ def fit_model_resolution(x, y, dy):
     return popt
 
 
-def fit_resolution_redshift(pk, zmax, outfile, kmin=None, kmax=None):
+def fit_resolution_redshift(file_pk, zmax, outfile, kmin=None, kmax=None):
+    pk = pk_io.Pk.read_from_picca(file_pk)
     delta_l = []
     for i, z in enumerate(pk.zbin):
         if z < zmax:

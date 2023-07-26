@@ -1,6 +1,6 @@
 import pickle
 import matplotlib.pyplot as plt
-from p1desi import utils, hcd
+from p1desi import utils, hcd, pk_io
 from matplotlib import cm
 import numpy as np
 
@@ -71,7 +71,8 @@ def prepare_uncertainty_systematics(
     return syste_tot, list_systematics, list_systematics_name
 
 
-def plot_stat_uncertainties(pk, outname, zmax, **plot_args):
+def plot_stat_uncertainties(file_pk, outname, zmax, **plot_args):
+    pk = pk_io.Pk.read_from_picca(file_pk)
 
     fontsize_x = utils.return_key(plot_args, "fontsize_x", 16)
     fontsize_y = utils.return_key(plot_args, "fontsize_y", 19)
@@ -94,7 +95,6 @@ def plot_stat_uncertainties(pk, outname, zmax, **plot_args):
 
     for i, z in enumerate(pk.zbin):
         if z < zmax:
-
             if pk.velunits:
                 kmax = float(utils.kAAtokskm(kmax_AA, z=z))
                 kmin = float(utils.kAAtokskm(kmin_AA, z=z))
@@ -161,7 +161,6 @@ def plot_syst_uncertainties(
     dla_completeness_coef,
     **plot_args,
 ):
-
     fontsize_x = utils.return_key(plot_args, "fontsize_x", 16)
     fontsize_y = utils.return_key(plot_args, "fontsize_y", 18)
     fontlegend = utils.return_key(plot_args, "fontlegend", 14)
