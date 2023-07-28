@@ -4,6 +4,8 @@ import astropy.table as t
 import struct
 from scipy.interpolate import interp2d
 from p1desi import utils
+from scipy.stats import sem
+
 
 def read_pk_means(pk_means_name, hdu=None):
     if hdu is None:
@@ -301,7 +303,6 @@ class Pk(object):
         )
 
     def compute_additional_stats(self):
-
         err_noiseoverraw = {}
         err_diffoverraw = {}
         err_diffovernoise = {}
@@ -350,7 +351,6 @@ class PkEboss(Pk):
 
     @classmethod
     def read_from_file(cls, name_file):
-
         k = {}
         p = {}
         p_noise = {}
@@ -405,7 +405,6 @@ class PkHR(Pk):
 
     @classmethod
     def read_from_file(cls, name_file):
-
         k = {}
         p = {}
         err = {}
@@ -443,7 +442,7 @@ class PkTrueOhioMock(Pk):
         velunits=None,
     ):
         super(PkTrueOhioMock, self).__init__(
-            velunits = velunits,
+            velunits=velunits,
             zbin=zbin,
             number_chunks=None,
             k=k,
@@ -455,7 +454,6 @@ class PkTrueOhioMock(Pk):
 
     @classmethod
     def read_from_file(cls, name_file, zbins_input, k_input, velunits=True):
-
         k = {}
         p = {}
         err = {}
@@ -489,7 +487,7 @@ class PkTrueOhioMock(Pk):
                 p[zbin] = utils.kskmtokAA(intp_p(k_vel, zbin), z=zbin)
                 norm_p[zbin] = intp_p(k_vel, zbin) * k_vel / np.pi
                 err[zbin] = np.zeros(k_input[zbin].shape)
-                norm_err[zbin] = np.zeros(k_input[zbin].shape)            
+                norm_err[zbin] = np.zeros(k_input[zbin].shape)
         return cls(
             velunits=velunits,
             zbin=zbins_input,
@@ -499,6 +497,107 @@ class PkTrueOhioMock(Pk):
             norm_p=norm_p,
             norm_err=norm_err,
         )
+
+
+class ModelFitPk(object):
+    def __init__(
+        self,
+        k=None,
+        p=None,
+        norm_p=None,
+    ):
+        self.k = k
+        self.p = p
+        self.norm_p = norm_p
+
+    @classmethod
+    def init_from_file(cls, filename, modelname, zmax=None):
+        if modelname == "eBOSSmodel_stack":
+            return cls.init_eboss_stack(filename)
+        if modelname == "HRmodel_stack":
+            return cls.init_hr_stack(filename)
+
+    @classmethod
+    def init_eboss_stack(cls, filename):
+        def read_in_model(model_file):
+            tab = fitsio.FITS(model_file)[1]
+            z = tab["z"][:].reshape(-1, 1000)
+            k = tab["k"][:].reshape(-1, 1000)
+            kpk = tab["kpk"][:].reshape(-1, 1000)
+            return z, k, kpk
+
+        eBOSSmodel_lowz = read_in_model(filename[0])
+        eBOSSmodel_highz = read_in_model(filename[1])
+        eBOSSmodel_stack = [
+            np.vstack([m, m2]) for m, m2 in zip(eBOSSmodel_lowz, eBOSSmodel_highz)
+        ]
+        z_unique = np.unique(eBOSSmodel_stack["z"])
+        k, p, norm_p = {}, {}, {}
+        for z in z_unique:
+            mask = eBOSSmodel_stack["z"] == z
+            k[z].append(eBOSSmodel_stack["k"][mask])
+            norm_p[z].append(eBOSSmodel_stack["kpk"][mask])
+            p[z].append(
+                np.pi * eBOSSmodel_stack["kpk"][mask] / eBOSSmodel_stack["k"][mask]
+            )
+
+        return cls(k=k, p=p, norm_p=norm_p)
+
+    @classmethod
+    def init_hr_stack(cls, filename):
+        def load_model(
+            k,
+            z,
+            k0=0.009,
+            k1=0.053,
+            z0=3,
+            A=0.066,
+            B=3.59,
+            n=-2.685,
+            alpha=-0.22,
+            beta=-0.16,
+        ):
+            knorm0 = k / k0
+            knorm1 = k / k1
+            exp1 = 3 + n + alpha * np.log(knorm0)
+            exp2 = B + beta * np.log(knorm0)
+            nom = knorm0**exp1
+            denom = 1 + knorm1**2
+            zfac = (1 + z) / (1 + z0)
+            return A * nom / denom * zfac**exp2
+
+        hrmodel = {}
+        z_array = np.arange(2.2, 4.7, 0.2)
+        k_array = np.arange(0.001, 0.1, 0.0001)
+        hrmodel["kpk"] = load_model(
+            k_array[np.newaxis, :],
+            z_array[:, np.newaxis],
+            A=0.084,
+            B=3.64,
+            alpha=-0.155,
+            beta=0.32,
+            k1=0.048,
+            n=-2.655,
+        )
+        kk, zz = np.meshgrid(k_array, z_array)
+        hrmodel["k"] = kk
+        hrmodel["z"] = zz
+
+        hrmodel_stack = (
+            np.array(hrmodel["z"]),
+            np.array(hrmodel["k"]),
+            np.array(hrmodel["kpk"]),
+        )
+
+        z_unique = np.unique(hrmodel_stack["z"])
+        k, p, norm_p = {}, {}, {}
+        for z in z_unique:
+            mask = hrmodel_stack["z"] == z
+            k[z].append(hrmodel_stack["k"][mask])
+            norm_p[z].append(hrmodel_stack["kpk"][mask])
+            p[z].append(np.pi * hrmodel_stack["kpk"][mask] / hrmodel_stack["k"][mask])
+
+        return cls(k=k, p=p, norm_p=norm_p)
 
 
 class MeanPkZ(object):
@@ -527,8 +626,10 @@ class MeanPkZ(object):
         self.err_diff = err_diff
 
     @classmethod
-    def init_from_pk(cls, pk, zmax):
+    def init_from_pk(cls, pk, zmax=None):
         velunits = pk.velunits
+        if zmax is None:
+            zmax = np.inf
 
         nb_z_bins = len(pk.zbin[pk.zbin < zmax])
 
@@ -555,7 +656,6 @@ class MeanPkZ(object):
         )
 
     def compute_additional_stats(self, pk, zmax):
-
         nb_z_bins = len(pk.zbin[pk.zbin < zmax])
 
         err_noiseoverraw = np.mean(
@@ -599,186 +699,67 @@ class MeanPkZ(object):
         self.err_diffoverraw = err_diffoverraw
         self.err_diffovernoise = err_diffovernoise
 
-
-def compute_mean_z_noise_power(data, zbins, kmin=4e-2, kmax=2.5):
-    velunits = data.meta["VELUNITS"]
-
-    if velunits and kmax == 2:
-        kmax = 0.035
-    if velunits and kmin == 4e-2:
-        kmin = 8e-4
-
-    diff_model = {"Pk_diff": [], "Pk_noise": []}
-    for iz, z in enumerate(zbins):
-        dat = data[iz]
-        select = dat["N"] > 0
-        k = dat["meank"][select]
-        Pk_noise = dat["meanPk_noise"][select][k < kmax]
-        Pk_diff = dat["meanPk_diff"][select][k < kmax]
-        diff_model["Pk_diff"].append(Pk_diff)
-        diff_model["Pk_noise"].append(Pk_noise)
-
-    dict_noise_diff = {
-        "diff": [],
-        "error_diff": [],
-        "pipeline": [],
-        "error_pipeline": [],
-        "diff_over_pipeline": [],
-        "error_diff_over_pipeline": [],
-    }
-    for i in range(len(diff_model["Pk_noise"])):
-        noise_error = scipy.stats.sem(diff_model["Pk_noise"][i], ddof=0)
-        diff_error = scipy.stats.sem(diff_model["Pk_diff"][i], ddof=0)
-        diff_over_noise_error = (
-            np.mean(diff_model["Pk_diff"][i]) / np.mean(diff_model["Pk_noise"][i])
-        ) * np.sqrt(
-            (diff_error / np.mean(diff_model["Pk_diff"][i])) ** 2
-            + (noise_error / np.mean(diff_model["Pk_noise"][i])) ** 2
-        )
-        dict_noise_diff["diff"].append(np.mean(diff_model["Pk_diff"][i]))
-        dict_noise_diff["error_diff"].append(diff_error)
-        dict_noise_diff["pipeline"].append(np.mean(diff_model["Pk_noise"][i]))
-        dict_noise_diff["error_pipeline"].append(noise_error)
-        dict_noise_diff["diff_over_pipeline"].append(
-            np.mean(
-                (diff_model["Pk_diff"][i] - diff_model["Pk_noise"][i])
-                / diff_model["Pk_noise"][i]
-            )
-        )
-        dict_noise_diff["error_diff_over_pipeline"].append(diff_over_noise_error)
-    dict_noise_diff["zbins"] = zbins
-
-    return dict_noise_diff
+    def compute_noise_asymptopte(self, k_asymptote, use_diff=False):
+        mask_k = self.k > k_asymptote
+        if use_diff:
+            noise = self.p_diff
+        else:
+            noise = self.p_noise
+        alpha = np.mean((self.p_raw - noise)[mask_k])
+        beta = np.mean((noise / self.p_raw)[mask_k])
+        return alpha, beta
 
 
-class TheoreticalPk(object):
+class MeanPkK(object):
     def __init__(
         self,
-        k=None,
+        velunits=False,
+        zbin=None,
         p=None,
+        p_raw=None,
+        p_noise=None,
+        p_diff=None,
+        err_noise=None,
+        err_diff=None,
     ):
-        self.k = k
+        self.velunits = velunits
+        self.zbin = zbin
         self.p = p
-    
-    # if comparison_model is not None:
-    #     zmodel,kmodel,kpkmodel = load_model(comparison_model,comparison_model_file)
+        self.p_raw = p_raw
+        self.p_noise = p_noise
+        self.p_diff = p_diff
+        self.err_noise = err_noise
+        self.err_diff = err_diff
 
+    @classmethod
+    def init_from_pk(cls, pk, kmax=None):
+        velunits = pk.velunits
+        if kmax is None:
+            kmax = np.inf
 
-    #     if comparison_model is not None:
-    #         izmodel=np.abs((zmodel-z))<z_binsize/2
-    #         izmodel=izmodel.nonzero()[0][0]
-    #         if velunits:
-    #             convfactor=1
-    #         else:
-    #             convfactor=3e5/(1215.67*(1+zmodel[izmodel,0]))
-    #         if plot_P:
-    #             k_to_plot_comparison = kmodel[izmodel,:]*convfactor
-    #             p_to_plot_comparison = (1/convfactor)*kpkmodel[izmodel,:]/kmodel[izmodel,:]*np.pi
-    #         else:
-    #             k_to_plot_comparison = kmodel[izmodel,:]*convfactor
-    #             p_to_plot_comparison = kpkmodel[izmodel,:]
-    #         err_to_plot_comparison = None
+        p, p_raw, p_noise, p_diff, err_noise, err_diff = {}, {}, {}, {}, {}, {}
+        for _, z in enumerate(pk.zbin):
+            mask = pk.k[z] < kmax
+            p[z] = np.mean(pk.p[z][mask])
+            p_raw[z] = np.mean(pk.p_raw[z][mask])
+            p_noise[z] = np.mean(pk.p_noise[z][mask])
+            err_noise[z] = sem(pk.p_noise[z][mask], ddof=0)
+            p_diff[z] = np.mean(pk.p_diff[z][mask])
+            err_diff[z] = sem(pk.p_diff[z][mask], ddof=0)
 
+        return cls(velunits, pk.zbin, p, p_raw, p_noise, p_diff, err_noise, err_diff)
 
+    def compute_additional_stats(self, pk, kmax=None):
+        noiseoverdiff, err_noiseoverdiff = {}, {}
+        for _, z in enumerate(pk.zbin):
+            mask = pk.k[z] < kmax
+            noiseoverdiff[z] = np.mean(pk.p_noise[z][mask] / pk.p_diff[z][mask])
 
-
-
-def load_model(model, model_file):
-
-    if model == "eBOSSmodel_stack":
-        eBOSSmodel_lowz = read_in_model(model_file[0])
-        eBOSSmodel_highz = read_in_model(model_file[1])
-        eBOSSmodel_stack = [
-            np.vstack([m, m2]) for m, m2 in zip(eBOSSmodel_lowz, eBOSSmodel_highz)
-        ]
-        return eBOSSmodel_stack
-    elif model == "Naimmodel_stack":
-
-        def naim_function4(
-            k,
-            z,
-            k0=0.009,
-            k1=0.053,
-            z0=3,
-            A=0.066,
-            B=3.59,
-            n=-2.685,
-            alpha=-0.22,
-            beta=-0.16,
-        ):
-            knorm0 = k / k0
-            knorm1 = k / k1
-            exp1 = 3 + n + alpha * np.log(knorm0)
-            exp2 = B + beta * np.log(knorm0)
-            nom = knorm0**exp1
-            denom = 1 + knorm1**2
-            zfac = (1 + z) / (1 + z0)
-            return A * nom / denom * zfac**exp2
-
-        Naimmodel = {}
-        z_array = np.arange(2.2, 4.7, 0.2)
-        k_array = np.arange(0.001, 0.1, 0.0001)
-        Naimmodel["kpk"] = naim_function4(
-            k_array[np.newaxis, :],
-            z_array[:, np.newaxis],
-            A=0.084,
-            B=3.64,
-            alpha=-0.155,
-            beta=0.32,
-            k1=0.048,
-            n=-2.655,
-        )
-        kk, zz = np.meshgrid(k_array, z_array)
-        Naimmodel["k"] = kk
-        Naimmodel["z"] = zz
-
-        Naimmodel_stack = (
-            np.array(Naimmodel["z"]),
-            np.array(Naimmodel["k"]),
-            np.array(Naimmodel["kpk"]),
-        )
-        return Naimmodel_stack
-
-    elif model == "Naimmodel_truth_mocks":
-
-        def readTrueP1D(fname):
-            file = open(fname, "rb")
-            nk, nz = struct.unpack("ii", file.read(struct.calcsize("ii")))
-
-            fmt = "d" * nz
-            data = file.read(struct.calcsize(fmt))
-            z = np.array(struct.unpack(fmt, data), dtype=np.double)
-
-            fmt = "d" * nk
-            data = file.read(struct.calcsize(fmt))
-            k = np.array(struct.unpack(fmt, data), dtype=np.double)
-
-            fmt = "d" * nk * nz
-            data = file.read(struct.calcsize(fmt))
-            p1d = np.array(struct.unpack(fmt, data), dtype=np.double).reshape((nz, nk))
-
-            return z, k, p1d
-
-        z, k, p = readTrueP1D(model_file)
-        Naimmodel = {}
-        Naimmodel["z"] = np.array(
-            [[z[i] for j in range(len(k))] for i in range(len(z))]
-        )
-        Naimmodel["k"] = np.array([k for i in range(len(z))])
-        Naimmodel["kpk"] = p * k / np.pi
-        Naimmodel_mock = (
-            np.array(Naimmodel["z"]),
-            np.array(Naimmodel["k"]),
-            np.array(Naimmodel["kpk"]),
-        )
-        return Naimmodel_mock
-    else:
-        raise ValueError("Incorrect model")
-
-
-def read_in_model(filename):
-    tab = fitsio.FITS(filename)[1]
-    z = tab["z"][:].reshape(-1, 1000)
-    k = tab["k"][:].reshape(-1, 1000)
-    kpk = tab["kpk"][:].reshape(-1, 1000)
-    return z, k, kpk
+            err_noiseoverdiff[z] = (
+                np.mean(pk.p_noise[z][mask]) / np.mean(pk.p_diff[z][mask])
+            ) * np.sqrt(
+                (self.err_noise[z] / np.mean(pk.p_noise[z][mask])) ** 2
+                + (self.err_diff[z] / np.mean(pk.p_diff[z][mask])) ** 2
+            )
+        self.noiseoverdiff = noiseoverdiff
+        self.err_noiseoverdiff = err_noiseoverdiff
