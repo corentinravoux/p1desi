@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 from desispec.io import read_sky
 from scipy.ndimage.filters import gaussian_filter
 import fitsio, glob, os
-
-lambdaLy = 1215.673123130217
+from p1desi import utils
 
 
 def get_exposure_list(
@@ -100,7 +99,6 @@ def compute_line_width(
     median_sky=None,
     wave=None,
 ):
-
     if method_width.lower() == "constant":
         line[0] = line[0] - width_angstrom
         line[1] = line[1] + width_angstrom
@@ -428,7 +426,6 @@ def plot_centered_lines(
         lines, p1d=True
     )
     for i in range(len(line_to_plot)):
-
         fig, ax = plt.subplots(
             2,
             2,
@@ -475,12 +472,10 @@ def plot_centered_lines(
 
 def compute_length_masked(lines, redshift_bins):
     percentage_mask = []
-    (line_to_plot, names, types, wave_peak, significance_peak) = read_lines(
-        lines, p1d=True
-    )
+    (line_to_plot, _, _, _, _) = read_lines(lines, p1d=True)
     for i in range(len(redshift_bins)):
-        lambda_min = (1 + redshift_bins[i] - 0.1) * lambdaLy
-        lambda_max = (1 + redshift_bins[i] + 0.1) * lambdaLy
+        lambda_min = (1 + redshift_bins[i] - 0.1) * utils.lambdaLy
+        lambda_max = (1 + redshift_bins[i] + 0.1) * utils.lambdaLy
         sum = 0
         for j in range(len(line_to_plot)):
             if (line_to_plot[j][1] < lambda_max) & (line_to_plot[j][0] > lambda_min):
