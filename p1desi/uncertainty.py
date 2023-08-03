@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from p1desi import utils, hcd, pk_io
 from matplotlib import cm
 import numpy as np
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 def create_uncertainty_systematics(
@@ -34,7 +35,6 @@ def create_uncertainty_systematics(
 
 
 def prepare_uncertainty_systematics(
-    zbins,
     file_systematics,
 ):
     (
@@ -344,3 +344,104 @@ def plot_syst_uncertainties(
         syste_tot,
         name_file,
     )
+
+
+def plot_covariance(
+    file_pk,
+    zmax,
+    kmax_AA,
+    kmin_AA,
+    out_name=None,
+    out_points=None,
+    use_boot=True,
+    add_systematics=True,
+    systematics_file=None,
+    **plot_args,
+):
+    figsize = utils.return_key(plot_args, "figsize", (20, 20))
+    wspace = utils.return_key(plot_args, "wspace", 0.3)
+    subplot_x = utils.return_key(plot_args, "subplot_x", 4)
+    subplot_y = utils.return_key(plot_args, "subplot_y", 4)
+
+    pk = pk_io.Pk.read_from_picca(file_pk)
+
+    k1_arr, k2_arr, cov_mat_arr, corr_mat_arr, z_arr = [], [], [], [], []
+    if add_systematics & (systematics_file is not None):
+        (
+            _,
+            list_systematics,
+            _,
+        ) = prepare_uncertainty_systematics(systematics_file)
+
+    elif add_systematics & (systematics_file is None):
+        raise ValueError("You need to provide a systematics file to add systematics")
+
+    fig = plt.figure(figsize=figsize)
+    fig.subplots_adjust(wspace=wspace)
+    for j, z in enumerate(pk.zbin):
+        if z < zmax:
+            if pk.velunits:
+                kmax = float(utils.kAAtokskm(kmax_AA, z=z))
+                kmin = float(utils.kAAtokskm(kmin_AA, z=z))
+            else:
+                kmax = kmax_AA
+                kmin = kmin_AA
+
+            mask_cov = (pk.cov_k1[z] < kmax) & (pk.cov_k2[z] < kmax)
+            mask_cov &= (pk.cov_k1[z] > kmin) & (pk.cov_k2[z] > kmin)
+
+            mask = (pk.k[z] > kmin) & (pk.k[z] < kmax)
+            nkbin = len(pk.k[z][mask])
+            kmin_plot = np.min(pk.k[z][mask])
+            kmax_plot = np.max(pk.k[z][mask])
+            extent = [kmin_plot, kmax_plot, kmax_plot, kmin_plot]
+            if use_boot:
+                cov_mat = pk.boot_cov[z][mask_cov].reshape(nkbin, nkbin)
+            else:
+                cov_mat = pk.cov[z][mask_cov].reshape(nkbin, nkbin)
+
+            for i in range(len(list_systematics)):
+                cov_sys = np.outer(
+                    list_systematics[i][z][mask], list_systematics[i][z][mask]
+                )
+                cov_mat = cov_mat + cov_sys
+
+            mean_k1 = np.array([pk.k[z][mask] for i in range(len(pk.k[z][mask]))]).T
+            mean_k2 = np.array([pk.k[z][mask] for i in range(len(pk.k[z][mask]))])
+
+            v = np.sqrt(np.diag(cov_mat))
+            outer_v = np.outer(v, v)
+            corr_mat = cov_mat / outer_v
+
+            ax = fig.add_subplot(subplot_y, subplot_x, j + 1)
+            ax.set_title(f"Correlation matrix at z = {z}")
+            im = ax.imshow(corr_mat, extent=extent)
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            fig.colorbar(im, cax=cax, orientation="vertical")
+
+            z_arr.append(np.full((nkbin * nkbin), z))
+            k1_arr.append(np.ravel(mean_k1))
+            k2_arr.append(np.ravel(mean_k2))
+            cov_mat_arr.append(np.ravel(cov_mat))
+            corr_mat_arr.append(np.ravel(corr_mat))
+
+    z_arr = np.concatenate(z_arr, axis=0)
+    k1_arr = np.concatenate(k1_arr, axis=0)
+    k2_arr = np.concatenate(k2_arr, axis=0)
+    cov_mat_arr = np.concatenate(cov_mat_arr, axis=0)
+    corr_mat_arr = np.concatenate(corr_mat_arr, axis=0)
+
+    fig.tight_layout()
+    if out_name is not None:
+        fig.savefig(f"{out_name}.pdf", format="pdf")
+    if out_points is not None:
+        if pk.velunits:
+            header = "REDSHIFT & WAVENUMBER 1 [s.km^-1] & WAVENUMBER 2 [s.km^-1] & COVARIANCE MATRIX & CORRELATION MATRIX"
+        else:
+            header = "REDSHIFT & WAVENUMBER 1 [Ang^-1] & WAVENUMBER 2 [Ang^-1] & COVARIANCE MATRIX & CORRELATION MATRIX"
+        np.savetxt(
+            f"{out_points}.txt",
+            np.transpose(np.stack([z_arr, k1_arr, k2_arr, cov_mat_arr, corr_mat_arr])),
+            header=header,
+        )
