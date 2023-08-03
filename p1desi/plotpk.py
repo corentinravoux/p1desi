@@ -27,7 +27,6 @@ def plot(
     systematics_file=None,
     **plot_args,
 ):
-
     zbins = pk.zbin[pk.zbin < zmax]
 
     marker_size = utils.return_key(plot_args, "marker_size", 7)
@@ -55,7 +54,7 @@ def plot(
             syste_tot,
             list_systematics,
             list_systematics_name,
-        ) = uncertainty.prepare_uncertainty_systematics(zbins, systematics_file)
+        ) = uncertainty.prepare_uncertainty_systematics(systematics_file)
 
     zarr, karr, pkarr, errarr = [], [], [], []
 
@@ -229,7 +228,7 @@ def plot_comparison(
             syste_tot,
             list_systematics,
             list_systematics_name,
-        ) = uncertainty.prepare_uncertainty_systematics(zbins, systematics_file)
+        ) = uncertainty.prepare_uncertainty_systematics(systematics_file)
 
     zarr, karr, pkarr, errarr = [], [], [], []
     zarr2, karr2, pkarr2, errarr2 = [], [], [], []
@@ -239,7 +238,6 @@ def plot_comparison(
         systindivarr = [[] for i in range(len(list_systematics))]
 
     for i, z in enumerate(zbins):
-
         if pk.velunits:
             kmax = float(utils.kAAtokskm(kmax_AA, z=z))
             kmin = float(utils.kAAtokskm(kmin_AA, z=z))
@@ -424,7 +422,6 @@ def plot_comparison(
                 )
 
         if z == z_plot_middle_ratio_error:
-
             err_ratio_plot = err_ratio
             k_ratio_plot = k
 
@@ -585,7 +582,6 @@ def return_outpoints(
     systindivarr=None,
     systindivname=None,
 ):
-
     stack = []
     header = "Z & K & "
     if plot_P:
