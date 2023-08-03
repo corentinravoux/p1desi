@@ -40,6 +40,10 @@ class Pk(object):
         p_noise_miss=None,
         resocor=None,
         err_resocor=None,
+        cov_k1=None,
+        cov_k2=None,
+        cov=None,
+        boot_cov=None,
     ):
         self.velunits = velunits
         self.zbin = zbin
@@ -63,6 +67,10 @@ class Pk(object):
         self.p_noise_miss = p_noise_miss
         self.resocor = resocor
         self.err_resocor = err_resocor
+        self.cov_k1 = cov_k1
+        self.cov_k2 = cov_k2
+        self.cov = cov
+        self.boot_cov = boot_cov
 
     @classmethod
     def read_from_picca(cls, name_file):
@@ -86,10 +94,18 @@ class Pk(object):
         resocor = {}
         err_resocor = {}
         zbins = []
+        cov_k1 = {}
+        cov_k2 = {}
+        cov = {}
+        boot_cov = {}
 
         mean_pk = read_pk_means(name_file, hdu=1)
         metadata = read_pk_means(name_file, hdu=2)
 
+        try:
+            covariance = read_pk_means(name_file, hdu=3)
+        except:
+            covariance = None
         try:
             velunits = metadata.meta["VELUNITS"]
             number_qso = metadata.meta["NQSO"]
@@ -158,6 +174,12 @@ class Pk(object):
             else:
                 minrescor[zbin] = minrescor_default
                 maxrescor[zbin] = maxrescor_default
+            if covariance is not None:
+                (w,) = np.where(covariance["index_zbin"] == i)
+                cov_k1[zbin] = np.array(covariance[w]["k1"])
+                cov_k2[zbin] = np.array(covariance[w]["k2"])
+                cov[zbin] = np.array(covariance[w]["covariance"])
+                boot_cov[zbin] = np.array(covariance[w]["boot_covariance"])
 
         return cls(
             velunits=velunits,
@@ -182,6 +204,10 @@ class Pk(object):
             p_noise_miss=p_noise_miss,
             resocor=resocor,
             err_resocor=err_resocor,
+            cov_k1=cov_k1,
+            cov_k2=cov_k2,
+            cov=cov,
+            boot_cov=boot_cov,
         )
 
     @classmethod
