@@ -378,7 +378,11 @@ def prepare_hcd_correction(zbins, file_correction_hcd):
     param_hcd = pickle.load(open(file_correction_hcd, "rb"))
     A_hcd = {}
     for iz, z in enumerate(zbins):
-        A_hcd[z] = np.poly1d(param_hcd[iz])
+        if iz >= len(param_hcd):
+            print(f"Redshift bin {z} have no hcd correction")
+            A_hcd[z] = 1
+        else:
+            A_hcd[z] = np.poly1d(param_hcd[iz])
     return A_hcd
 
 
@@ -386,7 +390,11 @@ def prepare_lines_correction(zbins, file_correction_lines):
     param_lines = pickle.load(open(file_correction_lines, "rb"))
     A_lines = {}
     for iz, z in enumerate(zbins):
-        A_lines[z] = np.poly1d(param_lines[iz])
+        if iz >= len(param_lines):
+            print(f"Redshift bin {z} have no line correction")
+            A_lines[z] = 1
+        else:
+            A_lines[z] = np.poly1d(param_lines[iz])
     return A_lines
 
 
@@ -394,7 +402,11 @@ def prepare_cont_correction(zbins, file_correction_cont):
     param_cont = pickle.load(open(file_correction_cont, "rb"))
     A_cont = {}
     for iz, z in enumerate(zbins):
-        A_cont[z] = np.poly1d(param_cont[iz])
+        if iz >= len(param_cont):
+            print(f"Redshift bin {z} have no continuum correction")
+            A_cont[z] = 1
+        else:
+            A_cont[z] = np.poly1d(param_cont[iz])
     return A_cont
 
 
@@ -404,26 +416,6 @@ def prepare_resolution_correction(zbins, file_correction_resolution):
     for _, z in enumerate(zbins):
         A_resolution[z] = np.poly1d(param_cont)
     return A_resolution
-
-
-### CR - unused in the latest version of EDR paper
-def model_residual_correction(k, a0, a1, a2):
-    return (a0 / k) + a1 + a2 * k
-
-
-def prepare_residual_correction(zbins, file_correction_residual):
-    """obsolete : unused in the latest version of EDR paper"""
-    param_residual = pickle.load(open(file_correction_residual, "rb"))
-    A_residual = {}
-    for iz, z in enumerate(zbins):
-
-        def model_residual_correction_z(k):
-            return model_residual_correction(
-                k, param_residual[iz][0], param_residual[iz][1], param_residual[iz][2]
-            )
-
-        A_residual[z] = model_residual_correction_z
-    return A_residual
 
 
 def apply_correction(pk, zmax, file_correction, type_correction):
