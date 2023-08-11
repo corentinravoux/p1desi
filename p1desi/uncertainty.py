@@ -1,6 +1,6 @@
 import pickle
 import matplotlib.pyplot as plt
-from p1desi import utils, hcd, pk_io
+from p1desi import utils, hcd, pk_io, corrections
 from matplotlib import cm
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -181,6 +181,10 @@ def plot_syst_uncertainties(
 
     fig, ax = plt.subplots(n_subplots, 2, figsize=figsize, sharex=True)
 
+    A_lines = corrections.prepare_lines_correction(pk.zbin, lines_coeff_fit)
+    A_hcd = corrections.prepare_hcd_correction(pk.zbin, hcd_coeff_fit)
+    A_cont = corrections.prepare_cont_correction(pk.zbin, continuum_coeff_fit)
+
     (
         syste_noise,
         syste_reso,
@@ -236,9 +240,7 @@ def plot_syst_uncertainties(
                 "Side band", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
-            syste_lines[z] = (
-                0.3 * np.abs(np.poly1d(lines_coeff_fit[iz])(pk.k[z]) - 1) * pk.p[z]
-            )
+            syste_lines[z] = 0.3 * np.abs(A_lines[z](pk.k[z]) - 1) * pk.p[z]
             syste_tot[z].append(syste_lines[z] ** 2)
             ax[4][1].plot(
                 pk.k[z],
@@ -251,7 +253,7 @@ def plot_syst_uncertainties(
                 "Line masking", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
-            syste_hcd[z] = 0.3 * np.abs(hcd_coeff_fit[iz] - 1) * pk.p[z]
+            syste_hcd[z] = 0.3 * np.abs(A_hcd[z](pk.k[z]) - 1) * pk.p[z]
             syste_tot[z].append(syste_hcd[z] ** 2)
             ax[5][1].plot(pk.k[z], syste_hcd[z] / pk.err[z], color=colors[iz])
             ax[5][0].plot(pk.k[z], syste_hcd[z], color=colors[iz])
@@ -259,17 +261,18 @@ def plot_syst_uncertainties(
                 "DLA masking", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
-            syste_continuum[z] = (
-                0.3 * np.abs(np.poly1d(continuum_coeff_fit[iz])(pk.k[z]) - 1) * pk.p[z]
-            )
+            syste_continuum[z] = 0.3 * np.abs(A_cont[z](pk.k[z]) - 1) * pk.p[z]
             syste_tot[z].append(syste_continuum[z] ** 2)
             ax[6][1].plot(pk.k[z], syste_continuum[z] / pk.err[z], color=colors[iz])
             ax[6][0].plot(pk.k[z], syste_continuum[z], color=colors[iz])
             ax[6][0].set_title(
                 "Continuum fitting", x=title_shift, y=title_yshift, fontsize=title_size
             )
-
-            A_dla_completeness = hcd.rogers(z, pk.k[z], *dla_completeness_coef[iz])
+            if iz >= len(dla_completeness_coef):
+                print(f"Redshift bin {z} have no dla completeness info")
+                A_dla_completeness = 1
+            else:
+                A_dla_completeness = hcd.rogers(z, pk.k[z], *dla_completeness_coef[iz])
             syste_dla_completeness[z] = 0.2 * np.abs(A_dla_completeness - 1) * pk.p[z]
             syste_tot[z].append(syste_dla_completeness[z] ** 2)
             ax[7][1].plot(
