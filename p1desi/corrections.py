@@ -73,6 +73,8 @@ def plot_and_compute_ratio_power(
         colors = [f"C{i}" for i, z in enumerate(pk.zbin) if z < zmax]
     elif color_map == "rainbow":
         colors = cm.rainbow(np.linspace(0, 1, len(pk.zbin[pk.zbin < zmax])))
+    elif color_map == "jet":
+        colors = cm.jet(np.linspace(0, 1, len(pk.zbin[pk.zbin < zmax])))
 
     params = []
 
@@ -380,7 +382,7 @@ def prepare_hcd_correction(zbins, file_correction_hcd):
     for iz, z in enumerate(zbins):
         if iz >= len(param_hcd):
             print(f"Redshift bin {z} have no hcd correction")
-            A_hcd[z] = 1
+            A_hcd[z] = np.poly1d(1)
         else:
             A_hcd[z] = np.poly1d(param_hcd[iz])
     return A_hcd
@@ -392,7 +394,7 @@ def prepare_lines_correction(zbins, file_correction_lines):
     for iz, z in enumerate(zbins):
         if iz >= len(param_lines):
             print(f"Redshift bin {z} have no line correction")
-            A_lines[z] = 1
+            A_lines[z] = np.poly1d(1)
         else:
             A_lines[z] = np.poly1d(param_lines[iz])
     return A_lines
@@ -404,7 +406,7 @@ def prepare_cont_correction(zbins, file_correction_cont):
     for iz, z in enumerate(zbins):
         if iz >= len(param_cont):
             print(f"Redshift bin {z} have no continuum correction")
-            A_cont[z] = 1
+            A_cont[z] = np.poly1d(1)
         else:
             A_cont[z] = np.poly1d(param_cont[iz])
     return A_cont

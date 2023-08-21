@@ -27,6 +27,7 @@ def plot_mean_resolution(
     alpha_indiv_redshift = utils.return_key(kwargs, "alpha_indiv_redshift", 0.5)
 
     plt.figure(figsize=figsize)
+    plt.minorticks_on()
 
     mean_k, mean_reso, mean_pixelization = [], [], []
 

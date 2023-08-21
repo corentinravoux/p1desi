@@ -184,6 +184,7 @@ def plot_syst_uncertainties(
     A_lines = corrections.prepare_lines_correction(pk.zbin, lines_coeff_fit)
     A_hcd = corrections.prepare_hcd_correction(pk.zbin, hcd_coeff_fit)
     A_cont = corrections.prepare_cont_correction(pk.zbin, continuum_coeff_fit)
+    A_reso = corrections.prepare_resolution_correction(pk.zbin, resolution_coeff_fit)
 
     (
         syste_noise,
@@ -217,9 +218,7 @@ def plot_syst_uncertainties(
                 "Resolution", x=title_shift, y=title_yshift, fontsize=title_size
             )
 
-            syste_resocorrection[z] = (
-                0.3 * np.abs(np.poly1d(resolution_coeff_fit)(pk.k[z]) - 1) * pk.p[z]
-            )
+            syste_resocorrection[z] = 0.3 * np.abs(A_reso[z](pk.k[z]) - 1) * pk.p[z]
             syste_tot[z].append(syste_resocorrection[z] ** 2)
             ax[2][1].plot(
                 pk.k[z], syste_resocorrection[z] / pk.err[z], color=colors[iz]
@@ -270,7 +269,7 @@ def plot_syst_uncertainties(
             )
             if iz >= len(dla_completeness_coef):
                 print(f"Redshift bin {z} have no dla completeness info")
-                A_dla_completeness = 1
+                A_dla_completeness = np.poly1d(1)
             else:
                 A_dla_completeness = hcd.rogers(z, pk.k[z], *dla_completeness_coef[iz])
             syste_dla_completeness[z] = 0.2 * np.abs(A_dla_completeness - 1) * pk.p[z]
