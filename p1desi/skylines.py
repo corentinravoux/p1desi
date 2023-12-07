@@ -1,10 +1,14 @@
-from matplotlib.lines import Line2D
-import numpy as np
-from scipy.ndimage import median_filter
+import glob
+import os
+
+import fitsio
 import matplotlib.pyplot as plt
+import numpy as np
 from desispec.io import read_sky
+from matplotlib.lines import Line2D
+from scipy.ndimage import median_filter
 from scipy.ndimage.filters import gaussian_filter
-import fitsio, glob, os
+
 from p1desi import utils
 
 
@@ -146,14 +150,14 @@ def get_lines_from_sky_file(
         mean_flux = np.mean(flux, axis=0)
         median_sky = median_filter(mean_flux, median_size)
 
-        ### CR - Other methods to compute median flux. Same results without scipy:
+        # Other methods to compute median flux. Same results without scipy:
         # median_sky = np.zeros(mean_flux.shape)
         # size = median_size//2
         # median_sky[size:-size] = np.array([np.median(mean_flux[i-size:i+size]) for i in range(size,len(mean_flux)-size)])
         # median_sky[0:size] = np.array([np.median(mean_flux[0:(size+i)]) for i in range(0,size)])
         # median_sky[-size:] = np.array([np.median(mean_flux[i+1-size:len(mean_flux)]) for i in range(len(mean_flux)-size,len(mean_flux))])
 
-        ### CR - Other methods to compute median flux. Median then mean:
+        # Other methods to compute median flux. Median then mean:
         # median_sky = np.mean(np.array([median_filter(flux,median_size) for j in range(len(flux))]),axis=0)
         mask = mean_flux > thres * median_sky
         wavelength_above = wavelength[mask]

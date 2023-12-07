@@ -1,11 +1,13 @@
-from p1desi import utils, pk_io
 import pickle
-import scipy
+
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.optimize import curve_fit
+import scipy
 from matplotlib import cm
 from matplotlib.lines import Line2D
+from scipy.optimize import curve_fit
+
+from p1desi import pk_io, utils
 
 
 def model_SB1(k, A, gamma, B, b, k1, phi1, C, c, k2, phi2):
@@ -35,7 +37,6 @@ def model_SB1_indiv_kms(param_mean, A, B, k):
 
 
 def fit_model_SB1(x, y, dy, k1, k2, dk, xmin=None, xmax=None):
-
     mask = (~np.isnan(x)) & (~np.isnan(y)) & (~np.isnan(dy))
     x, y, dy = x[mask], y[mask], dy[mask]
     if xmin is None:
@@ -129,9 +130,6 @@ def fit_model_SB1_indiv(
     return param, cov
 
 
-# CR - can be improved by loading a class for the mean
-
-
 def init_side_band_power(pSB1_name, pSB2_name, zmax):
     pSB1 = pk_io.Pk.read_from_picca(pSB1_name)
     pSB2 = pk_io.Pk.read_from_picca(pSB2_name)
@@ -157,13 +155,13 @@ def init_side_band_power(pSB1_name, pSB2_name, zmax):
     else:
         krestSB1 = np.array(krestSB1)
         krestSB2 = np.array(krestSB2)
-        
+
     krescaleSB1 = np.linspace(
-            np.nanmin(krestSB1), np.nanmax(krestSB1), krestSB1.shape[1]
-        )
+        np.nanmin(krestSB1), np.nanmax(krestSB1), krestSB1.shape[1]
+    )
     krescaleSB2 = np.linspace(
-            np.nanmin(krestSB2), np.nanmax(krestSB2), krestSB2.shape[1]
-        )
+        np.nanmin(krestSB2), np.nanmax(krestSB2), krestSB2.shape[1]
+    )
     for i, z in enumerate(pSB1.zbin):
         if z < zmax:
             pkrestSB1.append(np.interp(krescaleSB1, krestSB1[i], pSB1.p[z]))
@@ -189,7 +187,6 @@ def init_side_band_power(pSB1_name, pSB2_name, zmax):
 def fit_mean_side_band_rest(
     mean_dict, dkrest=1.0, kminrest=None, kmaxrest=8, velunits=False
 ):
-
     if velunits:
         kc4 = utils.kc4_speed
         ksi4 = utils.ksi4_speed
@@ -254,10 +251,9 @@ def plot_side_band_fit(
     nb_bins,
     kmaxrest,
     kmax,
-    save_txt = None,
+    save_txt=None,
     **kwargs,
 ):
-
     style = utils.return_key(kwargs, "style", None)
     if style is not None:
         plt.style.use(style)
@@ -387,7 +383,12 @@ def plot_side_band_fit(
             p_arr.append(p_plot)
             err_arr.append(err_plot)
 
-    z_arr, k_arr, p_arr, err_arr = np.concatenate(z_arr), np.concatenate(k_arr), np.concatenate(p_arr), np.concatenate(err_arr)
+    z_arr, k_arr, p_arr, err_arr = (
+        np.concatenate(z_arr),
+        np.concatenate(k_arr),
+        np.concatenate(p_arr),
+        np.concatenate(err_arr),
+    )
 
     ax[1].set_ylim(ylim)
     ax[0].set_ylim(ylim)
@@ -415,19 +416,27 @@ def plot_side_band_fit(
     plt.savefig(name_out)
 
     if save_txt is not None:
-        np.savetxt(f'{save_txt}_1.txt',
-                np.transpose(np.stack([mean_dict["krescaleSB1"],p_plot_SB1,err_plot_SB1])),
-                header='SB1 WAVENUMBER [Ang^-1] & SB1 POWER SPECTRUM & SB1 ERROR')
-        
-        np.savetxt(f'{save_txt}_2.txt',
-                np.transpose(np.stack([mean_dict["krescaleSB2"],p_plot_SB2,err_plot_SB2])),
-                header='SB2 WAVENUMBER [Ang^-1] & SB2 POWER SPECTRUM & SB2 ERROR')
+        np.savetxt(
+            f"{save_txt}_1.txt",
+            np.transpose(
+                np.stack([mean_dict["krescaleSB1"], p_plot_SB1, err_plot_SB1])
+            ),
+            header="SB1 WAVENUMBER [Ang^-1] & SB1 POWER SPECTRUM & SB1 ERROR",
+        )
 
-        np.savetxt(f'{save_txt}_3.txt',
-                np.transpose(np.stack([z_arr, k_arr, p_arr, err_arr])),
-                header='REDSHIFT & SB1 INDIV WAVENUMBER [Ang^-1] & SB1 INDIV POWER SPECTRUM & SB1 INDIV ERROR')
+        np.savetxt(
+            f"{save_txt}_2.txt",
+            np.transpose(
+                np.stack([mean_dict["krescaleSB2"], p_plot_SB2, err_plot_SB2])
+            ),
+            header="SB2 WAVENUMBER [Ang^-1] & SB2 POWER SPECTRUM & SB2 ERROR",
+        )
 
-
+        np.savetxt(
+            f"{save_txt}_3.txt",
+            np.transpose(np.stack([z_arr, k_arr, p_arr, err_arr])),
+            header="REDSHIFT & SB1 INDIV WAVENUMBER [Ang^-1] & SB1 INDIV POWER SPECTRUM & SB1 INDIV ERROR",
+        )
 
 
 def fit_and_plot_side_band(
@@ -446,7 +455,6 @@ def fit_and_plot_side_band(
     save_txt=None,
     **plt_args,
 ):
-
     pSB1, mean_dict = init_side_band_power(pSB1_name, pSB2_name, zmax)
 
     (
@@ -478,7 +486,7 @@ def fit_and_plot_side_band(
         nb_bins,
         kmaxrest,
         kmax,
-        save_txt = save_txt,
+        save_txt=save_txt,
         **plt_args,
     )
     return (
