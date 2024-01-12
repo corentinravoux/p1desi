@@ -18,6 +18,7 @@ dla_name=${15}
 bal=${16}
 nb_proc=${17}
 use_bookkeeping=${18}
+cross_exposure=${19}
 
 echo "input path for computation:"
 echo $path_in
@@ -55,6 +56,8 @@ echo "number of processors:"
 echo $nb_proc
 echo "Use of bookkeeping:"
 echo $use_bookkeeping
+echo "Launching cross-exposure mode:"
+echo $cross_exposure
 
 if [[ ${region} == "lya" ]]
 then
@@ -126,6 +129,16 @@ else
 folder_name=${suffix}
 fi
 
+
+if [[ ${cross_exposure} == "True" ]]
+then
+coadd_picca_flag="True"
+single_exposure_flag="keep single exposures = True"
+else
+single_exposure_flag=""
+fi
+
+
 path_out=${path_out}/p1d_${folder_name}
 mkdir -p ${path_out}
 
@@ -154,6 +167,7 @@ wave solution = lin
 minimal snr pk1d = 1
 keep surveys = '"${surveys}"'
 use non-coadded spectra = '"${coadd_picca_flag}"'
+'"${single_exposure_flag}"'
 '"${bal_flag}"'
 
 [expected flux]

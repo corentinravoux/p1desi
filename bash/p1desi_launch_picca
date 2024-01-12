@@ -26,6 +26,7 @@ rebinfac=${23}
 meansnrcut=${24}
 compute_cov=${25}
 nbboot=${26}
+cross_exposure=${27}
 
 echo "input path for computation:"
 echo $path_in
@@ -79,6 +80,8 @@ echo "Compute covariance and bootstrap covariance:"
 echo $compute_cov
 echo "Number of bootstrap iterations:"
 echo $nbboot
+echo "Launching cross-exposure mode:"
+echo $cross_exposure
 
 if [[ ${region} == "lya" ]]
 then
@@ -150,6 +153,15 @@ else
 folder_name=${suffix}
 fi
 
+if [[ ${cross_exposure} == "True" ]]
+then
+coadd_picca_flag="True"
+single_exposure_flag="keep single exposures = True"
+else
+single_exposure_flag=""
+fi
+
+
 path_out=${path_out}/p1d_${folder_name}
 mkdir -p ${path_out}
 
@@ -180,6 +192,7 @@ wave solution = lin
 minimal snr pk1d = 1
 keep surveys = '"${surveys}"'
 use non-coadded spectra = '"${coadd_picca_flag}"'
+'"${single_exposure_flag}"'
 '"${bal_flag}"'
 
 [expected flux]
@@ -230,6 +243,20 @@ echo -e 'picca_Pk1D.py \
 bash ${path_out}/p1d_command_${folder_name}_SNRcut${snr_cut}
 fi
 
+if [[ ${cross_exposure} == "True" ]]
+then
+
+mkdir -p ${path_out}/pk1d_SNRcut${snr_cut}_cross_exposure
+
+echo -e 'picca_Pk1D_cross_exposure.py \
+--in-dir '"${path_out}"'/pk1d_SNRcut'"${snr_cut}"' \
+--out-dir '"${path_out}"'/pk1d_SNRcut'"${snr_cut}_cross_exposure"' \
+--num-processors '"${nb_proc}"' > '"${path_out}"'/Log/cross_exposure_output_'"${folder_name}"'_SNRcut'"${snr_cut}"' 2> '"${path_out}"'/Log/cross_exposure_error_'"${folder_name}"'_SNRcut'"${snr_cut}"'' > ${path_out}/cross_exposure_command_${folder_name}_SNRcut${snr_cut}
+
+bash ${path_out}/cross_exposure_command_${folder_name}_SNRcut${snr_cut}
+
+fi
+
 if [[ ${velunits} == "True" ]]
 then
 velunits_flag="--velunits"
@@ -258,10 +285,15 @@ else
 cov_flag=""
 fi
 
-
+if [[ ${cross_exposure} == "True" ]]
+then
+pk_path_flag="_cross_exposure"
+else
+pk_path_flag=""
+fi
 
 echo -e 'picca_Pk1D_postprocess.py \
---in-dir '"${path_out}"'/pk1d_SNRcut'"${snr_cut}"' \
+--in-dir '"${path_out}"'/pk1d_SNRcut'"${snr_cut}"''"${pk_path_flag}"' \
 --weight-method '"${weights}"' \
 '"${velunits_flag}"' '"${rebinfac_flag}"' '"${meansnrcut_flag}"' \
 '"${cov_flag}"' \

@@ -5,6 +5,7 @@ suffix=${2}
 snr_cut=${3}
 noise_estimate=${4}
 nb_proc=${5}
+cross_exposure=${6}
 
 
 echo "input path for computation:"
@@ -17,7 +18,8 @@ echo "noise estimate for p1d:"
 echo $noise_estimate
 echo "number of processors:"
 echo $nb_proc
-
+echo "Launching cross-exposure mode:"
+echo $cross_exposure
 
 if [[ ${suffix} == "None" ]]
 then
@@ -46,3 +48,18 @@ echo -e 'picca_Pk1D.py \
 --num-noise-exp 2500 > '"${path_in}"'/Log/p1d_output_SNRcut'"${snr_cut}"''"${suffix_flag}"' 2> '"${path_in}"'/Log/p1d_error_SNRcut'"${snr_cut}"''"${suffix_flag}"'' > ${path_in}/p1d_command_SNRcut${snr_cut}${suffix_flag}
 
 bash ${path_in}/p1d_command_SNRcut${snr_cut}${suffix_flag}
+
+
+if [[ ${cross_exposure} == "True" ]]
+then
+
+mkdir -p ${path_out}/pk1d_SNRcut${snr_cut}_cross_exposure
+
+echo -e 'picca_Pk1D_cross_exposure.py \
+--in-dir '"${path_out}"'/pk1d_SNRcut'"${snr_cut}"' \
+--out-dir '"${path_out}"'/pk1d_SNRcut'"${snr_cut}_cross_exposure"' \
+--num-processors '"${nb_proc}"' > '"${path_out}"'/Log/cross_exposure_output_'"${folder_name}"'_SNRcut'"${snr_cut}"' 2> '"${path_out}"'/Log/cross_exposure_error_'"${folder_name}"'_SNRcut'"${snr_cut}"'' > ${path_out}/cross_exposure_command_${folder_name}_SNRcut${snr_cut}
+
+bash ${path_out}/cross_exposure_command_${folder_name}_SNRcut${snr_cut}
+
+fi
