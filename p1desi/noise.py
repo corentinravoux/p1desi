@@ -13,6 +13,7 @@ def plot_noise_power_ratio(
     out_points=None,
     plot_asymptote=True,
     k_asymptote=3.10,
+    zmax=None,
     **kwargs,
 ):
     figsize = utils.return_key(kwargs, "figsize", (8, 10))
@@ -44,8 +45,12 @@ def plot_noise_power_ratio(
         3, 1, figsize=figsize, gridspec_kw=dict(height_ratios=[2, 1, 1])
     )
     z_arr, k_arr, praw_arr, pnoise_arr = [], [], [], []
-
+    zbins = []
     for i, z in enumerate(pk.zbin):
+        if zmax is not None:
+            if z > zmax:
+                continue
+        zbins.append(z)
         z_arr.append([z for i in range(len(pk.k[z]))])
         k_arr.append(pk.k[z])
         praw_arr.append(pk.p_raw[z])
@@ -71,9 +76,9 @@ def plot_noise_power_ratio(
             color=color[i],
             marker=None,
             linestyle="-",
-            label=f"z = {pk.zbin[i]:.1f}",
+            label=f"z = {zbins[i]:.1f}",
         )
-        for i in range(len(pk.zbin))
+        for i in range(len(zbins))
     ]
     legend_elements = legend_elements + [
         Line2D(
