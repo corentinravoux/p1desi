@@ -241,7 +241,7 @@ echo -e 'picca_Pk1D.py \
 --num-noise-exp 2500 > '"${path_out}"'/Log/p1d_output_'"${folder_name}"'_SNRcut'"${snr_cut}"' 2> '"${path_out}"'/Log/p1d_error_'"${folder_name}"'_SNRcut'"${snr_cut}"'' > ${path_out}/p1d_command_${folder_name}_SNRcut${snr_cut}
 
 bash ${path_out}/p1d_command_${folder_name}_SNRcut${snr_cut}
-fi
+
 
 if [[ ${cross_exposure} == "True" ]]
 then
@@ -255,6 +255,7 @@ echo -e 'picca_Pk1D_cross_exposure.py \
 
 bash ${path_out}/cross_exposure_command_${folder_name}_SNRcut${snr_cut}
 
+fi
 fi
 
 if [[ ${velunits} == "True" ]]
