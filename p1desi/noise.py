@@ -1,9 +1,10 @@
-from p1desi import utils, pk_io
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-from matplotlib import cm
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import cm
+from matplotlib.lines import Line2D
+
+from p1desi import pk_io, utils
 
 
 def plot_noise_power_ratio(
@@ -118,7 +119,7 @@ def plot_noise_power_ratio(
         ax[i].margins(x=0)
 
     if plot_asymptote:
-        mean_pk_z = pk_io.MeanPkZ.init_from_pk(pk)
+        mean_pk_z = pk_io.MeanPkZ.init_from_pk(pk, zmax=zmax)
         alpha, beta = mean_pk_z.compute_noise_asymptopte(k_asymptote, use_diff=use_diff)
         empty_patch = [
             mpatches.Patch(
@@ -278,6 +279,7 @@ def plot_noise_power_ratio_meanz(
     out_points=None,
     plot_asymptote=True,
     k_asymptote=3.10,
+    zmax=None,
     **kwargs,
 ):
     figsize = utils.return_key(kwargs, "figsize", (8, 10))
@@ -292,7 +294,7 @@ def plot_noise_power_ratio_meanz(
     ticks_size = utils.return_key(kwargs, "ticks_size", 15)
     plot_velunits = utils.return_key(kwargs, "plot_velunits", True)
 
-    mean_pk_z = pk_io.MeanPkZ.init_from_pk(pk)
+    mean_pk_z = pk_io.MeanPkZ.init_from_pk(pk, zmax=zmax)
 
     if use_diff:
         noise = mean_pk_z.p_diff
@@ -336,7 +338,7 @@ def plot_noise_power_ratio_meanz(
         ax[i].margins(x=0)
 
     if plot_asymptote:
-        mean_pk_z = pk_io.MeanPkZ.init_from_pk(pk)
+        mean_pk_z = pk_io.MeanPkZ.init_from_pk(pk, zmax=zmax)
         alpha, beta = mean_pk_z.compute_noise_asymptopte(k_asymptote, use_diff=use_diff)
         empty_patch = [
             mpatches.Patch(
@@ -370,8 +372,9 @@ def plot_noise_power_ratio_meanz(
 def compute_asymptote(
     pk,
     k_asymptote,
+    zmax=None,
 ):
-    mean_pk_z = pk_io.MeanPkZ.init_from_pk(pk)
+    mean_pk_z = pk_io.MeanPkZ.init_from_pk(pk, zmax=zmax)
     alpha_pipeline, beta_pipeline = mean_pk_z.compute_noise_asymptopte(
         k_asymptote, use_diff=False
     )
@@ -415,7 +418,7 @@ def plot_noise_power_meank(
         [mean_pk_k.err_noise[z] for z in mean_pk_k.zbin],
         marker=marker,
         color=color,
-        linestype="None",
+        linestyle="None",
     )
     ax[0].errorbar(
         mean_pk_k.zbin,
@@ -424,7 +427,7 @@ def plot_noise_power_meank(
         marker=marker,
         markerfacecolor="None",
         markeredgecolor=color,
-        linestype="None",
+        linestyle="None",
     )
 
     ax[1].errorbar(

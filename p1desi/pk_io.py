@@ -1,10 +1,13 @@
-import numpy as np
-import scipy, fitsio
-import astropy.table as t
 import struct
+
+import astropy.table as t
+import fitsio
+import numpy as np
+import scipy
 from scipy.interpolate import interp2d
-from p1desi import utils
 from scipy.stats import sem
+
+from p1desi import utils
 
 
 def read_pk_means(pk_means_name, hdu=None):
@@ -731,8 +734,8 @@ class MeanPkZ(object):
             noise = self.p_diff
         else:
             noise = self.p_noise
-        alpha = np.mean((self.p_raw - noise)[mask_k])
-        beta = np.mean((noise / self.p_raw)[mask_k])
+        alpha = np.nanmean((self.p_raw - noise)[mask_k])
+        beta = np.nanmean((noise / self.p_raw)[mask_k])
         return alpha, beta
 
 
