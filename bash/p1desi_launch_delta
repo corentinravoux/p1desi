@@ -133,9 +133,11 @@ fi
 if [[ ${cross_exposure} == "True" ]]
 then
 coadd_picca_flag="True"
-single_exposure_flag="keep single exposures = True"
+single_exposure_flag1="keep single exposures = True"
+single_exposure_flag2="delta extraction single exposure = indiv"
 else
-single_exposure_flag=""
+single_exposure_flag1=""
+single_exposure_flag2=""
 fi
 
 
@@ -167,7 +169,8 @@ wave solution = lin
 minimal snr pk1d = 1
 keep surveys = '"${surveys}"'
 use non-coadded spectra = '"${coadd_picca_flag}"'
-'"${single_exposure_flag}"'
+'"${single_exposure_flag1}"'
+'"${single_exposure_flag2}"'
 '"${bal_flag}"'
 
 [expected flux]

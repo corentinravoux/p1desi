@@ -66,8 +66,8 @@ fi
 
 echo -e 'picca_Pk1D_postprocess.py \
 --in-dir '"${path_in}"' \
---rebinfac 1 \
---weights-method '"${weights}"' \
+--weight-method '"${weights}"' \
+--ncpu '"${nb_proc}"' \
 '"${velunits_flag}"' '"${rebinfac_flag}"' '"${meansnrcut_flag}"' \
 '"${cov_flag}"' \
 --overwrite> '"${path_in}"'/Log/p1d_output_SNRcut'"${snr_cut}"''"${suffix_flag}"' 2> '"${path_in}"'/Log/p1d_error_SNRcut'"${snr_cut}"''"${suffix_flag}"'' > ${path_out}/mean_p1d_command_SNRcut${snr_cut}_weights${weights}
