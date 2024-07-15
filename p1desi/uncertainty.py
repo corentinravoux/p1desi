@@ -366,6 +366,9 @@ def plot_covariance(
     wspace = utils.return_key(plot_args, "wspace", 0.3)
     subplot_x = utils.return_key(plot_args, "subplot_x", 4)
     subplot_y = utils.return_key(plot_args, "subplot_y", 4)
+    vmin = utils.return_key(plot_args, "vmin", -1)
+    vmax = utils.return_key(plot_args, "vmax", 1)
+    cmap = utils.return_key(plot_args, "map_color", "seismic")
 
     pk = pk_io.Pk.read_from_picca(file_pk)
 
@@ -403,12 +406,12 @@ def plot_covariance(
                 cov_mat = pk.boot_cov[z][mask_cov].reshape(nkbin, nkbin)
             else:
                 cov_mat = pk.cov[z][mask_cov].reshape(nkbin, nkbin)
-
-            for i in range(len(list_systematics)):
-                cov_sys = np.outer(
-                    list_systematics[i][z][mask], list_systematics[i][z][mask]
-                )
-                cov_mat = cov_mat + cov_sys
+            if add_systematics:
+                for i in range(len(list_systematics)):
+                    cov_sys = np.outer(
+                        list_systematics[i][z][mask], list_systematics[i][z][mask]
+                    )
+                    cov_mat = cov_mat + cov_sys
 
             mean_k1 = np.array([pk.k[z][mask] for i in range(len(pk.k[z][mask]))]).T
             mean_k2 = np.array([pk.k[z][mask] for i in range(len(pk.k[z][mask]))])
@@ -419,7 +422,7 @@ def plot_covariance(
 
             ax = fig.add_subplot(subplot_y, subplot_x, j + 1)
             ax.set_title(f"Correlation matrix at z = {z}")
-            im = ax.imshow(corr_mat, extent=extent)
+            im = ax.imshow(corr_mat, extent=extent,vmin=vmin,vmax=vmax,cmap=cmap)
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.05)
             fig.colorbar(im, cax=cax, orientation="vertical")
