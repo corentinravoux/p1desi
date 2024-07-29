@@ -3,8 +3,7 @@ import struct
 import astropy.table as t
 import fitsio
 import numpy as np
-import scipy
-from scipy.interpolate import interp2d
+from scipy.interpolate import RegularGridInterpolator
 from scipy.stats import sem
 
 from p1desi import utils
@@ -501,20 +500,25 @@ class PkTrueOhioMock(Pk):
         fmt = "d" * nk * nz
         data = file.read(struct.calcsize(fmt))
         p_file = np.array(struct.unpack(fmt, data), dtype=np.double).reshape((nz, nk))
-        intp_p = interp2d(k_file, z_file, p_file)
+        intp_p = RegularGridInterpolator(
+            (k_file, z_file),
+            np.transpose(p_file),
+            method="linear",
+            bounds_error=False,
+        )
         if velunits:
             for zbin in zbins_input:
                 k[zbin] = k_input[zbin]
-                p[zbin] = intp_p(k_input[zbin], zbin)
-                norm_p[zbin] = intp_p(k_input[zbin], zbin) * k_input[zbin] / np.pi
+                p[zbin] = intp_p((k_input[zbin], zbin))
+                norm_p[zbin] = intp_p((k_input[zbin], zbin)) * k_input[zbin] / np.pi
                 err[zbin] = np.zeros(k_input[zbin].shape)
                 norm_err[zbin] = np.zeros(k_input[zbin].shape)
         else:
             for zbin in zbins_input:
                 k_vel = utils.kAAtokskm(k_input[zbin], z=zbin)
                 k[zbin] = k_input[zbin]
-                p[zbin] = utils.kskmtokAA(intp_p(k_vel, zbin), z=zbin)
-                norm_p[zbin] = intp_p(k_vel, zbin) * k_vel / np.pi
+                p[zbin] = utils.kskmtokAA(intp_p((k_vel, zbin)), z=zbin)
+                norm_p[zbin] = intp_p((k_vel, zbin)) * k_vel / np.pi
                 err[zbin] = np.zeros(k_input[zbin].shape)
                 norm_err[zbin] = np.zeros(k_input[zbin].shape)
         return cls(
