@@ -7,15 +7,15 @@ Created on Thu Apr 30 09:50:01 2020
 """
 
 
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import cm
 from matplotlib.lines import Line2D
 from scipy.interpolate import interp1d
 from scipy.stats import binned_statistic
-from matplotlib import cm
 
-from p1desi import utils, uncertainty
+from p1desi import uncertainty, utils
 
 
 def plot(
