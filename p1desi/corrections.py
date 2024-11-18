@@ -160,7 +160,7 @@ def plot_and_compute_ratio_power(
 
             elif model == "power":
                 popt, pcov = curve_fit(
-                    model_residual_correction,
+                    model_cont_correction_eboss,
                     xdata=k,
                     ydata=ratio,
                     sigma=err_ratio,
@@ -173,7 +173,7 @@ def plot_and_compute_ratio_power(
                 k_th = np.linspace(np.min(k), np.max(k), 2000)
                 axplt.plot(
                     k_th,
-                    model_residual_correction(k_th, *popt),
+                    model_cont_correction_eboss(k_th, *popt),
                     color=colors[i],
                     ls="--",
                 )
@@ -334,7 +334,7 @@ def plot_and_compute_average_ratio_power(
         )
     else:
         plt.xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize_x)
-    plt.ylim(ymin, ymax, 1.02)
+    plt.ylim([ymin, ymax])
 
     plt.gca().xaxis.set_tick_params(labelsize=labelsize)
     plt.gca().yaxis.set_tick_params(labelsize=labelsize)
