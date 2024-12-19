@@ -360,6 +360,7 @@ def plot_covariance(
     use_boot=True,
     add_systematics=True,
     systematics_file=None,
+    plot_correlation=True,
     **plot_args,
 ):
     figsize = utils.return_key(plot_args, "figsize", (20, 20))
@@ -393,32 +394,34 @@ def plot_covariance(
             else:
                 kmax = kmax_AA
                 kmin = kmin_AA
-
-            mask_cov = (pk.cov_k1[z] < kmax) & (pk.cov_k2[z] < kmax)
-            mask_cov &= (pk.cov_k1[z] > kmin) & (pk.cov_k2[z] > kmin)
-
+            
             mask = (pk.k[z] > kmin) & (pk.k[z] < kmax)
-            nkbin = len(pk.k[z][mask])
+
             kmin_plot = np.min(pk.k[z][mask])
             kmax_plot = np.max(pk.k[z][mask])
             extent = [kmin_plot, kmax_plot, kmax_plot, kmin_plot]
             if use_boot:
-                cov_mat = pk.boot_cov[z][mask_cov].reshape(nkbin, nkbin)
+                cov_matrix = pk.boot_cov[z].reshape(len(pk.k[z]),len(pk.k[z]))
             else:
-                cov_mat = pk.cov[z][mask_cov].reshape(nkbin, nkbin)
+                cov_matrix = pk.cov[z].reshape(len(pk.k[z]),len(pk.k[z]))
+            cov_matrix_cut = cov_matrix[np.ix_(np.argwhere(mask)[:,0], np.argwhere(mask)[:,0])]
+
             if add_systematics:
                 for i in range(len(list_systematics)):
                     cov_sys = np.outer(
                         list_systematics[i][z][mask], list_systematics[i][z][mask]
                     )
-                    cov_mat = cov_mat + cov_sys
+                    cov_matrix_cut = cov_matrix_cut + cov_sys
 
             mean_k1 = np.array([pk.k[z][mask] for i in range(len(pk.k[z][mask]))]).T
             mean_k2 = np.array([pk.k[z][mask] for i in range(len(pk.k[z][mask]))])
 
-            v = np.sqrt(np.diag(cov_mat))
+            v = np.sqrt(np.diag(cov_matrix_cut))
             outer_v = np.outer(v, v)
-            corr_mat = cov_mat / outer_v
+            if plot_correlation:
+                corr_mat = cov_matrix_cut / outer_v
+            else:
+                corr_mat = cov_matrix_cut
 
             ax = fig.add_subplot(subplot_y, subplot_x, j + 1)
             ax.set_title(f"Correlation matrix at z = {z}")
@@ -427,10 +430,10 @@ def plot_covariance(
             cax = divider.append_axes("right", size="5%", pad=0.05)
             fig.colorbar(im, cax=cax, orientation="vertical")
 
-            z_arr.append(np.full((nkbin * nkbin), z))
+            z_arr.append(np.full(np.ravel(mean_k1).shape, z))
             k1_arr.append(np.ravel(mean_k1))
             k2_arr.append(np.ravel(mean_k2))
-            cov_mat_arr.append(np.ravel(cov_mat))
+            cov_mat_arr.append(np.ravel(cov_matrix_cut))
             corr_mat_arr.append(np.ravel(corr_mat))
 
     z_arr = np.concatenate(z_arr, axis=0)
