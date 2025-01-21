@@ -7,6 +7,11 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from p1desi import corrections, hcd, pk_io, utils
 
+try:
+    import sgolay2
+except ImportError:
+    print("SGolay2 not installed, 2D smoothing of covariance matrix unavailable")
+
 
 def create_uncertainty_systematics(
     syste_noise,
@@ -361,6 +366,9 @@ def plot_covariance(
     add_systematics=True,
     systematics_file=None,
     plot_correlation=True,
+    smooth_covstat=True,
+    smooth_cov_window=15,
+    smooth_cov_order=5,
     **plot_args,
 ):
     figsize = utils.return_key(plot_args, "figsize", (20, 20))
@@ -394,17 +402,28 @@ def plot_covariance(
             else:
                 kmax = kmax_AA
                 kmin = kmin_AA
-            
+
             mask = (pk.k[z] > kmin) & (pk.k[z] < kmax)
 
             kmin_plot = np.min(pk.k[z][mask])
             kmax_plot = np.max(pk.k[z][mask])
             extent = [kmin_plot, kmax_plot, kmax_plot, kmin_plot]
             if use_boot:
-                cov_matrix = pk.boot_cov[z].reshape(len(pk.k[z]),len(pk.k[z]))
+                cov_matrix = pk.boot_cov[z].reshape(len(pk.k[z]), len(pk.k[z]))
             else:
-                cov_matrix = pk.cov[z].reshape(len(pk.k[z]),len(pk.k[z]))
-            cov_matrix_cut = cov_matrix[np.ix_(np.argwhere(mask)[:,0], np.argwhere(mask)[:,0])]
+                cov_matrix = pk.cov[z].reshape(len(pk.k[z]), len(pk.k[z]))
+            cov_matrix_cut = cov_matrix[
+                np.ix_(np.argwhere(mask)[:, 0], np.argwhere(mask)[:, 0])
+            ]
+
+            if smooth_covstat:
+                diag = np.copy(np.diag(cov_matrix_cut))
+                np.fill_diagonal(cov_matrix_cut, np.full_like(diag, 0.0))
+                cov_matrix_cut = sgolay2.SGolayFilter2(
+                    window_size=smooth_cov_window,
+                    poly_order=smooth_cov_order,
+                )(cov_matrix_cut)
+                np.fill_diagonal(cov_matrix_cut, diag)
 
             if add_systematics:
                 for i in range(len(list_systematics)):
@@ -425,7 +444,7 @@ def plot_covariance(
 
             ax = fig.add_subplot(subplot_y, subplot_x, j + 1)
             ax.set_title(f"Correlation matrix at z = {z}")
-            im = ax.imshow(corr_mat, extent=extent,vmin=vmin,vmax=vmax,cmap=cmap)
+            im = ax.imshow(corr_mat, extent=extent, vmin=vmin, vmax=vmax, cmap=cmap)
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.05)
             fig.colorbar(im, cax=cax, orientation="vertical")

@@ -23,6 +23,10 @@ class Pk(object):
         velunits=False,
         zbin=None,
         number_chunks=None,
+        kmin=None,
+        kmax=None,
+        zmin=None,
+        zmax=None,
         number_qso=None,
         mean_snr=None,
         mean_z=None,
@@ -50,6 +54,10 @@ class Pk(object):
         self.velunits = velunits
         self.zbin = zbin
         self.number_chunks = number_chunks
+        self.kmin = kmin
+        self.kmax = kmax
+        self.zmin = zmin
+        self.zmax = zmax
         self.number_qso = number_qso
         self.mean_snr = mean_snr
         self.mean_z = mean_z
@@ -79,6 +87,10 @@ class Pk(object):
         minrescor = {}
         maxrescor = {}
         number_chunks = {}
+        kmin = {}
+        kmax = {}
+        zmin = {}
+        zmax = {}
         mean_snr = {}
         mean_z = {}
         k = {}
@@ -133,6 +145,10 @@ class Pk(object):
             norm_p[zbin] = np.array(mean_pk[w]["meanDelta2"])
             norm_err[zbin] = np.array(mean_pk[w]["errorDelta2"])
             number_chunks[zbin] = int(metadata[i]["N_chunks"])
+            kmin[zbin] = metadata[i]["k_min"]
+            kmax[zbin] = metadata[i]["k_max"]
+            zmin[zbin] = metadata[i]["z_min"]
+            zmax[zbin] = metadata[i]["z_max"]
             mean_snr[zbin] = np.mean(mean_pk[w]["meanforest_snr"])
             mean_z[zbin] = np.mean(mean_pk[w]["meanforest_z"])
             resocor[zbin] = np.array(mean_pk[w]["meancor_reso"])
@@ -187,6 +203,10 @@ class Pk(object):
             velunits=velunits,
             zbin=np.array(zbins),
             number_chunks=number_chunks,
+            kmin=kmin,
+            kmax=kmax,
+            zmin=zmin,
+            zmax=zmax,
             number_qso=number_qso,
             mean_snr=mean_snr,
             mean_z=mean_z,

@@ -7,12 +7,20 @@ Created on Thu Apr 30 09:50:01 2020
 """
 
 
+import fitsio
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
+
+try:
+    import sgolay2
+except ImportError:
+    print("SGolay2 not installed, 2D smoothing of covariance matrix unavailable")
+
 from matplotlib import cm
 from matplotlib.lines import Line2D
 from scipy.interpolate import interp1d
+from scipy.linalg import block_diag
 from scipy.stats import binned_statistic
 
 from p1desi import uncertainty, utils
@@ -605,3 +613,227 @@ def return_outpoints(
 
     text_file = np.vstack(stack)
     np.savetxt(outpoints + ".txt", np.transpose(text_file), header=header)
+
+
+def save_p1d(
+    mean_pk,
+    systematics_file,
+    zmax,
+    output_name,
+    zedge_bin=0.2,
+    smooth_covstat=True,
+    smooth_cov_window=15,
+    smooth_cov_order=5,
+    blinding="desi_y1",
+):
+
+    zbin_save = mean_pk.zbin[mean_pk.zbin < zmax]
+
+    kmin = mean_pk.kmin[zbin_save[0]]
+    kmax = mean_pk.kmax[zbin_save[0]]
+    n_k = mean_pk.k[zbin_save[0]].size
+    k_edges = np.linspace(kmin, kmax, n_k + 1)
+    k_edges_1 = k_edges[:-1]
+    k_edges_2 = k_edges[1:]
+    k_centers = (k_edges_1 + k_edges_2) / 2
+
+    z_edges_1_full = np.concatenate(
+        [np.full(mean_pk.k[z].shape, z - zedge_bin / 2) for z in zbin_save]
+    )
+    z_edges_2_full = np.concatenate(
+        [np.full(mean_pk.k[z].shape, z + zedge_bin / 2) for z in zbin_save]
+    )
+    z = np.concatenate([np.full(mean_pk.k[z].shape, z) for z in zbin_save])
+
+    k_edges_1_full = np.concatenate([k_edges_1 for z in zbin_save])
+    k_edges_2_full = np.concatenate([k_edges_2 for z in zbin_save])
+    k_centers_full = np.concatenate([k_centers for z in zbin_save])
+    pk = np.concatenate([mean_pk.p[z] for z in zbin_save])
+    error_stat = np.concatenate([mean_pk.err[z] for z in zbin_save])
+    p_raw = np.concatenate([mean_pk.p_raw[z] for z in zbin_save])
+    p_noise = np.concatenate([mean_pk.p_noise[z] for z in zbin_save])
+
+    cov = block_diag(*[mean_pk.cov[z].reshape(n_k, n_k) for z in zbin_save])
+    cov = block_diag(*[mean_pk.cov[z].reshape(n_k, n_k) for z in zbin_save])
+
+    if smooth_covstat:
+        diag = np.copy(np.diag(cov))
+        np.fill_diagonal(cov, np.full_like(diag, 0.0))
+        cov = sgolay2.SGolayFilter2(
+            window_size=smooth_cov_window, poly_order=smooth_cov_order
+        )(cov)
+        np.fill_diagonal(cov, diag)
+
+    syste_tot, list_systematics, list_systematics_name = (
+        uncertainty.prepare_uncertainty_systematics(
+            systematics_file,
+        )
+    )
+
+    cov_syst = np.zeros_like(cov)
+    for i in range(len(list_systematics_name)):
+        cov_syst = cov_syst + block_diag(
+            *[
+                np.outer(list_systematics[i][z], list_systematics[i][z])
+                for z in zbin_save
+            ]
+        )
+
+    full_cov = cov + cov_syst
+
+    error_syst = np.concatenate([syste_tot[z] for z in zbin_save])
+    error_pk = np.sqrt(error_stat**2 + error_syst**2)
+
+    fits = fitsio.FITS(output_name, "rw", clobber=True)
+
+    dtype = [
+        ("Z1", "f8"),
+        ("Z2", "f8"),
+        ("Z", "f8"),
+        ("K1", "f8"),
+        ("K2", "f8"),
+        ("K", "f8"),
+        ("PLYA", "f8"),
+        ("E_PK", "f8"),
+        ("E_STAT", "f8"),
+        ("E_SYST", "f8"),
+        ("PRAW", "f8"),
+        ("PNOISE", "f8"),
+    ]
+
+    if mean_pk.velunits:
+        units = [
+            "",
+            "",
+            "",
+            "(km/s)^(-1)",
+            "(km/s)^(-1)",
+            "(km/s)^(-1)",
+            "(km/s)",
+            "(km/s)",
+            "(km/s)",
+            "(km/s)",
+            "(km/s)",
+            "(km/s)",
+        ]
+    else:
+        units = [
+            "",
+            "",
+            "",
+            "AA^(-1)",
+            "AA^(-1)",
+            "AA^(-1)",
+            "AA",
+            "AA",
+            "AA",
+            "AA",
+            "AA",
+            "AA",
+        ]
+
+    hdu = np.zeros(z.size, dtype=dtype)
+    hdu["Z1"] = z_edges_1_full
+    hdu["Z2"] = z_edges_2_full
+    hdu["Z"] = z
+    hdu["K1"] = k_edges_1_full
+    hdu["K2"] = k_edges_2_full
+    hdu["K"] = k_centers_full
+    hdu["PLYA"] = pk
+    hdu["E_PK"] = error_pk
+    hdu["E_STAT"] = error_stat
+    hdu["E_SYST"] = error_syst
+    hdu["PRAW"] = p_raw
+    hdu["PNOISE"] = p_noise
+
+    header = {
+        "ZMIN": np.min(zbin_save),
+        "ZMAX": np.max(zbin_save),
+        "NZ": len(zbin_save),
+        "KMIN": kmin,
+        "KMAX": kmax,
+        "NK": n_k,
+        "VELUNITS": mean_pk.velunits,
+        "BLINDING": blinding,
+    }
+    if blinding is not None:
+        fits.write(hdu, header=header, units=units, extname="P1D_BLIND")
+    else:
+        fits.write(hdu, header=header, units=units, extname="P1D")
+
+    dtype_systematics = [
+        ("Z", "f8"),
+        ("K", "f8"),
+        ("E_SYST", "f8"),
+    ]
+    if mean_pk.velunits:
+        units_systematics = [
+            "",
+            "(km/s)^(-1)",
+            "(km/s)",
+        ]
+    else:
+        units_systematics = [
+            "",
+            "AA^(-1)",
+            "AA",
+        ]
+
+    for i in range(len(list_systematics_name)):
+        name_syste = "E_" + list_systematics_name[i].upper().replace(" ", "_")
+        if name_syste == "DLA":
+            name_syste = "DLA_MASKING"
+        dtype_systematics.append((name_syste, "f8"))
+        if mean_pk.velunits:
+            units_systematics.append("(km/s)")
+        else:
+            units_systematics.append("AA")
+
+    hdu_systematics = np.zeros(z.size, dtype=dtype_systematics)
+    hdu_systematics["Z"] = z
+    hdu_systematics["K"] = k_centers_full
+    hdu_systematics["E_SYST"] = error_syst
+
+    for i in range(len(list_systematics_name)):
+        name_syste = "E_" + list_systematics_name[i].upper().replace(" ", "_")
+        if name_syste == "DLA":
+            name_syste = "DLA_MASKING"
+        hdu_systematics[name_syste] = np.concatenate(
+            [list_systematics[i][z] for z in zbin_save]
+        )
+
+    header = {
+        "ZMIN": np.min(zbin_save),
+        "ZMAX": np.max(zbin_save),
+        "NZ": len(zbin_save),
+        "KMIN": kmin,
+        "KMAX": kmax,
+        "NK": n_k,
+        "VELUNITS": mean_pk.velunits,
+    }
+    fits.write(
+        hdu_systematics, header=header, units=units_systematics, extname="SYSTEMATICS"
+    )
+
+    header = {
+        "ZMIN": np.min(zbin_save),
+        "ZMAX": np.max(zbin_save),
+        "NZ": len(zbin_save),
+        "KMIN": kmin,
+        "KMAX": kmax,
+        "NK": n_k,
+        "VELUNITS": mean_pk.velunits,
+        "IS_BD": False,
+    }
+    if mean_pk.velunits:
+        units = ["(km/s)^2"]
+    else:
+        units = ["AA^2"]
+
+    fits.write(full_cov, header=header, units=units, extname="COVARIANCE")
+    fits.write(cov, header=header, units=units, extname="COVARIANCE_STAT")
+    fits.write(cov_syst, header=header, units=units, extname="COVARIANCE_SYST")
+
+    fits.close()
+
+    return
