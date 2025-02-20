@@ -78,7 +78,13 @@ def prepare_uncertainty_systematics(
     return syste_tot, list_systematics, list_systematics_name
 
 
-def plot_stat_uncertainties(file_pk, outname, zmax, **plot_args):
+def plot_stat_uncertainties(
+    file_pk,
+    zmax,
+    outname=None,
+    outpoints=None,
+    **plot_args,
+):
     pk = pk_io.Pk.read_from_picca(file_pk)
 
     fontsize_x = utils.return_key(plot_args, "fontsize_x", 16)
@@ -99,7 +105,7 @@ def plot_stat_uncertainties(file_pk, outname, zmax, **plot_args):
         colors = cm.rainbow(np.linspace(0, 1, len(pk.zbin[pk.zbin < zmax])))
 
     fig, ax = plt.subplots(1, 2, figsize=figsize)
-
+    z_arr, k_arr, err_arr, err_on_p_arr = [], [], [], []
     for i, z in enumerate(pk.zbin):
         if z < zmax:
             if pk.velunits:
@@ -122,6 +128,18 @@ def plot_stat_uncertainties(file_pk, outname, zmax, **plot_args):
                 label=r"$z = ${:1.1f}".format(z),
                 color=colors[i],
             )
+            z_arr.append(np.full(pk.k[z][mask].shape, z))
+            k_arr.append(pk.k[z][mask])
+            err_arr.append(pk.err[z][mask])
+            err_on_p_arr.append(pk.err[z][mask] / pk.p[z][mask])
+
+
+    z_arr = np.concatenate(z_arr, axis=0)
+    k_arr = np.concatenate(k_arr, axis=0)
+    err_arr = np.concatenate(err_arr, axis=0)
+    err_on_p_arr = np.concatenate(err_on_p_arr, axis=0)
+
+
     if pk.velunits:
         ax[0].set_xlabel(
             r"$k~[\mathrm{s}$" + r"$\cdot$" + "$\mathrm{km}^{-1}]$", fontsize=fontsize_x
@@ -147,9 +165,23 @@ def plot_stat_uncertainties(file_pk, outname, zmax, **plot_args):
     ax[1].xaxis.set_tick_params(labelsize=labelsize)
     ax[1].set_xlim(kmin, kmax)
     ax[1].set_ylim(ymin2, ymax2)
-    fig.tight_layout()
-    fig.savefig(f"{outname}.pdf")
-    fig.savefig(f"{outname}.png")
+    if outname is not None:
+        fig.tight_layout()
+        fig.savefig(f"{outname}.pdf")
+        fig.savefig(f"{outname}.png")
+
+    if outpoints is not None:
+        if pk.velunits:
+            header = "REDSHIFT & WAVENUMBER [s.km^-1] & P1D ERROR [km.s^-1] & P1D ERROR / P1D"
+        else:
+            header = (
+                "REDSHIFT & WAVENUMBER [Ang^-1] & P1D ERROR [Ang] & P1D ERROR / P1D"
+            )
+        np.savetxt(
+            f"{outpoints}.txt",
+            np.transpose(np.stack([z_arr, k_arr, err_arr, err_on_p_arr])),
+            header=header,
+        )
 
 
 def plot_syst_uncertainties(

@@ -835,5 +835,3 @@ def save_p1d(
     fits.write(cov_syst, header=header, units=units, extname="COVARIANCE_SYST")
 
     fits.close()
-
-    return
