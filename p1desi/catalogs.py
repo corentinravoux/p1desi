@@ -1,6 +1,6 @@
 import fitsio
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 def return_dataframe(
@@ -44,6 +44,8 @@ def save_dataframe_to_fits(
     filename,
     extname="QSO_CAT",
     clobber=True,
+    units=None,
+    add_checksum=False,
 ):
     """
     Save info from pandas dataframe in a fits file.
@@ -55,7 +57,20 @@ def save_dataframe_to_fits(
         None
     """
     fits = fitsio.FITS(filename, "rw", clobber=clobber)
-    fits.write(dataframe.to_records(index=False), extname=extname)
+    if units is not None:
+        fits.write(
+            dataframe.to_records(index=False),
+            extname=extname,
+            units=units,
+        )
+    else:
+        fits.write(
+            dataframe.to_records(index=False),
+            extname=extname,
+        )
+    if add_checksum:
+        fits[-1].write_checksum()
+        fits[-1].verify_checksum()
     fits.close()
 
 
