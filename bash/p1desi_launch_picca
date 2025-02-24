@@ -135,9 +135,18 @@ fi
 
 if [[ ${bal} == "None" ]]
 then
-bal_flag=""
+bal_flag1=""
+bal_flag2=""
+bal_flag3=""
+bal_flag4=""
+bal_flag5=""
 else
-bal_flag="BI max = "${bal}
+bal_flag1="type "${number_mask}" = BalMask"
+bal_flag2="[mask arguments "${number_mask}"]"
+bal_flag3="los_id name = TARGETID"
+bal_flag4="filename = "${cat}
+bal_flag5="bal index type = "${bal}
+number_mask=$((number_mask+1))
 fi
 
 if [[ ${use_bookkeeping} == "True" ]]
@@ -196,7 +205,6 @@ keep surveys = '"${surveys}"'
 use non-coadded spectra = '"${coadd_picca_flag}"'
 '"${single_exposure_flag1}"'
 '"${single_exposure_flag2}"'
-'"${bal_flag}"'
 
 [expected flux]
 type = Dr16ExpectedFlux
@@ -212,6 +220,7 @@ num corrections = 0
 num masks = '"${number_mask}"'
 '"${lines_flag1}"'
 '"${dla_flag1}"'
+'"${bal_flag1}"'
 
 
 '"${lines_flag2}"'
@@ -219,7 +228,12 @@ num masks = '"${number_mask}"'
 
 '"${dla_flag2}"'
 '"${dla_flag3}"'
-'"${dla_flag4}"'' > ${path_out}/delta_interface_${folder_name}
+'"${dla_flag4}"'
+
+'"${bal_flag2}"'
+'"${bal_flag3}"'
+'"${bal_flag4}"'
+'"${bal_flag5}"'' > ${path_out}/delta_interface_${folder_name}
 
 picca_delta_extraction.py ${path_out}/delta_interface_${folder_name}
 fi
