@@ -150,6 +150,132 @@ def plot_noise_power_ratio(
         )
 
 
+def plot_noise_power_ratio_bis(
+    pk,
+    use_diff=False,
+    out_name=None,
+    out_points=None,
+    plot_asymptote=True,
+    k_asymptote=3.10,
+    zmax=None,
+    **kwargs,
+):
+    figsize = utils.return_key(kwargs, "figsize", (11, 5))
+    ncol_legend = utils.return_key(kwargs, "ncol_legend", 2)
+    y_min = utils.return_key(kwargs, "y_min", 0.025)
+    y_max = utils.return_key(kwargs, "y_max", 0.05)
+    diff_y_min = utils.return_key(kwargs, "diff_y_min", -0.01)
+    diff_y_max = utils.return_key(kwargs, "diff_y_max", 0.15)
+    legend_size = utils.return_key(kwargs, "legend_size", 15)
+    fontsize = utils.return_key(kwargs, "fontsize", 16)
+    ticks_size = utils.return_key(kwargs, "ticks_size", 15)
+    cmap = utils.return_key(kwargs, "cmap", "rainbow")
+    if cmap == "rainbow":
+        color = cm.rainbow(np.linspace(0, 1, len(pk.zbin)))
+    else:
+        color = [f"C{i}" for i in range(len(pk.zbin))]
+
+    if use_diff:
+        noise = pk.p_diff
+        labelnoise = "diff"
+    else:
+        noise = pk.p_noise
+        labelnoise = "pipeline"
+
+    fig, ax = plt.subplots(1, 2, figsize=figsize)
+
+    z_arr, k_arr, praw_arr, pnoise_arr = [], [], [], []
+    zbins = []
+    for i, z in enumerate(pk.zbin):
+        if zmax is not None:
+            if z > zmax:
+                continue
+        zbins.append(z)
+        z_arr.append([z for i in range(len(pk.k[z]))])
+        k_arr.append(pk.k[z])
+        praw_arr.append(pk.p_raw[z])
+        pnoise_arr.append(noise[z])
+        ax[0].plot(pk.k[z], noise[z], ls="--", color=color[i])
+        ax[0].plot(pk.k[z], pk.p_raw[z], color=color[i])
+        ax[1].plot(pk.k[z], pk.p_raw[z] - noise[z], label=f"{z:.1f}", color=color[i])
+
+    z_arr, k_arr, praw_arr, pnoise_arr = (
+        np.concatenate(z_arr),
+        np.concatenate(k_arr),
+        np.concatenate(praw_arr),
+        np.concatenate(pnoise_arr),
+    )
+
+    ax[0].set_ylabel(r"$P~[\AA]$", fontsize=fontsize)
+
+    legend_elements = [
+        Line2D(
+            [],
+            [],
+            color=color[i],
+            marker=None,
+            linestyle="-",
+            label=f"z = {zbins[i]:.1f}",
+        )
+        for i in range(len(zbins))
+    ]
+    legend_elements = legend_elements + [
+        Line2D(
+            [], [], color="k", marker=None, linestyle="-", label=r"$P_{\mathrm{raw}}$"
+        ),
+        Line2D(
+            [],
+            [],
+            color="k",
+            marker=None,
+            linestyle="--",
+            label="$P_{\mathrm{" + labelnoise + "}}$",
+        ),
+    ]
+    ax[0].legend(
+        handles=legend_elements,
+        fontsize=legend_size,
+        ncol=ncol_legend,
+        loc="upper left",
+    )
+
+    ax[0].set_ylim(y_min, y_max)
+    ax[1].set_ylim(diff_y_min, diff_y_max)
+
+    ax[1].set_ylabel(
+        r"$P_{\mathrm{raw}} - P_{\mathrm{" + labelnoise + "}}[\AA]$", fontsize=fontsize
+    )
+
+    ax[0].set_xlabel("$k~[\AA^{-1}]$", fontsize=fontsize)
+    ax[1].set_xlabel("$k~[\AA^{-1}]$", fontsize=fontsize)
+
+    for i in [0, 1]:
+        ax[i].xaxis.set_tick_params(labelsize=ticks_size)
+        ax[i].yaxis.set_tick_params(labelsize=ticks_size)
+        ax[i].margins(x=0)
+
+    if plot_asymptote:
+        mean_pk_z = pk_io.MeanPkZ.init_from_pk(pk, zmax=zmax)
+        alpha, _ = mean_pk_z.compute_noise_asymptopte(k_asymptote, use_diff=use_diff)
+        empty_patch = [
+            mpatches.Patch(
+                color="none",
+                label=r"$\alpha =$" + f" {np.around(alpha,5)} " + "$\AA$         ",
+            )
+        ]
+        ax[1].legend(handles=empty_patch, fontsize=legend_size)
+
+    fig.tight_layout()
+    if out_name is not None:
+        fig.savefig(f"{out_name}.pdf", format="pdf")
+    if out_points is not None:
+        np.savetxt(
+            f"{out_name}.txt",
+            np.transpose(np.stack([z_arr, k_arr, praw_arr, pnoise_arr])),
+            header="REDSHIFT & WAVENUMBER [Ang^-1] & RAW POWER SPECTRA & NOISE POWER SPECTRA",
+        )
+
+
 def plot_noise_comparison(
     pk,
     out_name=None,
