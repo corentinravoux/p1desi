@@ -3,8 +3,14 @@ import struct
 import astropy.table as t
 import fitsio
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import RegularGridInterpolator, interp1d
+from scipy.signal import savgol_filter
 from scipy.stats import sem
+
+try:
+    import sgolay2
+except ImportError:
+    print("SGolay2 not installed, 2D smoothing of covariance matrix unavailable")
 
 from p1desi import utils
 
@@ -372,6 +378,110 @@ class Pk(object):
         self.err_noiseoverraw = err_noiseoverraw
         self.err_diffoverraw = err_diffoverraw
         self.err_diffovernoise = err_diffovernoise
+
+    def correct_noise_global(self, p_noise_miss_angstrom_global):
+        for z in self.zbin:
+            if self.velunits:
+                p_noise_corr = utils.kskmtokAA(p_noise_miss_angstrom_global, z=z)
+            else:
+                p_noise_corr = p_noise_miss_angstrom_global
+            self.p[z] = self.p[z] - (p_noise_corr / self.resocor[z])
+            self.norm_p[z] = (
+                self.norm_p[z] - self.k[z] * (p_noise_corr / self.resocor[z]) / np.pi
+            )
+            self.p_noise[z] = self.p_noise[z] - p_noise_corr
+
+    def posify_covariance_diagonal(self):
+        for _, z in enumerate(self.zbin):
+            nkbins = len(self.k[z])
+            covariance_matrix = self.cov[z].reshape(nkbins, nkbins)
+            positive_diagonal_covariance = posify_variance(np.diag(covariance_matrix))
+            np.fill_diagonal(covariance_matrix, positive_diagonal_covariance)
+            self.cov[z] = np.ravel(covariance_matrix)
+            if self.boot_cov is not None:
+                boot_covariance_matrix = self.boot_cov[z].reshape(nkbins, nkbins)
+                positive_diagonal_boot_covariance = posify_variance(
+                    np.diag(boot_covariance_matrix)
+                )
+                np.fill_diagonal(
+                    boot_covariance_matrix, positive_diagonal_boot_covariance
+                )
+                self.boot_cov[z] = np.ravel(boot_covariance_matrix)
+
+    def smooth_covariance_diagonal(
+        self,
+        smoothing_window=50,
+        smoothing_polynomial=5,
+    ):
+        for _, z in enumerate(self.zbin):
+            nkbins = len(self.k[z])
+            covariance_matrix = self.cov[z].reshape(nkbins, nkbins)
+            smooth_covariance_diagonal = smooth_variance(
+                np.diag(covariance_matrix),
+                smoothing_window,
+                smoothing_polynomial,
+            )
+            np.fill_diagonal(covariance_matrix, smooth_covariance_diagonal)
+            self.cov[z] = np.ravel(covariance_matrix)
+            if self.boot_cov is not None:
+                boot_covariance_matrix = self.boot_cov[z].reshape(nkbins, nkbins)
+                smooth_boot_covariance_diagonal = smooth_variance(
+                    np.diag(boot_covariance_matrix),
+                    smoothing_window,
+                    smoothing_polynomial,
+                )
+                np.fill_diagonal(
+                    boot_covariance_matrix, smooth_boot_covariance_diagonal
+                )
+                self.boot_cov[z] = np.ravel(boot_covariance_matrix)
+
+    def smooth_covariance(
+        self,
+        smooth_covariance_window=15,
+        smooth_covariance_order=5,
+        remove_diagonal=True,
+    ):
+
+        for _, z in enumerate(self.zbin):
+            nkbins = len(self.k[z])
+            covariance_matrix = self.cov[z].reshape(nkbins, nkbins)
+            self.cov[z] = np.ravel(
+                smooth_covariance(
+                    covariance_matrix,
+                    smooth_covariance_window,
+                    smooth_covariance_order,
+                    remove_diagonal=remove_diagonal,
+                )
+            )
+            if self.boot_cov is not None:
+                boot_covariance_matrix = self.boot_cov[z].reshape(nkbins, nkbins)
+                self.boot_cov[z] = np.ravel(
+                    smooth_covariance(
+                        boot_covariance_matrix,
+                        smooth_covariance_window,
+                        smooth_covariance_order,
+                        remove_diagonal=remove_diagonal,
+                    )
+                )
+
+    def correct_covariance(self):
+        self.posify_covariance_diagonal()
+        self.smooth_covariance_diagonal()
+        self.smooth_covariance()
+
+    def use_covariance_as_error(
+        self,
+        use_boot=True,
+    ):
+        for _, z in enumerate(self.zbin):
+            nkbins = len(self.k[z])
+            if use_boot:
+                covariance_matrix = self.boot_cov[z].reshape(nkbins, nkbins)
+            else:
+                covariance_matrix = self.cov[z].reshape(nkbins, nkbins)
+
+            self.err[z] = np.sqrt(np.diag(covariance_matrix))
+            self.norm_err[z] = self.k[z] * self.err[z] / np.pi
 
 
 class PkEboss(Pk):
@@ -816,3 +926,71 @@ class MeanPkK(object):
             )
         self.noiseoverdiff = noiseoverdiff
         self.err_noiseoverdiff = err_noiseoverdiff
+
+
+def posify_variance(variance):
+    if len(variance) == len(variance[np.isnan(variance)]):
+        return variance
+    elif len(variance) == len(variance[variance < 0.0]):
+        return variance
+    else:
+        mask_negative_variance = variance < 0.0
+        variance_indices = np.arange(len(variance))
+        interp_func = interp1d(
+            variance_indices[~mask_negative_variance],
+            variance[~mask_negative_variance],
+            kind="linear",
+            fill_value="extrapolate",
+        )
+        variance_positive = interp_func(variance_indices)
+        return variance_positive
+
+
+def smooth_variance(
+    variance,
+    smoothing_window,
+    smoothing_polynomial,
+):
+
+    window_filter = min(
+        smoothing_window,
+        int(3 * len(variance) / 4),
+    )
+    variance_smooth = np.exp(
+        savgol_filter(
+            np.log(variance),
+            window_filter,
+            smoothing_polynomial,
+        )
+    )
+    return variance_smooth
+
+
+def smooth_covariance(
+    covariance,
+    smooth_cov_window,
+    smooth_cov_order,
+    remove_diagonal=True,
+):
+    if remove_diagonal:
+        diag = np.copy(np.diag(covariance))
+        diag_for_smoothing = np.concatenate(
+            [
+                [(covariance[0, 1] + covariance[1, 0]) / 2],
+                [
+                    (covariance[i - 1, i + 1] + covariance[i + 1, i - 1]) / 2
+                    for i in range(1, len(diag) - 1)
+                ],
+                [(covariance[-1, -2] + covariance[-2, -1]) / 2],
+            ]
+        )
+        np.fill_diagonal(covariance, diag_for_smoothing)
+
+    covariance_smooth = sgolay2.SGolayFilter2(
+        window_size=smooth_cov_window,
+        poly_order=smooth_cov_order,
+    )(covariance)
+
+    if remove_diagonal:
+        np.fill_diagonal(covariance_smooth, diag)
+    return covariance_smooth

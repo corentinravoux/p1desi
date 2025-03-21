@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
-import sgolay2
 
 
 def compute_chi2(
@@ -10,24 +9,25 @@ def compute_chi2(
     kmin=0.0,
     kmax=2.0,
     zmin=2.1,
-    zmax=4.7,
-    use_boot=False,
+    zmax=4.3,
+    use_boot=True,
     extra_diag_errors=None,
+    extra_diag_factor=None,
     use_only_diag=False,
-    smooth_cov=True,
-    smooth_cov_window=15,
-    smooth_cov_order=5,
+    return_redshift_chi2=False,
 ):
 
+    zbin = mean_pk_ref.zbin[(mean_pk_ref.zbin > zmin) & (mean_pk_ref.zbin < zmax)]
+
+    if return_redshift_chi2:
+        chi2_list, ndof_list = [[] for _ in enumerate(zbin)], [
+            [] for _ in enumerate(zbin)
+        ]
     chi2_list, ndof_list = [], []
 
     for mean_pk in mean_pk_list:
-        zbin = mean_pk.zbin
         chi2 = 0.0
         ndof = 0
-        w = (zbin > zmin) & (zbin < zmax)
-        zbin = zbin[w]
-
         for i, z in enumerate(zbin):
 
             if use_only_diag:
@@ -36,6 +36,11 @@ def compute_chi2(
                 diag = mean_pk.err[z][mask] ** 2
                 if extra_diag_errors is not None:
                     diag += extra_diag_errors[z][mask]
+                elif extra_diag_factor is not None:
+                    if type(extra_diag_factor) == dict:
+                        diag = extra_diag_factor[z] * diag
+                    else:
+                        diag = extra_diag_factor * diag
                 cov = np.diag(diag)
                 vector = mean_pk.p[z][mask] - mean_pk_ref.p[z][mask]
 
@@ -47,6 +52,17 @@ def compute_chi2(
                         cov = mean_pk.cov[z].copy()
                     di = np.diag_indices(cov.shape[0])
                     cov[di] += extra_diag_errors[z]
+                elif extra_diag_factor is not None:
+                    if use_boot:
+                        cov = mean_pk.boot_cov[z].copy()
+                    else:
+                        cov = mean_pk.cov[z].copy()
+                    diag = np.diag(cov)
+                    if type(extra_diag_factor) == dict:
+                        np.fill_diagonal(cov, extra_diag_factor[z] * diag)
+                    else:
+                        np.fill_diagonal(cov, extra_diag_factor * diag)
+                    diag = extra_diag_factor * diag
                 else:
                     if use_boot:
                         cov = mean_pk.boot_cov[z]
@@ -67,21 +83,18 @@ def compute_chi2(
                 cov = cov.reshape(int(np.sqrt(cov.size)), int(np.sqrt(cov.size)))
 
                 vector = mean_pk.p[z][mask_pk] - mean_pk_ref.p[z][mask_pk]
-            if smooth_cov:
-                diag = np.copy(np.diag(cov))
-                np.fill_diagonal(cov, np.full_like(diag, 0.0))
-                cov = sgolay2.SGolayFilter2(
-                    window_size=smooth_cov_window, poly_order=smooth_cov_order
-                )(cov)
-                np.fill_diagonal(cov, diag)
 
             chi2_z = vector.dot(np.linalg.inv(cov).dot(vector))
+            if return_redshift_chi2:
+                chi2_list[i].append(chi2_z)
+                ndof_list[i].append(vector.size)
             chi2 += chi2_z
             ndof += vector.size
-        chi2_list.append(chi2)
-        ndof_list.append(ndof)
+        if not return_redshift_chi2:
+            chi2_list.append(chi2)
+            ndof_list.append(ndof)
 
-    return chi2_list, ndof_list
+    return chi2_list, ndof_list, zbin
 
 
 def getChi2Pdf(dof, sigma=3):
@@ -141,3 +154,33 @@ def plot_chi2(ndofs, chi2s, chi2s_ref=None, save=None):
                 np.transpose(np.stack([ndofs, chi2s])),
                 header="NDOF & CHI2",
             )
+
+
+def plot_chi2_z(ndofs, chi2s, zbin, figsize=(10, 10)):
+    fig = plt.figure(figsize=figsize)
+
+    for i, z in enumerate(zbin):
+        ax = fig.add_subplot(4, 4, i + 1)
+        kstest = scipy.stats.ks_1samp(
+            chi2s, scipy.stats.chi2(ndofs[0]).cdf, alternative="less"
+        )
+        kstest_two = scipy.stats.ks_1samp(chi2s, scipy.stats.chi2(ndofs[0]).cdf)
+        ax.hist(
+            chi2s[i],
+            bins=5,
+            density=True,
+            alpha=0.7,
+            label=r"$p$="
+            f"{kstest.pvalue:.2f} " + r"$p2s$="
+            f"{kstest_two.pvalue:.2f}",
+        )
+        x, f_x = getChi2Pdf(ndofs[i][0])
+        plt.plot(x, f_x, "k-", label=f"Expected ({int(ndofs[i][0]):d} dof)")
+        plt.legend()
+        ax.ticklabel_format(style="sci", axis="y", scilimits=(0, 0), useMathText=True)
+
+        ax.set_ylabel("PDF")
+        ax.set_xlabel("Chi-squared")
+        ax.set_title(
+            f"mean chi2 = {kstest_two.pvalue:.2f}, expected = {x[np.argmax(f_x)[0]]}"
+        )

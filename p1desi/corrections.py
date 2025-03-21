@@ -1,12 +1,16 @@
-import pickle, os, fitsio, glob
-import numpy as np
+import glob
+import os
+import pickle
 from functools import partial
-from p1desi import metals, utils, hcd
-from scipy.interpolate import interp1d
-import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
-from matplotlib import cm
 
+import fitsio
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import cm
+from scipy.interpolate import interp1d
+from scipy.optimize import curve_fit
+
+from p1desi import hcd, metals, utils
 
 ###################################################
 ############## Creating corrections ###############
@@ -254,7 +258,7 @@ def plot_and_compute_ratio_power(
         )
 
 
-def plot_and_compute_average_ratio_power(
+def plot_and_compute_average_ratio_power_resolution(
     pk,
     pk2,
     path_out,
@@ -263,6 +267,8 @@ def plot_and_compute_average_ratio_power(
     zmax,
     kmin_AA,
     kmax_AA,
+    derive_velcor=False,
+    zmax_velcor=None,
     **plt_args,
 ):
     k_tot, ratio_tot, err_tot = [], [], []
@@ -274,38 +280,39 @@ def plot_and_compute_average_ratio_power(
 
     plt.figure(figsize=(8, 5))
 
-    for z in pk.zbin[1:]:
-        if z < zmax:
-            if pk.velunits:
-                kmax = float(utils.kAAtokskm(kmax_AA, z=z))
-                kmin = float(utils.kAAtokskm(kmin_AA, z=z))
-            else:
-                kmax = kmax_AA
-                kmin = kmin_AA
+    zbins = pk.zbin[pk.zbin < zmax]
 
-            k = pk.k[z]
-            ratio = pk.norm_p[z] / pk2.norm_p[z]
-            err_ratio = (pk.norm_p[z] / pk2.norm_p[z]) * np.sqrt(
-                (pk.norm_err[z] / pk.norm_p[z]) ** 2
-                + (pk2.norm_err[z] / pk2.norm_p[z]) ** 2
-            )
-            mask = (
-                np.isnan(k)
-                | np.isnan(ratio)
-                | np.isnan(err_ratio)
-                | (k > kmax)
-                | (k < kmin)
-            )
+    for z in zbins:
+        if pk.velunits:
+            kmax = float(utils.kAAtokskm(kmax_AA, z=z))
+            kmin = float(utils.kAAtokskm(kmin_AA, z=z))
+        else:
+            kmax = kmax_AA
+            kmin = kmin_AA
 
-            k[mask] = np.nan
-            ratio[mask] = np.nan
-            err_ratio[mask] = np.nan
+        k = pk.k[z]
+        ratio = pk.norm_p[z] / pk2.norm_p[z]
+        err_ratio = (pk.norm_p[z] / pk2.norm_p[z]) * np.sqrt(
+            (pk.norm_err[z] / pk.norm_p[z]) ** 2
+            + (pk2.norm_err[z] / pk2.norm_p[z]) ** 2
+        )
+        mask = (
+            np.isnan(k)
+            | np.isnan(ratio)
+            | np.isnan(err_ratio)
+            | (k > kmax)
+            | (k < kmin)
+        )
 
-            plt.plot(k, ratio, alpha=0.5, ls=":", color=f"k")
+        k[mask] = np.nan
+        ratio[mask] = np.nan
+        err_ratio[mask] = np.nan
 
-            k_tot.append(k)
-            ratio_tot.append(ratio)
-            err_tot.append(err_ratio)
+        plt.plot(k, ratio, alpha=0.5, ls=":", color=f"k")
+
+        k_tot.append(k)
+        ratio_tot.append(ratio)
+        err_tot.append(err_ratio)
 
     k_tot = np.nanmean(k_tot, axis=0)
     ratio_tot = np.nanmean(ratio_tot, axis=0)
@@ -319,10 +326,22 @@ def plot_and_compute_average_ratio_power(
         k_tot, ratio_tot, err_tot, marker=".", markersize=10, ls="None", color="C0"
     )
 
-    func = lambda k, a, b, c: a * k**2 + b * k + c
-    param = curve_fit(func, k_tot, ratio_tot, sigma=err_tot, p0=[0, 0, 0])[0]
+    param = curve_fit(
+        model_resolution_desi, k_tot, ratio_tot, sigma=err_tot, p0=[0, 1.0, 0]
+    )[0]
     k = np.linspace(np.min(k_tot), np.max(k_tot), 1000)
-    plt.plot(k, np.poly1d(param)(k))
+    if derive_velcor:
+        param_kms = []
+        zbins_velcor = pk.zbin[pk.zbin < zmax_velcor]
+        for i, z in enumerate(zbins_velcor):
+            param_kms.append(
+                [
+                    param[0],
+                    param[1],
+                    param[2] * utils.return_conversion_factor(z),
+                ]
+            )
+    plt.plot(k, model_resolution_desi(k, *param))
 
     plt.ylabel(
         r"$\langle P_{1\mathrm{D},\alpha,\mathrm{RAW}} / P_{1\mathrm{D},\alpha,\mathrm{CCD}} \rangle_z$",
@@ -361,6 +380,14 @@ def plot_and_compute_average_ratio_power(
             param,
             open(os.path.join(path_out, f"{name_correction}_{suffix}.pickle"), "wb"),
         )
+        if derive_velcor:
+            pickle.dump(
+                param_kms,
+                open(
+                    os.path.join(path_out, f"{name_correction}_{suffix}_kms.pickle"),
+                    "wb",
+                ),
+            )
         np.savetxt(
             os.path.join(path_out, f"{name_correction}_{suffix}.txt"),
             np.transpose(np.stack([k_tot, ratio_tot, err_tot])),
@@ -374,6 +401,29 @@ def plot_and_compute_average_ratio_power(
 
 
 ######### Corrections masking + continuum #########
+
+
+def model_resolution_desi(k, a, b, c):
+    return a - b * np.exp(c * k)
+
+
+def load_model_resolution_desi(a, b, c):
+    def func(k):
+        return model_resolution_desi(k, a, b, c)
+
+    return func
+
+
+def prepare_bal_correction(zbins, file_correction_bal):
+    param_bal = pickle.load(open(file_correction_bal, "rb"))
+    A_bal = {}
+    for iz, z in enumerate(zbins):
+        if iz >= len(param_bal):
+            print(f"Redshift bin {z} have no bal correction")
+            A_bal[z] = np.poly1d(1)
+        else:
+            A_bal[z] = np.poly1d(param_bal[iz])
+    return A_bal
 
 
 def prepare_hcd_correction(zbins, file_correction_hcd):
@@ -413,10 +463,18 @@ def prepare_cont_correction(zbins, file_correction_cont):
 
 
 def prepare_resolution_correction(zbins, file_correction_resolution):
-    param_cont = pickle.load(open(file_correction_resolution, "rb"))
+    param_res = pickle.load(open(file_correction_resolution, "rb"))
     A_resolution = {}
-    for _, z in enumerate(zbins):
-        A_resolution[z] = np.poly1d(param_cont)
+    if np.array(param_res).ndim == 1:
+        for _, z in enumerate(zbins):
+            A_resolution[z] = load_model_resolution_desi(*param_res)
+    else:
+        for iz, z in enumerate(zbins):
+            if iz >= len(param_res):
+                print(f"Redshift bin {z} have no resoltution correction")
+                A_resolution[z] = np.poly1d(1)
+            else:
+                A_resolution[z] = load_model_resolution_desi(*param_res[iz])
     return A_resolution
 
 
@@ -616,6 +674,7 @@ def apply_p1d_corections(
     file_correction_cont=None,
     file_correction_cont_eboss=None,
     file_correction_resolution=None,
+    file_correction_bal=None,
     file_metal=None,
     file_metal_eboss=None,
 ):

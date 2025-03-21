@@ -1,6 +1,7 @@
+from functools import partial
+
 import numpy as np
 from matplotlib.ticker import FuncFormatter
-from functools import partial
 
 lambdaLy = 1215.673123130217
 
@@ -27,11 +28,16 @@ def return_key(dictionary, string, default_value):
     return dictionary[string] if string in dictionary.keys() else default_value
 
 
+def return_conversion_factor(z):
+    return speed_light / (1 + z) / lambdaLy
+
+
 def kAAtokskm(x, z=2.2):
-    return x / (speed_light / (1 + z) / lambdaLy)
+    return x / return_conversion_factor(z)
+
 
 def kskmtokAA(x, z=2.2):
-    return x * (speed_light / (1 + z) / lambdaLy)
+    return x * return_conversion_factor(z)
 
 
 def kAAtokskm_label(x, pos=None, z=2.2):
@@ -46,8 +52,6 @@ def kskmtokAA_label(x, pos=None, z=2.2):
     knew = float(kstr) * (speed_light / (1 + z) / lambdaLy)
     transformed_label = "{:.3f}".format(knew)
     return transformed_label
-
-
 
 
 def place_k_speed_unit_axis(fig, ax, fontsize=None, size=None, pos=0.2):

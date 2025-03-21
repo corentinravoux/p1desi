@@ -130,9 +130,7 @@ def fit_model_SB1_indiv(
     return param, cov
 
 
-def init_side_band_power(pSB1_name, pSB2_name, zmax):
-    pSB1 = pk_io.Pk.read_from_picca(pSB1_name)
-    pSB2 = pk_io.Pk.read_from_picca(pSB2_name)
+def init_side_band_power(pSB1, pSB2, zmax):
 
     velunits = pSB1.velunits
 
@@ -181,7 +179,7 @@ def init_side_band_power(pSB1_name, pSB2_name, zmax):
         len(pkrestSB2)
     )
 
-    return pSB1, mean_dict
+    return mean_dict
 
 
 def fit_mean_side_band_rest(
@@ -269,30 +267,38 @@ def plot_side_band_fit(
     ylabel_1 = utils.return_key(
         kwargs,
         "ylabel_1",
-        r"$P_{\mathrm{SB}}~[\mathrm{km}\cdot\mathrm{s}^{-1}]$"
-        if pSB1.velunits
-        else r"$P_{\mathrm{SB}}~[\AA]$",
+        (
+            r"$P_{\mathrm{SB}}~[\mathrm{km}\cdot\mathrm{s}^{-1}]$"
+            if pSB1.velunits
+            else r"$P_{\mathrm{SB}}~[\AA]$"
+        ),
     )
     ylabel_2 = utils.return_key(
         kwargs,
         "ylabel_2",
-        r"$P_{\mathrm{SB1}}~[\mathrm{km}\cdot\mathrm{s}^{-1}]$"
-        if pSB1.velunits
-        else r"$P_{\mathrm{SB1}}~[\AA]$",
+        (
+            r"$P_{\mathrm{SB1}}~[\mathrm{km}\cdot\mathrm{s}^{-1}]$"
+            if pSB1.velunits
+            else r"$P_{\mathrm{SB1}}~[\AA]$"
+        ),
     )
     xlabel_1 = utils.return_key(
         kwargs,
         "xlabel_1",
-        r"$k~[\mathrm{s}\cdot\mathrm{km}^{-1}]$"
-        if pSB1.velunits
-        else r"$k_{\mathrm{rest}}=k_{\mathrm{obs}}(1+z)~[\mathrm{\AA}^{-1}]$",
+        (
+            r"$k~[\mathrm{s}\cdot\mathrm{km}^{-1}]$"
+            if pSB1.velunits
+            else r"$k_{\mathrm{rest}}=k_{\mathrm{obs}}(1+z)~[\mathrm{\AA}^{-1}]$"
+        ),
     )
     xlabel_2 = utils.return_key(
         kwargs,
         "xlabel_2",
-        r"$k~[\mathrm{s}\cdot\mathrm{km}^{-1}]$"
-        if pSB1.velunits
-        else r"$k_{\mathrm{obs}}~[\mathrm{\AA}^{-1}]$",
+        (
+            r"$k~[\mathrm{s}\cdot\mathrm{km}^{-1}]$"
+            if pSB1.velunits
+            else r"$k_{\mathrm{obs}}~[\mathrm{\AA}^{-1}]$"
+        ),
     )
 
     fig, ax = plt.subplots(2, 1, figsize=figsize, sharex=False)
@@ -439,9 +445,129 @@ def plot_side_band_fit(
         )
 
 
+def plot_side_band_fit_bis(
+    name_out,
+    plot_P,
+    pSB1,
+    zmax,
+    param_SB1_mean,
+    param_SB1_indiv,
+    nb_bins,
+    kmax,
+    kmin,
+    save_txt=None,
+    **kwargs,
+):
+    style = utils.return_key(kwargs, "style", None)
+    if style is not None:
+        plt.style.use(style)
+
+    figsize = utils.return_key(kwargs, "figsize", (9, 9))
+    ncol_legend = utils.return_key(kwargs, "ncol_legend", 2)
+    size_legend = utils.return_key(kwargs, "size_legend", 11)
+    fontsize = utils.return_key(kwargs, "fontsize", 15)
+    size = utils.return_key(kwargs, "size", 14)
+    markersize = utils.return_key(kwargs, "markersize", 8)
+
+    ylim = utils.return_key(kwargs, "ylim", [-0.01, 0.05] if plot_P else [-0.001, 0.02])
+
+    ylabel = utils.return_key(
+        kwargs,
+        "ylabel_2",
+        (
+            r"$P_{\mathrm{SB1}}~[\mathrm{km}\cdot\mathrm{s}^{-1}]$"
+            if pSB1.velunits
+            else r"$P_{\mathrm{SB1}}~[\AA]$"
+        ),
+    )
+    xlabel = utils.return_key(
+        kwargs,
+        "xlabel_2",
+        (
+            r"$k~[\mathrm{s}\cdot\mathrm{km}^{-1}]$"
+            if pSB1.velunits
+            else r"$k~[\mathrm{\AA}^{-1}]$"
+        ),
+    )
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize, sharex=False)
+
+    color = cm.rainbow(np.linspace(0, 1, len(pSB1.zbin[pSB1.zbin < zmax])))
+
+    z_arr, k_arr, p_arr, err_arr = [], [], [], []
+    for i, z in enumerate(pSB1.zbin):
+        if z < zmax:
+            k_fit = np.linspace(np.nanmin(pSB1.k[z]), kmax, nb_bins)
+            if pSB1.velunits:
+                model_fitted = model_SB1_indiv_kms(
+                    param_SB1_mean,
+                    param_SB1_indiv[i][0],
+                    param_SB1_indiv[i][1],
+                    k_fit,
+                )
+            else:
+                model_fitted = model_SB1_indiv(
+                    param_SB1_mean,
+                    z,
+                    param_SB1_indiv[i][0],
+                    param_SB1_indiv[i][1],
+                    k_fit,
+                )
+            if plot_P:
+                p_plot = pSB1.p[z]
+                err_plot = pSB1.err[z]
+                p_plot_fit = model_fitted
+            else:
+                p_plot = pSB1.norm_p[z]
+                err_plot = pSB1.norm_err[z]
+                p_plot_fit = k_fit * model_fitted / np.pi
+            ax.errorbar(
+                pSB1.k[z],
+                p_plot,
+                err_plot,
+                label=f"z = {z:.1f} ({pSB1.number_chunks[z]} chunks)",
+                marker=".",
+                ls="None",
+                color=color[i],
+                markersize=markersize,
+            )
+            ax.plot(k_fit, p_plot_fit, color=color[i])
+
+            z_arr.append([z for i in range(len(pSB1.k[z]))])
+            k_arr.append(pSB1.k[z])
+            p_arr.append(p_plot)
+            err_arr.append(err_plot)
+
+    z_arr, k_arr, p_arr, err_arr = (
+        np.concatenate(z_arr),
+        np.concatenate(k_arr),
+        np.concatenate(p_arr),
+        np.concatenate(err_arr),
+    )
+
+    ax.set_ylim(ylim)
+    ax.set_xlim([kmin, kmax])
+
+    ax.legend(ncol=ncol_legend, fontsize=size_legend)
+    ax.set_ylabel(ylabel, fontsize=fontsize)
+    ax.set_xlabel(xlabel, fontsize=fontsize)
+    ax.tick_params("x", labelsize=size)
+    ax.tick_params("y", labelsize=size)
+
+    plt.tight_layout()
+    plt.savefig(name_out)
+
+    if save_txt is not None:
+        np.savetxt(
+            f"{save_txt}.txt",
+            np.transpose(np.stack([z_arr, k_arr, p_arr, err_arr])),
+            header="REDSHIFT & SB1 INDIV WAVENUMBER [Ang^-1] & SB1 INDIV POWER SPECTRUM & SB1 INDIV ERROR",
+        )
+
+
 def fit_and_plot_side_band(
-    pSB1_name,
-    pSB2_name,
+    pSB1,
+    pSB2,
     name_out,
     zmax,
     nb_bins,
@@ -455,7 +581,7 @@ def fit_and_plot_side_band(
     save_txt=None,
     **plt_args,
 ):
-    pSB1, mean_dict = init_side_band_power(pSB1_name, pSB2_name, zmax)
+    mean_dict = init_side_band_power(pSB1, pSB2, zmax)
 
     (
         param_SB1_mean,
