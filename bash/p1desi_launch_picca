@@ -298,7 +298,7 @@ fi
 
 if [[ ${compute_cov} == "True" ]]
 then
-cov_flag="--covariance --bootstrap --nbootstrap "${nbboot}
+cov_flag="--covariance --bootstrap --nbootstrap "${nbboot}" --bootstrap_average"
 else
 cov_flag=""
 fi

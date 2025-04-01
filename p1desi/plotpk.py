@@ -11,7 +11,6 @@ import fitsio
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
-
 from matplotlib import cm
 from matplotlib.lines import Line2D
 from scipy.interpolate import interp1d
@@ -61,6 +60,7 @@ def plot(
         elif analysis_type == "y1":
             function_uncertainty = uncertainty.prepare_uncertainty_systematics_y1
         (
+            _,
             syste_tot,
             list_systematics,
             list_systematics_name,
@@ -248,6 +248,7 @@ def plot_comparison(
         elif analysis_type == "y1":
             function_uncertainty = uncertainty.prepare_uncertainty_systematics_y1
         (
+            _,
             syste_tot,
             list_systematics,
             list_systematics_name,
@@ -305,7 +306,9 @@ def plot_comparison(
             if systematics_file is not None:
                 syst = (pk_to_plot.k[z] * syste_tot[z] / np.pi)[mask_k]
                 for syst_indiv in list_systematics:
-                    list_systematics_z.append((pk_to_plot.k[z] * syst_indiv[z] / np.pi)[mask_k])
+                    list_systematics_z.append(
+                        (pk_to_plot.k[z] * syst_indiv[z] / np.pi)[mask_k]
+                    )
 
             p2 = pk2.norm_p[z][mask_k2]
             error_bar2 = pk2.norm_err[z][mask_k2]
@@ -334,7 +337,9 @@ def plot_comparison(
                 means_syst = binned_statistic(k, syst, bins=k2_edges, statistic="mean")
                 syst = means_syst.statistic / np.sqrt(number.statistic)
 
-                means_syst = binned_statistic(k, syst_comp, bins=k2_edges, statistic="mean")
+                means_syst = binned_statistic(
+                    k, syst_comp, bins=k2_edges, statistic="mean"
+                )
                 syst_comp = means_syst.statistic / np.sqrt(number.statistic)
 
                 for j in range(len(list_systematics_z)):
@@ -657,12 +662,10 @@ def save_p1d(
     zmax,
     output_name,
     zedge_bin=0.2,
-    smooth_covstat=True,
-    smooth_cov_window=15,
-    smooth_cov_order=5,
     blinding="desi_y1",
     analysis_type="y1",
     use_boot=True,
+    verify_cov=True,
 ):
 
     zbin_save = mean_pk.zbin[mean_pk.zbin < zmax]
@@ -696,17 +699,12 @@ def save_p1d(
     else:
         cov = block_diag(*[mean_pk.cov[z].reshape(n_k, n_k) for z in zbin_save])
 
-    if smooth_covstat:
-        cov = uncertainty.smooth_covariance(
-            cov,
-            smooth_cov_window=smooth_cov_window,
-            smooth_cov_order=smooth_cov_order,
-        )
     if analysis_type == "edr":
         function_uncertainty = uncertainty.prepare_uncertainty_systematics
     elif analysis_type == "y1":
         function_uncertainty = uncertainty.prepare_uncertainty_systematics_y1
     (
+        _,
         syste_tot,
         list_systematics,
         list_systematics_name,
@@ -872,6 +870,29 @@ def save_p1d(
     else:
         units = ["AA^2"]
 
+    if verify_cov:
+        eig_full = np.linalg.eigvals(full_cov)
+        if len([eig_full[eig_full < 0.0]]):
+            print(
+                "Full covariance matrix has negative eigenvalues",
+                "First ten values:",
+                eig_full[eig_full < 0.0][:10],
+            )
+        eig = np.linalg.eigvals(cov)
+        if len([eig[eig < 0.0]]):
+            print(
+                "Statistical covariance matrix has negative eigenvalues",
+                "First ten values:",
+                eig[eig < 0.0][:10],
+            )
+        eig_syst = np.linalg.eigvals(cov_syst)
+        if len([eig_syst[eig_syst < 0.0]]):
+            print(
+                "Systematics covariance matrix has negative eigenvalues",
+                "First ten values:",
+                eig_syst[eig_syst < 0.0][:10],
+            )
+
     fits.write(full_cov, header=header, units=units, extname="COVARIANCE")
     fits.write(cov, header=header, units=units, extname="COVARIANCE_STAT")
     fits.write(cov_syst, header=header, units=units, extname="COVARIANCE_SYST")
@@ -945,6 +966,7 @@ def plot_three_comparison(
         elif analysis_type == "y1":
             function_uncertainty = uncertainty.prepare_uncertainty_systematics_y1
         (
+            _,
             syste_tot,
             list_systematics,
             list_systematics_name,
@@ -1519,7 +1541,6 @@ def plot_variations(
         )
 
 
-
 def plot_three_comparison_bis(
     pk,
     pk2,
@@ -1574,6 +1595,7 @@ def plot_three_comparison_bis(
         elif analysis_type == "y1":
             function_uncertainty = uncertainty.prepare_uncertainty_systematics_y1
         (
+            _,
             syste_tot,
             _,
             _,
@@ -1587,7 +1609,6 @@ def plot_three_comparison_bis(
         if pk_low_z is not None:
             if z < z_change:
                 pk_to_plot = pk_low_z
-
 
         if pk_to_plot.velunits:
             kmax = float(utils.kAAtokskm(kmax_AA, z=z))
@@ -1645,7 +1666,6 @@ def plot_three_comparison_bis(
 
             k_resample = (means.bin_edges[:-1] + means.bin_edges[1:]) / 2.0
 
-
         if systematics_file is not None:
             error_bar = np.sqrt(stat**2 + syst**2)
         else:
@@ -1698,9 +1718,8 @@ def plot_three_comparison_bis(
 
         ratio2 = p_interp / p3_interp
         err_ratio2 = (p_interp / p3_interp) * np.sqrt(
-                (error_bar_resample / p_interp) ** 2
-                + (err_p3_interp / p3_interp) ** 2
-            )
+            (error_bar_resample / p_interp) ** 2 + (err_p3_interp / p3_interp) ** 2
+        )
         zarr.append(np.array([z for j in range(len(k))]))
         karr.append(k)
 
@@ -1846,7 +1865,6 @@ def plot_three_comparison_bis(
             header=header,
         )
     return (fig, ax)
-
 
 
 def print_data_numbers(

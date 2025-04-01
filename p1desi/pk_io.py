@@ -464,10 +464,46 @@ class Pk(object):
                     )
                 )
 
-    def correct_covariance(self):
+    def multiplicative_covariance_correction(
+        self,
+        correction_term=0.85,
+    ):
+        for _, z in enumerate(self.zbin):
+            if type(correction_term) == dict:
+                correction = correction_term[z]
+            else:
+                correction = correction_term
+            nkbins = len(self.k[z])
+            covariance_matrix = self.cov[z].reshape(nkbins, nkbins)
+            covariance_matrix *= correction
+            self.cov[z] = np.ravel(covariance_matrix)
+            if self.boot_cov is not None:
+                boot_covariance_matrix = self.boot_cov[z].reshape(nkbins, nkbins)
+                boot_covariance_matrix *= correction
+                self.boot_cov[z] = np.ravel(boot_covariance_matrix)
+
+    def correct_covariance(
+        self,
+        smoothing_variance_window=50,
+        smoothing_variance_order=5,
+        smooth_covariance_window=15,
+        smooth_covariance_order=5,
+        smooth_covariance_remove_diagonal=True,
+        correction_covariance_term=0.85,
+    ):
         self.posify_covariance_diagonal()
-        self.smooth_covariance_diagonal()
-        self.smooth_covariance()
+        self.smooth_covariance_diagonal(
+            smoothing_window=smoothing_variance_window,
+            smoothing_polynomial=smoothing_variance_order,
+        )
+        self.smooth_covariance(
+            smooth_covariance_window=smooth_covariance_window,
+            smooth_covariance_order=smooth_covariance_order,
+            remove_diagonal=smooth_covariance_remove_diagonal,
+        )
+        self.multiplicative_covariance_correction(
+            correction_term=correction_covariance_term,
+        )
 
     def use_covariance_as_error(
         self,

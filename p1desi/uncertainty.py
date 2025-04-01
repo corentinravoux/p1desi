@@ -3,12 +3,12 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from p1desi import corrections, hcd, pk_io, utils
+from p1desi import corrections, hcd, utils
 
 
 def create_uncertainty_systematics(
+    wavenumber,
     syste_noise,
     syste_reso,
     syste_resocorrection,
@@ -22,6 +22,7 @@ def create_uncertainty_systematics(
 ):
     pickle.dump(
         (
+            wavenumber,
             syste_noise,
             syste_reso,
             syste_resocorrection,
@@ -40,6 +41,7 @@ def prepare_uncertainty_systematics(
     file_systematics,
 ):
     (
+        wavenumber,
         syste_noise,
         syste_reso,
         syste_resocorrection,
@@ -70,10 +72,11 @@ def prepare_uncertainty_systematics(
         "Continuum",
         "DLA completeness",
     ]
-    return syste_tot, list_systematics, list_systematics_name
+    return wavenumber, syste_tot, list_systematics, list_systematics_name
 
 
 def create_uncertainty_systematics_y1(
+    wavenumber,
     syste_reso,
     syste_resocorrection,
     syste_sb,
@@ -88,6 +91,7 @@ def create_uncertainty_systematics_y1(
 ):
     pickle.dump(
         (
+            wavenumber,
             syste_reso,
             syste_resocorrection,
             syste_sb,
@@ -107,6 +111,7 @@ def prepare_uncertainty_systematics_y1(
     file_systematics,
 ):
     (
+        wavenumber,
         syste_reso,
         syste_resocorrection,
         syste_sb,
@@ -140,7 +145,7 @@ def prepare_uncertainty_systematics_y1(
         "DLA completeness",
         "BAL completeness",
     ]
-    return syste_tot, list_systematics, list_systematics_name
+    return wavenumber, syste_tot, list_systematics, list_systematics_name
 
 
 def plot_stat_uncertainties(
@@ -297,6 +302,7 @@ def plot_syst_uncertainties(
     A_reso = corrections.prepare_resolution_correction(zbins, resolution_coeff_fit)
 
     (
+        wavenumber_systematics,
         syste_noise,
         syste_reso,
         syste_resocorrection,
@@ -306,7 +312,7 @@ def plot_syst_uncertainties(
         syste_continuum,
         syste_dla_completeness,
         syste_tot,
-    ) = ({}, {}, {}, {}, {}, {}, {}, {}, {})
+    ) = ({}, {}, {}, {}, {}, {}, {}, {}, {}, {})
 
     for iz, z in enumerate(zbins):
         syste_tot[z] = []
@@ -391,6 +397,7 @@ def plot_syst_uncertainties(
         ax[8][1].plot(pk.k[z], syste_tot[z] / pk.err[z], color=colors[iz])
         ax[8][0].plot(pk.k[z], syste_tot[z], color=colors[iz])
         ax[8][0].set_title("Total", x=title_shift, y=title_yshift, fontsize=title_size)
+        wavenumber_systematics[z] = pk.k[z]
 
     ax[0][0].set_xlim(kmin, kmax)
 
@@ -438,6 +445,7 @@ def plot_syst_uncertainties(
         plt.savefig(f"{outname}.pdf")
         name_file = f"{outname}.pickle"
     create_uncertainty_systematics(
+        wavenumber_systematics,
         syste_noise,
         syste_reso,
         syste_resocorrection,
@@ -500,6 +508,7 @@ def plot_syst_uncertainties_y1(
     A_reso = corrections.prepare_resolution_correction(zbins, resolution_coeff_fit)
 
     (
+        wavenumber_systematics,
         syste_reso,
         syste_resocorrection,
         syste_sb,
@@ -510,7 +519,7 @@ def plot_syst_uncertainties_y1(
         syste_dla_completeness,
         syste_bal_completeness,
         syste_tot,
-    ) = ({}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+    ) = ({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
 
     for iz, z in enumerate(zbins):
         pk_to_plot = pk
@@ -721,6 +730,7 @@ def plot_syst_uncertainties_y1(
         )
         ax[9][0].plot(pk_to_plot.k[z], syste_tot[z], color=colors[iz])
         ax[9][0].set_title("Total", x=title_shift, y=title_yshift, fontsize=title_size)
+        wavenumber_systematics[z] = pk_to_plot.k[z]
 
     ax[0][0].set_xlim(kmin, kmax)
 
@@ -768,6 +778,7 @@ def plot_syst_uncertainties_y1(
         plt.savefig(f"{outname}.pdf")
         name_file = f"{outname}.pickle"
     create_uncertainty_systematics_y1(
+        wavenumber_systematics,
         syste_reso,
         syste_resocorrection,
         syste_sb,

@@ -204,6 +204,28 @@ def plot_and_compute_ratio_power(
                 axplt.plot(k_th, func(k_th, *popt), color=f"C{i}")
                 params.append(popt)
 
+            elif model == "skylines":
+                model_skylines_desi
+                popt, _ = curve_fit(
+                    model_skylines_desi,
+                    xdata=k,
+                    ydata=ratio,
+                    sigma=err_ratio,
+                    p0=[1.0, 1.0, 1.0, 1.0],
+                    bounds=(
+                        [-np.inf, -np.inf, -np.inf, -np.inf],
+                        [np.inf, np.inf, np.inf, np.inf],
+                    ),
+                )
+                k_th = np.linspace(np.min(k), np.max(k), 2000)
+                axplt.plot(
+                    k_th,
+                    model_skylines_desi(k_th, *popt),
+                    color=colors[i],
+                    ls="--",
+                )
+                params.append(popt)
+
     z_arr, k_arr, ratio_arr, err_arr = (
         np.concatenate(z_arr),
         np.concatenate(k_arr),
@@ -256,6 +278,7 @@ def plot_and_compute_ratio_power(
             np.transpose(np.stack([z_arr, k_arr, ratio_arr, err_arr])),
             header="REDSHIFT & WAVENUMBER [Ang^-1] & RATIO POWER SPECTRA & ERROR RATIO",
         )
+    return params
 
 
 def plot_and_compute_average_ratio_power_resolution(
@@ -401,6 +424,10 @@ def plot_and_compute_average_ratio_power_resolution(
 
 
 ######### Corrections masking + continuum #########
+
+
+def model_skylines_desi(k, a, b, c, d):
+    return (a + b * k) / (c + d * k)
 
 
 def model_resolution_desi(k, a, b, c):
