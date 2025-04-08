@@ -89,7 +89,7 @@ class Pk(object):
         self.boot_cov = boot_cov
 
     @classmethod
-    def read_from_picca(cls, name_file):
+    def read_from_picca(cls, name_file,use_bootstrap_average_covariance=False):
         minrescor = {}
         maxrescor = {}
         number_chunks = {}
@@ -203,7 +203,10 @@ class Pk(object):
                 cov_k1[zbin] = np.array(covariance[w]["k1"])
                 cov_k2[zbin] = np.array(covariance[w]["k2"])
                 cov[zbin] = np.array(covariance[w]["covariance"])
-                boot_cov[zbin] = np.array(covariance[w]["boot_covariance"])
+                if use_bootstrap_average_covariance:
+                    boot_cov[zbin] = np.array(covariance[w]["boot_average_covariance"])
+                else:
+                    boot_cov[zbin] = np.array(covariance[w]["boot_covariance"])
 
         return cls(
             velunits=velunits,
@@ -408,6 +411,22 @@ class Pk(object):
                 )
                 self.boot_cov[z] = np.ravel(boot_covariance_matrix)
 
+    def regularize_covariance(
+        self,
+        eigval_min=1e-10,
+    ):
+        for _, z in enumerate(self.zbin):
+            nkbins = len(self.k[z])
+            covariance_matrix = self.cov[z].reshape(nkbins, nkbins)
+            self.cov[z] = np.ravel(
+                regularize_covariance(covariance_matrix, eigval_min=eigval_min)
+            )
+            if self.boot_cov is not None:
+                boot_covariance_matrix = self.boot_cov[z].reshape(nkbins, nkbins)
+                self.boot_cov[z] = np.ravel(
+                    regularize_covariance(boot_covariance_matrix, eigval_min=eigval_min)
+                )
+
     def smooth_covariance_diagonal(
         self,
         smoothing_window=50,
@@ -466,7 +485,7 @@ class Pk(object):
 
     def multiplicative_covariance_correction(
         self,
-        correction_term=0.85,
+        correction_term=0.9,
     ):
         for _, z in enumerate(self.zbin):
             if type(correction_term) == dict:
@@ -489,7 +508,8 @@ class Pk(object):
         smooth_covariance_window=15,
         smooth_covariance_order=5,
         smooth_covariance_remove_diagonal=True,
-        correction_covariance_term=0.85,
+        correction_covariance_term=0.9,
+        eigval_min=1e-10,
     ):
         self.posify_covariance_diagonal()
         self.smooth_covariance_diagonal(
@@ -504,6 +524,7 @@ class Pk(object):
         self.multiplicative_covariance_correction(
             correction_term=correction_covariance_term,
         )
+        self.regularize_covariance(eigval_min=eigval_min)
 
     def use_covariance_as_error(
         self,
@@ -1030,3 +1051,15 @@ def smooth_covariance(
     if remove_diagonal:
         np.fill_diagonal(covariance_smooth, diag)
     return covariance_smooth
+
+
+def regularize_covariance(
+    covariance,
+    eigval_min=1e-10,
+):
+    if np.isfinite(covariance).all():
+        eigval, eigvec = np.linalg.eig(covariance)
+        eigval[eigval < 0.0] = eigval_min
+        covariance_regularized = eigvec @ np.diag(eigval) @ np.linalg.inv(eigvec)
+        return covariance_regularized
+    return covariance

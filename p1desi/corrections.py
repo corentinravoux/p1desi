@@ -205,7 +205,6 @@ def plot_and_compute_ratio_power(
                 params.append(popt)
 
             elif model == "skylines":
-                model_skylines_desi
                 popt, _ = curve_fit(
                     model_skylines_desi,
                     xdata=k,
@@ -221,6 +220,26 @@ def plot_and_compute_ratio_power(
                 axplt.plot(
                     k_th,
                     model_skylines_desi(k_th, *popt),
+                    color=colors[i],
+                    ls="--",
+                )
+                params.append(popt)
+            elif model == "resolution_desi":
+                popt, _ = curve_fit(
+                    model_resolution_desi,
+                    xdata=k,
+                    ydata=ratio,
+                    sigma=err_ratio,
+                    p0=[1.0, 1.0],
+                    bounds=(
+                        [-np.inf, -np.inf],
+                        [np.inf, np.inf],
+                    ),
+                )
+                k_th = np.linspace(np.min(k), np.max(k), 2000)
+                axplt.plot(
+                    k_th,
+                    model_resolution_desi(k_th, *popt),
                     color=colors[i],
                     ls="--",
                 )
@@ -350,7 +369,7 @@ def plot_and_compute_average_ratio_power_resolution(
     )
 
     param = curve_fit(
-        model_resolution_desi, k_tot, ratio_tot, sigma=err_tot, p0=[0, 1.0, 0]
+        model_resolution_desi, k_tot, ratio_tot, sigma=err_tot, p0=[1.0, 1.0]
     )[0]
     k = np.linspace(np.min(k_tot), np.max(k_tot), 1000)
     if derive_velcor:
@@ -430,13 +449,13 @@ def model_skylines_desi(k, a, b, c, d):
     return (a + b * k) / (c + d * k)
 
 
-def model_resolution_desi(k, a, b, c):
-    return a - b * np.exp(c * k)
+def model_resolution_desi(k, a, b):
+    return a * np.exp(-b * k**2)
 
 
-def load_model_resolution_desi(a, b, c):
+def load_model_resolution_desi(a, b):
     def func(k):
-        return model_resolution_desi(k, a, b, c)
+        return model_resolution_desi(k, a, b)
 
     return func
 

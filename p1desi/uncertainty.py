@@ -648,8 +648,8 @@ def plot_syst_uncertainties_y1(
             y=title_yshift,
             fontsize=title_size,
         )
-
-        syste_bal[z] = 0.3 * np.abs(A_bal[z](pk_to_plot.k[z]) - 1) * pk_to_plot.p[z]
+        # 0.06 from mocks because 0.3 was overestimating the systematics
+        syste_bal[z] = 0.06 * np.abs(A_bal[z](pk_to_plot.k[z]) - 1) * pk_to_plot.p[z]
         syste_tot[z].append(syste_bal[z] ** 2)
         ax[6][1].plot(
             pk_to_plot.k[z],

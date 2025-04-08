@@ -17,7 +17,7 @@ from scipy.interpolate import interp1d
 from scipy.linalg import block_diag
 from scipy.stats import binned_statistic
 
-from p1desi import uncertainty, utils
+from p1desi import uncertainty, utils, pk_io
 
 
 def plot(
@@ -719,6 +719,9 @@ def save_p1d(
             ]
         )
 
+    # Add a very small value to the diagonal to avoid numerical eigenvalue issues
+    np.fill_diagonal(cov_syst, (1 + 10**(-10))*np.diag(cov_syst))
+
     full_cov = cov + cov_syst
 
     error_syst = np.concatenate([syste_tot[z] for z in zbin_save])
@@ -872,27 +875,38 @@ def save_p1d(
 
     if verify_cov:
         eig_full = np.linalg.eigvals(full_cov)
-        if len([eig_full[eig_full < 0.0]]):
+        if len(eig_full[eig_full < 0.0]) !=0:
             print(
                 "Full covariance matrix has negative eigenvalues",
                 "First ten values:",
                 eig_full[eig_full < 0.0][:10],
             )
+        if len(full_cov[np.isnan(full_cov)]) != 0:
+            print(
+                "Full covariance matrix has NaN values",
+            )
         eig = np.linalg.eigvals(cov)
-        if len([eig[eig < 0.0]]):
+        if len(eig[eig < 0.0])!=0:
             print(
                 "Statistical covariance matrix has negative eigenvalues",
                 "First ten values:",
                 eig[eig < 0.0][:10],
             )
+        if len(cov[np.isnan(cov)]) != 0:
+            print(
+                "Statistical covariance matrix has NaN values",
+            )
         eig_syst = np.linalg.eigvals(cov_syst)
-        if len([eig_syst[eig_syst < 0.0]]):
+        if len(eig_syst[eig_syst < 0.0])!=0:
             print(
                 "Systematics covariance matrix has negative eigenvalues",
                 "First ten values:",
                 eig_syst[eig_syst < 0.0][:10],
             )
-
+        if len(cov_syst[np.isnan(cov_syst)]) != 0:
+            print(
+                "Systematics covariance matrix has NaN values",
+            )
     fits.write(full_cov, header=header, units=units, extname="COVARIANCE")
     fits.write(cov, header=header, units=units, extname="COVARIANCE_STAT")
     fits.write(cov_syst, header=header, units=units, extname="COVARIANCE_SYST")
