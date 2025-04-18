@@ -15,9 +15,9 @@ from matplotlib import cm
 from matplotlib.lines import Line2D
 from scipy.interpolate import interp1d
 from scipy.linalg import block_diag
-from scipy.stats import binned_statistic
+from scipy.stats import binned_statistic, chi2
 
-from p1desi import uncertainty, utils, pk_io
+from p1desi import pk_io, uncertainty, utils
 
 
 def plot(
@@ -199,8 +199,11 @@ def plot_comparison(
         raise ValueError(
             "The power spectrum you want to compare are expressed in different units"
         )
+    zmin = utils.return_key(plot_args, "zmin", None)
 
     zbins = pk.zbin[pk.zbin < zmax]
+    if zmin is not None:
+        zbins = zbins[zbins > zmin]
 
     marker_size = utils.return_key(plot_args, "marker_size", 7)
     marker_style = utils.return_key(plot_args, "marker_style", ".")
@@ -210,6 +213,7 @@ def plot_comparison(
     fontlegend = utils.return_key(plot_args, "fontl", 14)
     kmin_AA = utils.return_key(plot_args, "kmin_AA", 0.145)
     kmax_AA = utils.return_key(plot_args, "kmax_AA", 2.5)
+    kmax_plot = utils.return_key(plot_args, "kmax_plot", None)
     ymin = utils.return_key(plot_args, "ymin", 0.01)
     ymax = utils.return_key(plot_args, "ymax", 0.2)
     figsize = utils.return_key(plot_args, "figsize", (10, 8))
@@ -232,14 +236,19 @@ def plot_comparison(
     apply_mask_comp = utils.return_key(plot_args, "apply_mask_comp", True)
     zmax_comp = utils.return_key(plot_args, "zmax_comp", None)
     resample_pk = utils.return_key(plot_args, "resample_pk", False)
+    height_ratios = utils.return_key(plot_args, "height_ratios", [3, 1])
     color_map = utils.return_key(plot_args, "color_map", "default")
     if color_map == "default":
-        color = [f"C{i}" for i, z in enumerate(pk.zbin) if z < zmax]
+        color = [f"C{i}" for i, z in enumerate(zbins)]
     elif color_map == "rainbow":
-        color = cm.rainbow(np.linspace(0, 1, len(pk.zbin[pk.zbin < zmax])))
+        color = cm.rainbow(np.linspace(0, 1, len(zbins)))
 
     fig, ax = plt.subplots(
-        2, 1, figsize=figsize, gridspec_kw=dict(height_ratios=[3, 1]), sharex=True
+        2,
+        1,
+        figsize=figsize,
+        gridspec_kw=dict(height_ratios=height_ratios),
+        sharex=True,
     )
 
     if systematics_file is not None:
@@ -502,8 +511,11 @@ def plot_comparison(
     ax[0].yaxis.set_tick_params(direction="in")
     ax[0].xaxis.set_tick_params(labelsize=labelsize)
     ax[0].yaxis.set_tick_params(labelsize=labelsize)
+    if kmax_plot is not None:
+        ax[0].set_xlim(kmin, kmax_plot)
+    else:
+        ax[0].set_xlim(kmin, kmax)
 
-    ax[0].set_xlim(kmin, kmax)
     ax[0].set_ylim(ymin, ymax)
     ax[1].set_ylabel(f"{label}/{label2}", fontsize=fontsize_y)
     ax[1].set_ylim(ymin_ratio, ymax_ratio)
@@ -719,8 +731,8 @@ def save_p1d(
             ]
         )
 
-    # Add a very small value to the diagonal to avoid numerical eigenvalue issues
-    np.fill_diagonal(cov_syst, (1 + 10**(-10))*np.diag(cov_syst))
+    # Add a very small value to the diagonal to avoid numerical eigenvalue issues
+    np.fill_diagonal(cov_syst, (1 + 10 ** (-10)) * np.diag(cov_syst))
 
     full_cov = cov + cov_syst
 
@@ -875,7 +887,7 @@ def save_p1d(
 
     if verify_cov:
         eig_full = np.linalg.eigvals(full_cov)
-        if len(eig_full[eig_full < 0.0]) !=0:
+        if len(eig_full[eig_full < 0.0]) != 0:
             print(
                 "Full covariance matrix has negative eigenvalues",
                 "First ten values:",
@@ -886,7 +898,7 @@ def save_p1d(
                 "Full covariance matrix has NaN values",
             )
         eig = np.linalg.eigvals(cov)
-        if len(eig[eig < 0.0])!=0:
+        if len(eig[eig < 0.0]) != 0:
             print(
                 "Statistical covariance matrix has negative eigenvalues",
                 "First ten values:",
@@ -897,7 +909,7 @@ def save_p1d(
                 "Statistical covariance matrix has NaN values",
             )
         eig_syst = np.linalg.eigvals(cov_syst)
-        if len(eig_syst[eig_syst < 0.0])!=0:
+        if len(eig_syst[eig_syst < 0.0]) != 0:
             print(
                 "Systematics covariance matrix has negative eigenvalues",
                 "First ten values:",
@@ -1409,10 +1421,16 @@ def plot_variations(
     zmax,
     outname=None,
     outpoints=None,
+    add_data_split_covariance=False,
+    compute_chi2=False,
+    no_legend=False,
     **plot_args,
 ):
+    zmin = utils.return_key(plot_args, "zmin", None)
 
     zbins = mean_pk_ref.zbin[mean_pk_ref.zbin < zmax]
+    if zmin is not None:
+        zbins = zbins[zbins > zmin]
 
     marker_size = utils.return_key(plot_args, "marker_size", 7)
     marker_style = utils.return_key(plot_args, "marker_style", ".")
@@ -1429,11 +1447,9 @@ def plot_variations(
     extrapolate_ratio = utils.return_key(plot_args, "extrapolate_ratio", False)
     color_map = utils.return_key(plot_args, "color_map", "default")
     if color_map == "default":
-        color = [f"C{i}" for i, z in enumerate(mean_pk_ref.zbin) if z < zmax]
+        color = [f"C{i}" for i, z in enumerate(zbins)]
     elif color_map == "rainbow":
-        color = cm.rainbow(
-            np.linspace(0, 1, len(mean_pk_ref.zbin[mean_pk_ref.zbin < zmax]))
-        )
+        color = cm.rainbow(np.linspace(0, 1, len(zbins)))
 
     fig, ax = plt.subplots(len(mean_pk_list_variation), 1, figsize=figsize)
     if len(mean_pk_list_variation) == 1:
@@ -1445,6 +1461,10 @@ def plot_variations(
         [[] for j in range(len(mean_pk_list_variation))],
         [[] for j in range(len(mean_pk_list_variation))],
     )
+    if compute_chi2:
+        chi2_arr = [[] for j in range(len(mean_pk_list_variation))]
+        chi2_cov_arr = [[] for j in range(len(mean_pk_list_variation))]
+        ndof_arr = [0 for j in range(len(mean_pk_list_variation))]
     for i, z in enumerate(zbins):
         if mean_pk_ref.velunits:
             kmax = float(utils.kAAtokskm(kmax_AA, z=z))
@@ -1493,9 +1513,38 @@ def plot_variations(
             )(k)
 
             ratio = p / p2_interp
-            err_ratio = (p / p2_interp) * np.sqrt(
-                (error_bar / p) ** 2 + (err_p2_interp / p2_interp) ** 2
-            )
+            if add_data_split_covariance:
+                err_ratio = (p / p2_interp) * np.sqrt(
+                    (error_bar / p) ** 2
+                    + (err_p2_interp / p2_interp) ** 2
+                    - 2 * (error_bar**2 / (p * p2_interp))
+                )
+            else:
+                err_ratio = (p / p2_interp) * np.sqrt(
+                    (error_bar / p) ** 2 + (err_p2_interp / p2_interp) ** 2
+                )
+            if compute_chi2:
+
+                chi2_arr[j].append((ratio - 1) ** 2 / err_ratio**2)
+
+                k1 = mean_pk_ref.cov_k1[z]
+                k2 = mean_pk_ref.cov_k2[z]
+                k1_matrix = k1.reshape(int(np.sqrt(k1.size)), int(np.sqrt(k1.size)))
+                mask_pk = (k1_matrix[:, 0] > kmin) & (k1_matrix[:, 0] < kmax)
+                mask_cov = (k1 < kmax) & (k2 < kmax)
+                mask_cov &= (k1 > kmin) & (k2 > kmin)
+                cov1 = mean_pk_ref.boot_cov[z]
+                cov1 = cov1[mask_cov]
+                cov1 = cov1.reshape(int(np.sqrt(cov1.size)), int(np.sqrt(cov1.size)))
+                cov2 = mean_pk_ref.boot_cov[z]
+                cov2 = cov2[mask_cov]
+                cov2 = cov2.reshape(int(np.sqrt(cov2.size)), int(np.sqrt(cov2.size)))
+                cov = cov1 + cov2
+                diff = mean_pk_ref.p[z][mask_pk] - mean_pk_comp.p[z][mask_pk]
+
+                chi2_cov_arr[j].append(diff.dot(np.linalg.inv(cov).dot(diff)))
+                ndof_arr[j] = ndof_arr[j] + len(diff)
+
             ratio_arr[j].append(ratio)
             err_arr[j].append(err_ratio)
             ax[j].errorbar(
@@ -1525,13 +1574,29 @@ def plot_variations(
         ax[j].xaxis.set_tick_params(labelsize=labelsize)
         ax[j].yaxis.set_tick_params(labelsize=labelsize)
         ax[j].set_ylim(bottom=ymin, top=ymax)
+        if compute_chi2:
+            chi2_arr[j] = np.concatenate(chi2_arr[j])
+            p_value = 1 - chi2.cdf(np.nansum(chi2_arr[j]), df=len(chi2_arr[j]))
+            print(f"Diag p-value for {j}: {p_value}, ndof = {len(chi2_arr[j])}")
+            p_value_cov = 1 - chi2.cdf(np.nansum(chi2_cov_arr[j]), df=ndof_arr[j])
+            print(f"Cov p-value for {j}: {p_value_cov}, ndof = {ndof_arr[j]}")
+            ax[j].text(
+                x=0.02,  # 2% from left
+                y=0.05,  # 2% from bottom
+                s=f"p-value = {p_value:.2f}",
+                transform=ax[j].transAxes,  # Uses axes-relative coordinates
+                fontsize=fontlegend,
+                color="k",
+                bbox=dict(facecolor="white", alpha=0.7),
+            )
     if mean_pk_ref.velunits:
         ax[-1].set_xlabel(
             r"$k~[\mathrm{s}$" + r"$\cdot$" + "$\mathrm{km}^{-1}]$", fontsize=fontsize_x
         )
     else:
         ax[-1].set_xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize_x)
-    ax[0].legend(ncol=4, fontsize=fontlegend)
+    if not (no_legend):
+        ax[0].legend(ncol=4, fontsize=fontlegend)
     fig.tight_layout()
 
     if outname is not None:

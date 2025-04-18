@@ -170,6 +170,7 @@ def plot_noise_power_ratio_bis(
     fontsize = utils.return_key(kwargs, "fontsize", 16)
     ticks_size = utils.return_key(kwargs, "ticks_size", 15)
     cmap = utils.return_key(kwargs, "cmap", "rainbow")
+    force_label = utils.return_key(kwargs, "force_label", None)
     if cmap == "rainbow":
         color = cm.rainbow(np.linspace(0, 1, len(pk.zbin)))
     else:
@@ -181,6 +182,8 @@ def plot_noise_power_ratio_bis(
     else:
         noise = pk.p_noise
         labelnoise = "pipeline"
+    if force_label is not None:
+        labelnoise = force_label
 
     fig, ax = plt.subplots(1, 2, figsize=figsize)
 
