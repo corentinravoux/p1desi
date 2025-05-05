@@ -15,7 +15,7 @@ from matplotlib import cm
 from matplotlib.lines import Line2D
 from scipy.interpolate import interp1d
 from scipy.linalg import block_diag
-from scipy.stats import binned_statistic, chi2
+from scipy.stats import binned_statistic, chi2, pearsonr
 
 from p1desi import pk_io, uncertainty, utils
 
@@ -1421,8 +1421,8 @@ def plot_variations(
     zmax,
     outname=None,
     outpoints=None,
-    add_data_split_covariance=False,
-    compute_chi2=False,
+    data_split=False,
+    compute_p_values=False,
     no_legend=False,
     **plot_args,
 ):
@@ -1461,10 +1461,15 @@ def plot_variations(
         [[] for j in range(len(mean_pk_list_variation))],
         [[] for j in range(len(mean_pk_list_variation))],
     )
-    if compute_chi2:
+    if compute_p_values:
         chi2_arr = [[] for j in range(len(mean_pk_list_variation))]
         chi2_cov_arr = [[] for j in range(len(mean_pk_list_variation))]
         ndof_arr = [0 for j in range(len(mean_pk_list_variation))]
+
+        p_distrib_arr = [[] for j in range(len(mean_pk_list_variation))]
+        p_pearson_arr = [[] for j in range(len(mean_pk_list_variation))]
+        all_ratio = [[] for j in range(len(mean_pk_list_variation))]
+
     for i, z in enumerate(zbins):
         if mean_pk_ref.velunits:
             kmax = float(utils.kAAtokskm(kmax_AA, z=z))
@@ -1513,7 +1518,7 @@ def plot_variations(
             )(k)
 
             ratio = p / p2_interp
-            if add_data_split_covariance:
+            if data_split:
                 err_ratio = (p / p2_interp) * np.sqrt(
                     (error_bar / p) ** 2
                     + (err_p2_interp / p2_interp) ** 2
@@ -1523,7 +1528,7 @@ def plot_variations(
                 err_ratio = (p / p2_interp) * np.sqrt(
                     (error_bar / p) ** 2 + (err_p2_interp / p2_interp) ** 2
                 )
-            if compute_chi2:
+            if compute_p_values:
 
                 chi2_arr[j].append((ratio - 1) ** 2 / err_ratio**2)
 
@@ -1545,17 +1550,42 @@ def plot_variations(
                 chi2_cov_arr[j].append(diff.dot(np.linalg.inv(cov).dot(diff)))
                 ndof_arr[j] = ndof_arr[j] + len(diff)
 
+                all_ratio[j].append(ratio)
+
+                mask = ~np.isnan(ratio)
+                p_value_distrib = len(ratio[mask][ratio[mask] > 1]) / len(ratio[mask])
+                p_value_distrib = 2 * min(p_value_distrib, 1 - p_value_distrib)
+                p_distrib_arr[j].append(p_value_distrib)
+
+                mask = (~np.isnan(ratio)) & (~np.isnan(err_ratio))
+                _, p_value_pearson = pearsonr(
+                    k[mask], (ratio[mask] - ratio[mask].mean()) / err_ratio[mask]
+                )
+                p_pearson_arr[j].append(p_value_pearson)
+
             ratio_arr[j].append(ratio)
             err_arr[j].append(err_ratio)
-            ax[j].errorbar(
-                k,
-                ratio,
-                err_ratio,
-                marker=marker_style,
-                color=color[i],
-                markersize=marker_size,
-                label=r"$z = ${:1.1f}".format(z),
-            )
+            if data_split:
+                ax[j].errorbar(
+                    k,
+                    ratio,
+                    err_ratio,
+                    marker=marker_style,
+                    color=color[i],
+                    markersize=marker_size,
+                    label=r"$z = ${:1.1f}".format(z),
+                    zorder=len(zbins) - i,
+                )
+            else:
+                ax[j].plot(
+                    k,
+                    ratio,
+                    marker=marker_style,
+                    color=color[i],
+                    markersize=marker_size,
+                    label=r"$z = ${:1.1f}".format(z),
+                    zorder=len(zbins) - i,
+                )
 
     (
         z_arr,
@@ -1573,22 +1603,54 @@ def plot_variations(
         ax[j].set_ylabel(f"{label_base}/{label}", fontsize=fontsize_y)
         ax[j].xaxis.set_tick_params(labelsize=labelsize)
         ax[j].yaxis.set_tick_params(labelsize=labelsize)
-        ax[j].set_ylim(bottom=ymin, top=ymax)
-        if compute_chi2:
+        if type(ymin) == list:
+            ax[j].set_ylim(bottom=ymin[j], top=ymax[j])
+        else:
+            ax[j].set_ylim(bottom=ymin, top=ymax)
+        if compute_p_values:
             chi2_arr[j] = np.concatenate(chi2_arr[j])
-            p_value = 1 - chi2.cdf(np.nansum(chi2_arr[j]), df=len(chi2_arr[j]))
-            print(f"Diag p-value for {j}: {p_value}, ndof = {len(chi2_arr[j])}")
+            p_value_chi2 = 1 - chi2.cdf(np.nansum(chi2_arr[j]), df=len(chi2_arr[j]))
+            print(f"Diag p-value for {j}: {p_value_chi2}, ndof = {len(chi2_arr[j])}")
             p_value_cov = 1 - chi2.cdf(np.nansum(chi2_cov_arr[j]), df=ndof_arr[j])
             print(f"Cov p-value for {j}: {p_value_cov}, ndof = {ndof_arr[j]}")
-            ax[j].text(
-                x=0.02,  # 2% from left
-                y=0.05,  # 2% from bottom
-                s=f"p-value = {p_value:.2f}",
-                transform=ax[j].transAxes,  # Uses axes-relative coordinates
-                fontsize=fontlegend,
-                color="k",
-                bbox=dict(facecolor="white", alpha=0.7),
+
+            print("hyp ratio = 1 has p-value for each z bin", p_distrib_arr[j])
+            print("hyp ratio uncorrelated with k has p-value", p_pearson_arr[j])
+
+            all_ratio[j] = np.concatenate(all_ratio[j])
+            mask = ~np.isnan(all_ratio[j])
+
+            p_value_distrib = len(all_ratio[j][mask][all_ratio[j][mask] > 1]) / len(
+                all_ratio[j][mask]
             )
+            p_value_distrib = 2 * min(p_value_distrib, 1 - p_value_distrib)
+
+            print("hyp ratio = 1 has p-value for each z bin", p_value_distrib)
+
+            if data_split:
+                ax[j].text(
+                    x=0.02,  # 2% from left
+                    y=0.05,  # 2% from bottom
+                    s=r"$\chi^2$ " + f"p-value = {p_value_chi2:.2f}",
+                    transform=ax[j].transAxes,  # Uses axes-relative coordinates
+                    fontsize=fontlegend,
+                    color="k",
+                    bbox=dict(facecolor="white", alpha=0.7),
+                    zorder=len(zbins),
+                )
+            else:
+                ax[j].text(
+                    x=0.02,  # 2% from left
+                    y=0.05,  # 2% from bottom
+                    s=f"Distribution p-value = {p_value_distrib:.2f}\n"
+                    + f"Correlation p-value = {np.min(p_pearson_arr[j]):.2f}",
+                    transform=ax[j].transAxes,  # Uses axes-relative coordinates
+                    fontsize=fontlegend,
+                    color="k",
+                    bbox=dict(facecolor="white", alpha=0.7),
+                    zorder=len(zbins),
+                )
+
     if mean_pk_ref.velunits:
         ax[-1].set_xlabel(
             r"$k~[\mathrm{s}$" + r"$\cdot$" + "$\mathrm{km}^{-1}]$", fontsize=fontsize_x
@@ -1596,7 +1658,7 @@ def plot_variations(
     else:
         ax[-1].set_xlabel(r"$k~[\mathrm{\AA}^{-1}]$", fontsize=fontsize_x)
     if not (no_legend):
-        ax[0].legend(ncol=4, fontsize=fontlegend)
+        ax[0].legend(ncol=3, fontsize=fontlegend, loc="upper right")
     fig.tight_layout()
 
     if outname is not None:
