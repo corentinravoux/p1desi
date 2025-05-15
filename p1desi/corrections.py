@@ -7,7 +7,7 @@ import fitsio
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm
-from scipy.interpolate import interp1d
+from scipy.interpolate import RegularGridInterpolator, interp1d
 from scipy.optimize import curve_fit
 
 from p1desi import hcd, metals, utils
@@ -29,6 +29,8 @@ def plot_and_compute_ratio_power(
     kmin_fit_AA,
     kmax_AA,
     model_param=None,
+    use_covariance_fit=False,
+    use_boot=False,
     **plt_args,
 ):
     """
@@ -36,8 +38,8 @@ def plot_and_compute_ratio_power(
 
     Inputs:
 
-        pk: object containing the power spectrum data to plot, with attributes k, norm_p, and norm_err for the wave number k, power spectrum P, and error on P respectively
-        pk2: object containing the power spectrum data to divide pk by, with attributes k, norm_p, and norm_err for the wave number k, power spectrum P, and error on P respectively
+        pk: object containing the power spectrum data to plot, with attributes k, p, and err for the wave number k, power spectrum P, and error on P respectively
+        pk2: object containing the power spectrum data to divide pk by, with attributes k, p, and err for the wave number k, power spectrum P, and error on P respectively
         path_out: string specifying the filepath to save the plot
         name_correction: string specifying the correction applied to the power spectra
         suffix: string to add to the end of the plot file name
@@ -94,32 +96,29 @@ def plot_and_compute_ratio_power(
             if pk.velunits:
                 kmax = float(utils.kAAtokskm(kmax_AA, z=z))
                 kmin = float(utils.kAAtokskm(kmin_AA, z=z))
-                kmin_fit = float(utils.kAAtokskm(kmin_fit_AA, z=z))
             else:
                 kmax = kmax_AA
                 kmin = kmin_AA
-                kmin_fit = kmin_fit_AA
             k = pk.k[z]
 
-            norm_pk2_interp = interp1d(
+            pk2_interp = interp1d(
                 pk2.k[z],
-                pk2.norm_p[z],
+                pk2.p[z],
                 kind="linear",
                 bounds_error=False,
                 fill_value="extrapolate",
             )(k)
-            norm_err_pk2_interp = interp1d(
+            err_pk2_interp = interp1d(
                 pk2.k[z],
-                pk2.norm_err[z],
+                pk2.err[z],
                 kind="linear",
                 bounds_error=False,
                 fill_value="extrapolate",
             )(k)
 
-            ratio = pk.norm_p[z] / norm_pk2_interp
-            err_ratio = (pk.norm_p[z] / norm_pk2_interp) * np.sqrt(
-                (pk.norm_err[z] / pk.norm_p[z]) ** 2
-                + (norm_err_pk2_interp / norm_pk2_interp) ** 2
+            ratio = pk.p[z] / pk2_interp
+            err_ratio = (pk.p[z] / pk2_interp) * np.sqrt(
+                (pk.err[z] / pk.p[z]) ** 2 + (err_pk2_interp / pk2_interp) ** 2
             )
 
             mask = (
@@ -148,26 +147,101 @@ def plot_and_compute_ratio_power(
             ratio_arr.append(ratio)
             err_arr.append(err_ratio)
 
-            mask_fit = k > kmin_fit
+            if model is not None:
+                if use_covariance_fit:
 
+                    if use_boot:
+                        cov1 = pk.boot_cov[z]
+                        cov2 = pk2.boot_cov[z]
+                    else:
+                        cov1 = pk.cov[z]
+                        cov2 = pk2.cov[z]
+
+                    k11 = pk.cov_k1[z]
+                    k12 = pk.cov_k2[z]
+                    mask_cov1 = (k11 < kmax) & (k12 < kmax)
+                    mask_cov1 &= (k11 > kmin) & (k12 > kmin)
+
+                    k11 = k11[mask_cov1]
+                    k12 = k12[mask_cov1]
+                    cov1 = cov1[mask_cov1]
+
+                    k11_matrix = k11.reshape(
+                        int(np.sqrt(k11.size)), int(np.sqrt(k11.size))
+                    )
+                    k12_matrix = k12.reshape(
+                        int(np.sqrt(k12.size)), int(np.sqrt(k12.size))
+                    )
+                    cov1 = cov1.reshape(
+                        int(np.sqrt(cov1.size)), int(np.sqrt(cov1.size))
+                    )
+
+                    k21 = pk2.cov_k1[z]
+                    k22 = pk2.cov_k2[z]
+                    mask_cov2 = (k21 < kmax) & (k22 < kmax)
+                    mask_cov2 &= (k21 > kmin) & (k22 > kmin)
+
+                    k21 = k21[mask_cov2]
+                    k22 = k22[mask_cov2]
+                    cov2 = cov2[mask_cov2]
+
+                    k21_matrix = k21.reshape(
+                        int(np.sqrt(k21.size)), int(np.sqrt(k21.size))
+                    )
+                    k22_matrix = k22.reshape(
+                        int(np.sqrt(k22.size)), int(np.sqrt(k22.size))
+                    )
+                    cov2 = cov2.reshape(
+                        int(np.sqrt(cov2.size)), int(np.sqrt(cov2.size))
+                    )
+                    K11, K12 = np.meshgrid(
+                        k11_matrix[:, 0], k12_matrix[0, :], indexing="ij"
+                    )
+
+                    cov2_interp = RegularGridInterpolator(
+                        (k21_matrix[:, 0], k22_matrix[0, :]), cov2, method="linear"
+                    )((K11, K12))
+
+                    dR_dX1 = 1 / pk2_interp[~mask]
+                    dR_dX2 = pk.p[z][~mask] / (pk2_interp[~mask] ** 2)
+
+                    dR_dX1_outer = np.outer(dR_dX1, dR_dX1)
+                    dR_dX2_outer = np.outer(dR_dX2, dR_dX2)
+
+                    cov_ratio = dR_dX1_outer * cov1 + dR_dX2_outer * cov2_interp
+                    err_fit = cov_ratio
+                else:
+                    err_fit = err_ratio
             if model == "poly":
-                weights = 1 / err_ratio
-                p = np.polyfit(
-                    k[mask_fit],
-                    ratio[mask_fit],
-                    model_param["order_poly"],
-                    w=weights[mask_fit],
+
+                def poly_func(x, *coefficients):
+                    return np.sum(
+                        coeff * (x**i) for i, coeff in enumerate(coefficients)
+                    )
+
+                popt, _ = curve_fit(
+                    poly_func,
+                    xdata=k,
+                    ydata=ratio,
+                    sigma=err_fit,
+                    p0=[1.0 for i in range(model_param["order_poly"] + 1)],
                 )
+
                 k_th = np.linspace(np.min(k), np.max(k), 2000)
-                axplt.plot(k_th, np.poly1d(p)(k_th), color=colors[i], ls="--")
-                params.append(p)
+                axplt.plot(
+                    k_th,
+                    poly_func(k_th, *popt),
+                    color=colors[i],
+                    ls="--",
+                )
+                params.append(popt)
 
             elif model == "power":
-                popt, pcov = curve_fit(
+                popt, _ = curve_fit(
                     model_cont_correction_eboss,
                     xdata=k,
                     ydata=ratio,
-                    sigma=err_ratio,
+                    sigma=err_fit,
                     p0=[1.0, 0.0, 0.0],
                     bounds=(
                         [-np.inf, -5, 0],
@@ -189,11 +263,11 @@ def plot_and_compute_ratio_power(
                     b0_rogers = 429.58
                 else:
                     b0_rogers = 7.316
-                popt, pcov = curve_fit(
+                popt, _ = curve_fit(
                     func,
                     xdata=k,
                     ydata=ratio,
-                    sigma=err_ratio,
+                    sigma=err_fit,
                     p0=[0.8633, 0.2943, b0_rogers, -0.4964, 1.0, 0.01],
                     bounds=(
                         [0, 0, 0, -np.inf, 0, 0],
@@ -209,7 +283,7 @@ def plot_and_compute_ratio_power(
                     model_skylines_desi,
                     xdata=k,
                     ydata=ratio,
-                    sigma=err_ratio,
+                    sigma=err_fit,
                     p0=[1.0, 1.0, 1.0, 1.0],
                     bounds=(
                         [-np.inf, -np.inf, -np.inf, -np.inf],
@@ -229,7 +303,7 @@ def plot_and_compute_ratio_power(
                     model_resolution_desi,
                     xdata=k,
                     ydata=ratio,
-                    sigma=err_ratio,
+                    sigma=err_fit,
                     p0=[1.0, 1.0],
                     bounds=(
                         [-np.inf, -np.inf],
