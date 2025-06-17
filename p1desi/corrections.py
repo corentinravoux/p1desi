@@ -216,7 +216,8 @@ def plot_and_compute_ratio_power(
 
                 def poly_func(x, *coefficients):
                     return np.sum(
-                        coeff * (x**i) for i, coeff in enumerate(coefficients)
+                        coeff * (x ** (len(coefficients) - 1 - i))
+                        for i, coeff in enumerate(coefficients)
                     )
 
                 popt, _ = curve_fit(
@@ -657,23 +658,32 @@ def apply_correction_eboss(pk, zmax, file_correction, type_correction):
 
 
 def prepare_metal_subtraction(zbins, file_metal, velunits=False):
-    (param_SB1_mean, param_SB1_indiv) = pickle.load(open(file_metal, "rb"))
     P_metal_m = {}
-    for iz, z in enumerate(zbins):
-        if velunits:
-            P_metal_m[z] = partial(
-                metals.model_SB1_indiv_kms,
-                param_SB1_mean,
-                param_SB1_indiv[iz][0],
-                param_SB1_indiv[iz][1],
-            )
-        else:
-            P_metal_m[z] = partial(
-                metals.model_SB1_indiv,
-                param_SB1_mean,
-                z,
-                param_SB1_indiv[iz][0],
-                param_SB1_indiv[iz][1],
+    if type(file_metal) == str:
+        (param_SB1_mean, param_SB1_indiv) = pickle.load(open(file_metal, "rb"))
+        for iz, z in enumerate(zbins):
+            if velunits:
+                P_metal_m[z] = partial(
+                    metals.model_SB1_indiv_kms,
+                    param_SB1_mean,
+                    param_SB1_indiv[iz][0],
+                    param_SB1_indiv[iz][1],
+                )
+            else:
+                P_metal_m[z] = partial(
+                    metals.model_SB1_indiv,
+                    param_SB1_mean,
+                    z,
+                    param_SB1_indiv[iz][0],
+                    param_SB1_indiv[iz][1],
+                )
+    else:
+        for iz, z in enumerate(zbins):
+            P_metal_m[z] = interp1d(
+                file_metal.k[z],
+                file_metal.p[z],
+                bounds_error=False,
+                fill_value="extrapolate",
             )
     return P_metal_m
 
