@@ -88,6 +88,8 @@ def create_uncertainty_systematics_y1(
     syste_bal_completeness,
     syste_tot,
     name,
+    velunits,
+    zbins,
 ):
     pickle.dump(
         (
@@ -104,6 +106,63 @@ def create_uncertainty_systematics_y1(
             syste_tot,
         ),
         open(name, "wb"),
+    )
+
+    if velunits:
+        header = (
+            "REDSHIFT & WAVENUMBER [s.km^-1] & SYST RESOLUTION &"
+            + " SYST RESOLUTION CORRECTION & SYST SIDE BAND &"
+            + " SYST LINES & SYST DLA & SYST BAL & SYST CONTINUUM &"
+            + " SYST DLA COMPLETENESS & SYST BAL COMPLETENESS & TOTAL SYST"
+        )
+    else:
+        header = (
+            "REDSHIFT & WAVENUMBER [Ang^-1] & SYST RESOLUTION &"
+            + " SYST RESOLUTION CORRECTION & SYST SIDE BAND &"
+            + " SYST LINES & SYST DLA & SYST BAL & SYST CONTINUUM &"
+            + " SYST DLA COMPLETENESS & SYST BAL COMPLETENESS & TOTAL SYST"
+        )
+
+    z_array = [z for z in zbins for i in range(len(wavenumber[z]))]
+    wavenumber_array = np.concatenate([wavenumber[z] for z in zbins], axis=0)
+    syste_reso_array = np.concatenate([syste_reso[z] for z in zbins], axis=0)
+    syste_resocorrection_array = np.concatenate(
+        [syste_resocorrection[z] for z in zbins], axis=0
+    )
+    syste_sb_array = np.concatenate([syste_sb[z] for z in zbins], axis=0)
+    syste_lines_array = np.concatenate([syste_lines[z] for z in zbins], axis=0)
+    syste_hcd_array = np.concatenate([syste_hcd[z] for z in zbins], axis=0)
+    syste_bal_array = np.concatenate([syste_bal[z] for z in zbins], axis=0)
+    syste_continuum_array = np.concatenate([syste_continuum[z] for z in zbins], axis=0)
+    syste_dla_completeness_array = np.concatenate(
+        [syste_dla_completeness[z] for z in zbins], axis=0
+    )
+    syste_bal_completeness_array = np.concatenate(
+        [syste_bal_completeness[z] for z in zbins], axis=0
+    )
+    syste_tot_array = np.concatenate([syste_tot[z] for z in zbins], axis=0)
+
+    np.savetxt(
+        f"{name.split('.pickle')[0]}.txt",
+        np.transpose(
+            np.stack(
+                [
+                    z_array,
+                    wavenumber_array,
+                    syste_reso_array,
+                    syste_resocorrection_array,
+                    syste_sb_array,
+                    syste_lines_array,
+                    syste_hcd_array,
+                    syste_bal_array,
+                    syste_continuum_array,
+                    syste_dla_completeness_array,
+                    syste_bal_completeness_array,
+                    syste_tot_array,
+                ]
+            )
+        ),
+        header=header,
     )
 
 
@@ -790,6 +849,8 @@ def plot_syst_uncertainties_y1(
         syste_bal_completeness,
         syste_tot,
         name_file,
+        pk.velunits,
+        zbins,
     )
 
 

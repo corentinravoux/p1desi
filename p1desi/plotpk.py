@@ -677,8 +677,12 @@ def save_p1d(
     blinding="desi_y1",
     analysis_type="y1",
     use_boot=True,
-    verify_cov=True,
+    verify_cov=False,
+    pk_low_z=None,
+    z_change=None,
 ):
+
+    velunits = mean_pk.velunits
 
     zbin_save = mean_pk.zbin[mean_pk.zbin < zmax]
 
@@ -690,26 +694,51 @@ def save_p1d(
     k_edges_2 = k_edges[1:]
     k_centers = (k_edges_1 + k_edges_2) / 2
 
-    z_edges_1_full = np.concatenate(
-        [np.full(mean_pk.k[z].shape, z - zedge_bin / 2) for z in zbin_save]
-    )
-    z_edges_2_full = np.concatenate(
-        [np.full(mean_pk.k[z].shape, z + zedge_bin / 2) for z in zbin_save]
-    )
-    z = np.concatenate([np.full(mean_pk.k[z].shape, z) for z in zbin_save])
+    z_edges_1_full = []
+    z_edges_2_full = []
+    z_array = []
+    k_edges_1_full = []
+    k_edges_2_full = []
+    k_centers_full = []
+    pk = []
+    error_stat = []
+    p_raw = []
+    p_noise = []
+    cov = []
 
-    k_edges_1_full = np.concatenate([k_edges_1 for z in zbin_save])
-    k_edges_2_full = np.concatenate([k_edges_2 for z in zbin_save])
-    k_centers_full = np.concatenate([k_centers for z in zbin_save])
-    pk = np.concatenate([mean_pk.p[z] for z in zbin_save])
-    error_stat = np.concatenate([mean_pk.err[z] for z in zbin_save])
-    p_raw = np.concatenate([mean_pk.p_raw[z] for z in zbin_save])
-    p_noise = np.concatenate([mean_pk.p_noise[z] for z in zbin_save])
+    for z in zbin_save:
+        mean_pk_used = mean_pk
+        if pk_low_z is not None:
+            if z < z_change:
+                mean_pk_used = pk_low_z
 
-    if use_boot:
-        cov = block_diag(*[mean_pk.boot_cov[z].reshape(n_k, n_k) for z in zbin_save])
-    else:
-        cov = block_diag(*[mean_pk.cov[z].reshape(n_k, n_k) for z in zbin_save])
+        z_edges_1_full.append(np.full(mean_pk_used.k[z].shape, z - zedge_bin / 2))
+
+        z_edges_2_full.append(np.full(mean_pk_used.k[z].shape, z + zedge_bin / 2))
+        z_array.append(np.full(mean_pk_used.k[z].shape, z))
+        k_edges_1_full.append(k_edges_1)
+        k_edges_2_full.append(k_edges_2)
+        k_centers_full.append(k_centers)
+        pk.append(mean_pk_used.p[z])
+        error_stat.append(mean_pk_used.err[z])
+        p_raw.append(mean_pk_used.p_raw[z])
+        p_noise.append(mean_pk_used.p_noise[z])
+        if use_boot:
+            cov.append(mean_pk_used.boot_cov[z].reshape(n_k, n_k))
+        else:
+            cov.append(mean_pk_used.cov[z].reshape(n_k, n_k))
+
+    z_edges_1_full = np.concatenate(z_edges_1_full)
+    z_edges_2_full = np.concatenate(z_edges_2_full)
+    z_array = np.concatenate(z_array)
+    k_edges_1_full = np.concatenate(k_edges_1_full)
+    k_edges_2_full = np.concatenate(k_edges_2_full)
+    k_centers_full = np.concatenate(k_centers_full)
+    pk = np.concatenate(pk)
+    error_stat = np.concatenate(error_stat)
+    p_raw = np.concatenate(p_raw)
+    p_noise = np.concatenate(p_noise)
+    cov = block_diag(*cov)
 
     if analysis_type == "edr":
         function_uncertainty = uncertainty.prepare_uncertainty_systematics
@@ -756,7 +785,7 @@ def save_p1d(
         ("PNOISE", "f8"),
     ]
 
-    if mean_pk.velunits:
+    if velunits:
         units = [
             "",
             "",
@@ -787,10 +816,10 @@ def save_p1d(
             "AA",
         ]
 
-    hdu = np.zeros(z.size, dtype=dtype)
+    hdu = np.zeros(z_array.size, dtype=dtype)
     hdu["Z1"] = z_edges_1_full
     hdu["Z2"] = z_edges_2_full
-    hdu["Z"] = z
+    hdu["Z"] = z_array
     hdu["K1"] = k_edges_1_full
     hdu["K2"] = k_edges_2_full
     hdu["K"] = k_centers_full
@@ -808,7 +837,7 @@ def save_p1d(
         "KMIN": kmin,
         "KMAX": kmax,
         "NK": n_k,
-        "VELUNITS": mean_pk.velunits,
+        "VELUNITS": velunits,
         "BLINDING": blinding,
     }
     if blinding is not None:
@@ -821,7 +850,7 @@ def save_p1d(
         ("K", "f8"),
         ("E_SYST", "f8"),
     ]
-    if mean_pk.velunits:
+    if velunits:
         units_systematics = [
             "",
             "(km/s)^(-1)",
@@ -839,13 +868,13 @@ def save_p1d(
         if name_syste == "DLA":
             name_syste = "DLA_MASKING"
         dtype_systematics.append((name_syste, "f8"))
-        if mean_pk.velunits:
+        if velunits:
             units_systematics.append("(km/s)")
         else:
             units_systematics.append("AA")
 
-    hdu_systematics = np.zeros(z.size, dtype=dtype_systematics)
-    hdu_systematics["Z"] = z
+    hdu_systematics = np.zeros(z_array.size, dtype=dtype_systematics)
+    hdu_systematics["Z"] = z_array
     hdu_systematics["K"] = k_centers_full
     hdu_systematics["E_SYST"] = error_syst
 
@@ -864,7 +893,7 @@ def save_p1d(
         "KMIN": kmin,
         "KMAX": kmax,
         "NK": n_k,
-        "VELUNITS": mean_pk.velunits,
+        "VELUNITS": velunits,
     }
     fits.write(
         hdu_systematics, header=header, units=units_systematics, extname="SYSTEMATICS"
@@ -877,10 +906,10 @@ def save_p1d(
         "KMIN": kmin,
         "KMAX": kmax,
         "NK": n_k,
-        "VELUNITS": mean_pk.velunits,
+        "VELUNITS": velunits,
         "IS_BD": False,
     }
-    if mean_pk.velunits:
+    if velunits:
         units = ["(km/s)^2"]
     else:
         units = ["AA^2"]
