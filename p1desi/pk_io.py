@@ -12,7 +12,7 @@ try:
 except ImportError:
     print("SGolay2 not installed, 2D smoothing of covariance matrix unavailable")
 
-from p1desi import utils
+from p1desi import corrections, utils
 
 
 def read_pk_means(pk_means_name, hdu=None):
@@ -89,7 +89,7 @@ class Pk(object):
         self.boot_cov = boot_cov
 
     @classmethod
-    def read_from_picca(cls, name_file,use_bootstrap_average_covariance=False):
+    def read_from_picca(cls, name_file, use_bootstrap_average_covariance=False):
         minrescor = {}
         maxrescor = {}
         number_chunks = {}
@@ -1063,3 +1063,141 @@ def regularize_covariance(
         covariance_regularized = eigvec @ np.diag(eigval) @ np.linalg.inv(eigvec)
         return covariance_regularized
     return covariance
+
+
+def print_infos(
+    mean_pk,
+    z,
+    k_range_small,
+    k_range_med,
+    k_range_high,
+    ref=None,
+):
+
+    number_chunks = mean_pk.number_chunks[z]
+
+    mask_k_small = (mean_pk.k[z] >= k_range_small[0]) & (
+        mean_pk.k[z] < k_range_small[1]
+    )
+    mask_k_med = (mean_pk.k[z] >= k_range_med[0]) & (mean_pk.k[z] < k_range_med[1])
+    mask_k_high = (mean_pk.k[z] >= k_range_high[0]) & (mean_pk.k[z] < k_range_high[1])
+
+    pk_small = mean_pk.p[z][mask_k_small]
+    pk_med = mean_pk.p[z][mask_k_med]
+    pk_high = mean_pk.p[z][mask_k_high]
+    err_small = mean_pk.err[z][mask_k_small]
+    err_med = mean_pk.err[z][mask_k_med]
+    err_high = mean_pk.err[z][mask_k_high]
+
+    print("number of chunks = {}".format(number_chunks))
+    print("pk at small k = {}".format(np.mean(pk_small)))
+    print("pk at medium k = {}".format(np.mean(pk_med)))
+    print("pk at high k = {}".format(np.mean(pk_high)))
+    print("err at small k = {}".format(np.mean(err_small)))
+    print("err at medium k = {}".format(np.mean(err_med)))
+    print("err at high k = {}".format(np.mean(err_high)))
+
+    if ref is not None:
+        print(
+            "Ratio to reference at small k = {}".format(
+                np.mean(pk_small) / ref["pk_small"]
+            )
+        )
+        print(
+            "Ratio to reference at medium k = {}".format(
+                np.mean(pk_med) / ref["pk_med"]
+            )
+        )
+        print(
+            "Ratio to reference at high k = {}".format(
+                np.mean(pk_high) / ref["pk_high"]
+            )
+        )
+        print(
+            "Ratio to reference err at small k = {}".format(
+                np.mean(err_small) / ref["err_small"]
+            )
+        )
+        print(
+            "Ratio to reference err at medium k = {}".format(
+                np.mean(err_med) / ref["err_med"]
+            )
+        )
+        print(
+            "Ratio to reference err at high k = {}".format(
+                np.mean(err_high) / ref["err_high"]
+            )
+        )
+        return {
+            "number_chunks": number_chunks,
+            "pk_small": np.mean(pk_small),
+            "pk_med": np.mean(pk_med),
+            "pk_high": np.mean(pk_high),
+            "err_small": np.mean(err_small),
+            "err_med": np.mean(err_med),
+            "err_high": np.mean(err_high),
+            "ratio_pk_small": np.mean(pk_small) / ref["pk_small"],
+            "ratio_pk_med": np.mean(pk_med) / ref["pk_med"],
+            "ratio_pk_high": np.mean(pk_high) / ref["pk_high"],
+            "ratio_err_small": np.mean(err_small) / ref["err_small"],
+            "ratio_err_med": np.mean(err_med) / ref["err_med"],
+            "ratio_err_high": np.mean(err_high) / ref["err_high"],
+        }
+
+    return {
+        "number_chunks": number_chunks,
+        "pk_small": np.mean(pk_small),
+        "pk_med": np.mean(pk_med),
+        "pk_high": np.mean(pk_high),
+        "err_small": np.mean(err_small),
+        "err_med": np.mean(err_med),
+        "err_high": np.mean(err_high),
+    }
+
+
+def load_and_apply_correction(
+    file_pk,
+    p_noise_miss,
+    zmax,
+    correction_to_apply,
+    file_correction_hcd,
+    file_correction_bal,
+    file_correction_lines,
+    file_correction_cont,
+    file_correction_resolution,
+    file_metal,
+    use_bootstrap_average_covariance=False,
+):
+    mean_pk = Pk.read_from_picca(
+        file_pk, use_bootstrap_average_covariance=use_bootstrap_average_covariance
+    )
+    if p_noise_miss is not None:
+        mean_pk.correct_noise_global(p_noise_miss)
+    mean_pk.correct_covariance()
+    mean_pk.use_covariance_as_error()
+
+    apply_DESI_maskcont_corr = True
+    apply_eBOSS_maskcont_corr = False
+    if file_metal is None:
+        apply_DESI_sb_corr = False
+    else:
+        apply_DESI_sb_corr = True
+    apply_eBOSS_sb_corr = False
+
+    corrections.apply_p1d_corections(
+        mean_pk,
+        zmax,
+        apply_DESI_maskcont_corr,
+        apply_eBOSS_maskcont_corr,
+        apply_DESI_sb_corr,
+        apply_eBOSS_sb_corr,
+        correction_to_apply,
+        file_correction_hcd=file_correction_hcd,
+        file_correction_bal=file_correction_bal,
+        file_correction_lines=file_correction_lines,
+        file_correction_cont=file_correction_cont,
+        file_correction_resolution=file_correction_resolution,
+        file_metal=file_metal,
+    )
+
+    return mean_pk
