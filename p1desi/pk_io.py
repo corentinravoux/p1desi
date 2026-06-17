@@ -1013,13 +1013,29 @@ def smooth_variance(
         smoothing_window,
         int(3 * len(variance) / 4),
     )
-    variance_smooth = np.exp(
-        savgol_filter(
-            np.log(variance),
-            window_filter,
-            smoothing_polynomial,
+    mask = np.isnan(variance)
+    variance_smooth = np.zeros_like(variance)
+    variance_smooth[mask] = np.nan
+    valid_count = len(variance) - np.sum(mask)
+
+    if window_filter % 2 == 0:
+        window_filter -= 1
+
+    if (
+        valid_count >= window_filter
+        and window_filter > smoothing_polynomial
+        and window_filter >= 3
+    ):
+        variance_smooth[~mask] = np.exp(
+            savgol_filter(
+                np.log(variance[~mask]),
+                window_filter,
+                smoothing_polynomial,
+            )
         )
-    )
+    else:
+        variance_smooth[~mask] = variance[~mask]
+
     return variance_smooth
 
 
