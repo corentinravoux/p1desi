@@ -176,6 +176,7 @@ delta lambda rest frame = 2.6666666666666666666666
 lambda abs IGM = LYA
 wave solution = lin
 minimal snr pk1d = 1
+in_nside = 16
 keep surveys = '"${surveys}"'
 use non-coadded spectra = '"${coadd_picca_flag}"'
 '"${single_exposure_flag1}"'
