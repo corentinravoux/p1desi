@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Launcher: apply the missing-noise correction to a set of P1D measurements.
+
+Edit the paths / analysis identifiers and noise-correction values at the top,
+then run. Iterates the configured regions and applies
+:mod:`p1desi.corrections` noise corrections to each measurement.
+"""
 import fitsio, os, glob
 import numpy as np
 from p1desi import bookkeeping, corrections

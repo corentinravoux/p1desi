@@ -1,3 +1,14 @@
+"""Reading, representing and post-processing the P1D measurement.
+
+Central I/O module of :mod:`p1desi`. Defines the :class:`Pk` container that
+holds a mean one-dimensional Lyman-alpha power spectrum and all of its
+auxiliary arrays (raw / noise / diff power, errors, resolution correction,
+covariance) as dictionaries keyed by redshift bin, plus reader classmethods for
+the picca and p1desi FITS formats and for a handful of external measurements
+(eBOSS, high-resolution, Ohio mocks). Also provides covariance
+regularisation/smoothing helpers and per-redshift / per-k reductions.
+"""
+
 import struct
 
 import astropy.table as t
@@ -16,6 +27,15 @@ from p1desi import corrections, utils
 
 
 def read_pk_means(pk_means_name, hdu=None):
+    """Read a P1D table from a FITS file as an astropy Table.
+
+    Args:
+        pk_means_name (str): FITS file path.
+        hdu (int, optional): HDU index to read (default HDU if None).
+
+    Returns:
+        astropy.table.Table: The requested table.
+    """
     if hdu is None:
         table = t.Table.read(pk_means_name)
     else:
@@ -24,6 +44,21 @@ def read_pk_means(pk_means_name, hdu=None):
 
 
 class Pk(object):
+    """A mean one-dimensional Lyman-alpha power spectrum and its diagnostics.
+
+    All spectral quantities are stored as dictionaries keyed by redshift bin
+    (``self.zbin`` is the array of bin centres). For a bin ``z``, ``k[z]`` are
+    the wavenumbers (Angstrom^-1 unless ``velunits`` is True, then s/km),
+    ``p[z]`` the corrected power, ``p_raw``/``p_noise``/``p_diff`` the raw /
+    noise / exposure-difference power, ``err*`` the matching errors,
+    ``norm_p``/``norm_err`` the dimensionless ``k*P/pi`` power, ``resocor`` /
+    ``err_resocor`` the resolution correction, and ``cov`` / ``boot_cov`` the
+    analytic / bootstrap covariance (indexed by ``cov_k1``/``cov_k2``).
+
+    Instances are normally built through the ``read_from_*`` classmethods rather
+    than the constructor.
+    """
+
     def __init__(
         self,
         velunits=False,
@@ -57,6 +92,11 @@ class Pk(object):
         cov=None,
         boot_cov=None,
     ):
+        """Store the P1D arrays and metadata (all keyed by redshift bin).
+
+        See the class docstring for the meaning of each quantity. Every
+        argument defaults to None so partially populated instances are allowed.
+        """
         self.velunits = velunits
         self.zbin = zbin
         self.number_chunks = number_chunks
@@ -90,6 +130,19 @@ class Pk(object):
 
     @classmethod
     def read_from_picca(cls, name_file, use_bootstrap_average_covariance=False):
+        """Build a :class:`Pk` from a picca mean-P1D FITS file.
+
+        Reads the mean-P1D table (HDU 1), the per-bin metadata (HDU 2) and, when
+        present, the covariance (HDU 3), filling every per-redshift dictionary.
+
+        Args:
+            name_file (str): picca mean-P1D FITS file.
+            use_bootstrap_average_covariance (bool, optional): Use the
+                ``boot_average_covariance`` column instead of ``boot_covariance``.
+
+        Returns:
+            Pk: The populated power-spectrum object.
+        """
         minrescor = {}
         maxrescor = {}
         number_chunks = {}
@@ -243,6 +296,19 @@ class Pk(object):
 
     @classmethod
     def read_from_p1desi(cls, name_file, zbins):
+        """Build a :class:`Pk` from a p1desi-format mean-P1D FITS file.
+
+        Unlike :meth:`read_from_picca`, the p1desi format stores one table row
+        per redshift bin (indexed by ``zbins``) with per-k arrays and an ``N``
+        occupancy column used to drop empty k bins.
+
+        Args:
+            name_file (str): p1desi mean-P1D FITS file.
+            zbins (list[float]): Redshift bin centres, in table row order.
+
+        Returns:
+            Pk: The populated power-spectrum object (no covariance).
+        """
         minrescor = {}
         maxrescor = {}
         number_chunks = {}
@@ -360,6 +426,12 @@ class Pk(object):
         )
 
     def compute_additional_stats(self):
+        """Compute error-propagated ratios of the noise/diff/raw power spectra.
+
+        Populates ``self.err_noiseoverraw``, ``self.err_diffoverraw`` and
+        ``self.err_diffovernoise`` (per redshift bin) by propagating the
+        individual errors through each ratio.
+        """
         err_noiseoverraw = {}
         err_diffoverraw = {}
         err_diffovernoise = {}
@@ -383,6 +455,16 @@ class Pk(object):
         self.err_diffovernoise = err_diffovernoise
 
     def correct_noise_global(self, p_noise_miss_angstrom_global):
+        """Subtract a global missing-noise power from the P1D in place.
+
+        The missing-noise term (given in Angstrom^-1 units) is converted to the
+        object's units, divided by the resolution correction and removed from
+        ``p``, ``norm_p`` and ``p_noise`` for every redshift bin.
+
+        Args:
+            p_noise_miss_angstrom_global (float): Global missing-noise power in
+                Angstrom^-1 units.
+        """
         for z in self.zbin:
             if self.velunits:
                 p_noise_corr = utils.kskmtokAA(p_noise_miss_angstrom_global, z=z)
@@ -395,6 +477,11 @@ class Pk(object):
             self.p_noise[z] = self.p_noise[z] - p_noise_corr
 
     def posify_covariance_diagonal(self):
+        """Force the covariance diagonal positive for every redshift bin.
+
+        Applies :func:`posify_variance` to the diagonal of ``cov`` (and
+        ``boot_cov`` if present), in place.
+        """
         for _, z in enumerate(self.zbin):
             nkbins = len(self.k[z])
             covariance_matrix = self.cov[z].reshape(nkbins, nkbins)
@@ -415,6 +502,14 @@ class Pk(object):
         self,
         eigval_min=1e-10,
     ):
+        """Clip the covariance eigenvalues from below for every redshift bin.
+
+        Applies :func:`regularize_covariance` to ``cov`` (and ``boot_cov`` if
+        present), in place, to keep the matrix positive definite.
+
+        Args:
+            eigval_min (float, optional): Minimum allowed eigenvalue.
+        """
         for _, z in enumerate(self.zbin):
             nkbins = len(self.k[z])
             covariance_matrix = self.cov[z].reshape(nkbins, nkbins)
@@ -432,6 +527,15 @@ class Pk(object):
         smoothing_window=50,
         smoothing_polynomial=5,
     ):
+        """Savitzky-Golay-smooth the covariance diagonal per redshift bin.
+
+        Applies :func:`smooth_variance` to the diagonal of ``cov`` (and
+        ``boot_cov`` if present), in place.
+
+        Args:
+            smoothing_window (int, optional): Savitzky-Golay window length.
+            smoothing_polynomial (int, optional): Savitzky-Golay polynomial order.
+        """
         for _, z in enumerate(self.zbin):
             nkbins = len(self.k[z])
             covariance_matrix = self.cov[z].reshape(nkbins, nkbins)
@@ -460,7 +564,17 @@ class Pk(object):
         smooth_covariance_order=5,
         remove_diagonal=True,
     ):
+        """2D-smooth the off-diagonal covariance per redshift bin.
 
+        Applies :func:`smooth_covariance` to ``cov`` (and ``boot_cov`` if
+        present), in place; requires ``sgolay2`` for the 2D filtering.
+
+        Args:
+            smooth_covariance_window (int, optional): 2D smoothing window.
+            smooth_covariance_order (int, optional): 2D polynomial order.
+            remove_diagonal (bool, optional): Preserve the diagonal, smoothing
+                only the off-diagonal structure.
+        """
         for _, z in enumerate(self.zbin):
             nkbins = len(self.k[z])
             covariance_matrix = self.cov[z].reshape(nkbins, nkbins)
@@ -487,6 +601,12 @@ class Pk(object):
         self,
         correction_term=0.9,
     ):
+        """Rescale the covariance by a multiplicative factor, in place.
+
+        Args:
+            correction_term (float | dict, optional): Scalar factor, or a per-
+                redshift dictionary of factors.
+        """
         for _, z in enumerate(self.zbin):
             if type(correction_term) == dict:
                 correction = correction_term[z]
@@ -511,6 +631,23 @@ class Pk(object):
         correction_covariance_term=0.9,
         eigval_min=1e-10,
     ):
+        """Run the full covariance cleaning pipeline in place.
+
+        Chains, per redshift bin: diagonal posification, diagonal smoothing,
+        off-diagonal 2D smoothing, multiplicative rescaling and eigenvalue
+        regularisation.
+
+        Args:
+            smoothing_variance_window (int, optional): Diagonal smoothing window.
+            smoothing_variance_order (int, optional): Diagonal smoothing order.
+            smooth_covariance_window (int, optional): Off-diagonal 2D window.
+            smooth_covariance_order (int, optional): Off-diagonal 2D order.
+            smooth_covariance_remove_diagonal (bool, optional): Keep the diagonal
+                untouched during 2D smoothing.
+            correction_covariance_term (float | dict, optional): Multiplicative
+                rescaling factor.
+            eigval_min (float, optional): Minimum eigenvalue for regularisation.
+        """
         self.posify_covariance_diagonal()
         self.smooth_covariance_diagonal(
             smoothing_window=smoothing_variance_window,
@@ -530,6 +667,15 @@ class Pk(object):
         self,
         use_boot=True,
     ):
+        """Replace the diagonal errors by the covariance diagonal, in place.
+
+        Sets ``err`` to the square root of the (bootstrap or analytic)
+        covariance diagonal and updates the normalised ``norm_err``.
+
+        Args:
+            use_boot (bool, optional): Use the bootstrap covariance (else the
+                analytic one).
+        """
         for _, z in enumerate(self.zbin):
             nkbins = len(self.k[z])
             if use_boot:
@@ -542,6 +688,8 @@ class Pk(object):
 
 
 class PkEboss(Pk):
+    """A :class:`Pk` loaded from the published eBOSS P1D text file (velocity units)."""
+
     def __init__(
         self,
         zbin=None,
@@ -552,6 +700,7 @@ class PkEboss(Pk):
         norm_p=None,
         norm_err=None,
     ):
+        """Store the eBOSS P1D arrays (see :class:`Pk`); ``velunits`` is True."""
         super(PkEboss, self).__init__(
             velunits=True,
             zbin=zbin,
@@ -566,6 +715,16 @@ class PkEboss(Pk):
 
     @classmethod
     def read_from_file(cls, name_file):
+        """Load the eBOSS P1D from its multi-column text table.
+
+        The statistical and systematic error columns are combined in quadrature.
+
+        Args:
+            name_file (str): eBOSS P1D text file.
+
+        Returns:
+            PkEboss: The loaded power spectrum.
+        """
         k = {}
         p = {}
         p_noise = {}
@@ -598,6 +757,8 @@ class PkEboss(Pk):
 
 
 class PkHR(Pk):
+    """A :class:`Pk` loaded from a high-resolution P1D text file (velocity units)."""
+
     def __init__(
         self,
         zbin=None,
@@ -607,6 +768,7 @@ class PkHR(Pk):
         norm_p=None,
         norm_err=None,
     ):
+        """Store the high-resolution P1D arrays (see :class:`Pk`)."""
         super(PkHR, self).__init__(
             velunits=True,
             zbin=zbin,
@@ -620,6 +782,14 @@ class PkHR(Pk):
 
     @classmethod
     def read_from_file(cls, name_file):
+        """Load the high-resolution P1D from its pipe-delimited text table.
+
+        Args:
+            name_file (str): High-resolution P1D text file.
+
+        Returns:
+            PkHR: The loaded power spectrum.
+        """
         k = {}
         p = {}
         err = {}
@@ -646,6 +816,8 @@ class PkHR(Pk):
 
 
 class PkTrueOhioMock(Pk):
+    """The true (input) P1D of the Ohio mocks, read from a binary grid file."""
+
     def __init__(
         self,
         zbin=None,
@@ -656,6 +828,7 @@ class PkTrueOhioMock(Pk):
         norm_err=None,
         velunits=None,
     ):
+        """Store the mock true-P1D arrays (see :class:`Pk`)."""
         super(PkTrueOhioMock, self).__init__(
             velunits=velunits,
             zbin=zbin,
@@ -669,6 +842,21 @@ class PkTrueOhioMock(Pk):
 
     @classmethod
     def read_from_file(cls, name_file, zbins_input, k_input, velunits=True):
+        """Load the Ohio-mock true P1D and interpolate it onto a target grid.
+
+        Reads the ``(nk, nz)`` binary grid, builds a linear ``(k, z)``
+        interpolator and evaluates it at the requested bins/wavenumbers,
+        converting units when ``velunits`` is False. Errors are set to zero.
+
+        Args:
+            name_file (str): Binary mock-P1D file.
+            zbins_input (array-like): Target redshift bins.
+            k_input (dict): Target wavenumbers per redshift bin.
+            velunits (bool, optional): Output in velocity units (s/km).
+
+        Returns:
+            PkTrueOhioMock: The interpolated true power spectrum.
+        """
         k = {}
         p = {}
         err = {}
@@ -720,18 +908,31 @@ class PkTrueOhioMock(Pk):
 
 
 class ModelFitPk(object):
+    """A tabulated P1D best-fit model (eBOSS or high-resolution stack)."""
+
     def __init__(
         self,
         k=None,
         p=None,
         norm_p=None,
     ):
+        """Store the model wavenumbers ``k``, power ``p`` and normalised ``norm_p``."""
         self.k = k
         self.p = p
         self.norm_p = norm_p
 
     @classmethod
     def init_from_file(cls, filename, modelname, zmax=None):
+        """Dispatch to the eBOSS or high-resolution model loader by name.
+
+        Args:
+            filename: File(s) holding the model.
+            modelname (str): ``"eBOSSmodel_stack"`` or ``"HRmodel_stack"``.
+            zmax (float, optional): Maximum redshift (unused by the loaders).
+
+        Returns:
+            ModelFitPk: The loaded model.
+        """
         if modelname == "eBOSSmodel_stack":
             return cls.init_eboss_stack(filename)
         if modelname == "HRmodel_stack":
@@ -739,6 +940,14 @@ class ModelFitPk(object):
 
     @classmethod
     def init_eboss_stack(cls, filename):
+        """Load and stack the low- and high-redshift eBOSS best-fit models.
+
+        Args:
+            filename (sequence[str]): ``(low_z_file, high_z_file)`` FITS models.
+
+        Returns:
+            ModelFitPk: The stacked model keyed by redshift.
+        """
         def read_in_model(model_file):
             tab = fitsio.FITS(model_file)[1]
             z = tab["z"][:].reshape(-1, 1000)
@@ -765,6 +974,14 @@ class ModelFitPk(object):
 
     @classmethod
     def init_hr_stack(cls, filename):
+        """Build the high-resolution analytic P1D model on a fixed (k, z) grid.
+
+        Args:
+            filename: Unused (the model is analytic, evaluated on a built-in grid).
+
+        Returns:
+            ModelFitPk: The model keyed by redshift.
+        """
         def load_model(
             k,
             z,
@@ -821,6 +1038,8 @@ class ModelFitPk(object):
 
 
 class MeanPkZ(object):
+    """The P1D averaged over redshift bins (a single k-vector power spectrum)."""
+
     def __init__(
         self,
         velunits=False,
@@ -834,6 +1053,7 @@ class MeanPkZ(object):
         err_noise=None,
         err_diff=None,
     ):
+        """Store the redshift-averaged P1D arrays (single vectors, not z-keyed)."""
         self.velunits = velunits
         self.k = k
         self.p = p
@@ -847,6 +1067,17 @@ class MeanPkZ(object):
 
     @classmethod
     def init_from_pk(cls, pk, zmax=None):
+        """Average a :class:`Pk` over its redshift bins below ``zmax``.
+
+        Errors are averaged and reduced by ``sqrt(n_zbins)``.
+
+        Args:
+            pk (Pk): Source power spectrum.
+            zmax (float, optional): Upper redshift bound (exclusive).
+
+        Returns:
+            MeanPkZ: The redshift-averaged power spectrum.
+        """
         velunits = pk.velunits
         if zmax is None:
             zmax = np.inf
@@ -876,6 +1107,15 @@ class MeanPkZ(object):
         )
 
     def compute_additional_stats(self, pk, zmax):
+        """Compute redshift-averaged error-propagated noise/diff/raw ratios.
+
+        Populates ``self.err_noiseoverraw``, ``self.err_diffoverraw`` and
+        ``self.err_diffovernoise`` from the source :class:`Pk`.
+
+        Args:
+            pk (Pk): Source power spectrum.
+            zmax (float): Upper redshift bound (exclusive).
+        """
         nb_z_bins = len(pk.zbin[pk.zbin < zmax])
 
         err_noiseoverraw = np.mean(
@@ -920,6 +1160,17 @@ class MeanPkZ(object):
         self.err_diffovernoise = err_diffovernoise
 
     def compute_noise_asymptopte(self, k_asymptote, use_diff=False):
+        """Estimate the high-k noise asymptote of the redshift-averaged P1D.
+
+        Args:
+            k_asymptote (float): Wavenumber above which the asymptote is measured.
+            use_diff (bool, optional): Use the exposure-difference power instead
+                of the pipeline noise power.
+
+        Returns:
+            tuple[float, float]: ``(alpha, beta)`` — the mean raw-minus-noise
+            power and the mean noise-over-raw ratio above ``k_asymptote``.
+        """
         mask_k = self.k > k_asymptote
         if use_diff:
             noise = self.p_diff
@@ -931,6 +1182,8 @@ class MeanPkZ(object):
 
 
 class MeanPkK(object):
+    """The P1D averaged over wavenumbers (one value per redshift bin)."""
+
     def __init__(
         self,
         velunits=False,
@@ -942,6 +1195,7 @@ class MeanPkK(object):
         err_noise=None,
         err_diff=None,
     ):
+        """Store the k-averaged P1D scalars, keyed by redshift bin."""
         self.velunits = velunits
         self.zbin = zbin
         self.p = p
@@ -953,6 +1207,15 @@ class MeanPkK(object):
 
     @classmethod
     def init_from_pk(cls, pk, kmax=None):
+        """Average a :class:`Pk` over wavenumbers below ``kmax`` per redshift bin.
+
+        Args:
+            pk (Pk): Source power spectrum.
+            kmax (float, optional): Upper wavenumber bound (exclusive).
+
+        Returns:
+            MeanPkK: The k-averaged power spectrum (one scalar per redshift bin).
+        """
         velunits = pk.velunits
         if kmax is None:
             kmax = np.inf
@@ -970,6 +1233,14 @@ class MeanPkK(object):
         return cls(velunits, pk.zbin, p, p_raw, p_noise, p_diff, err_noise, err_diff)
 
     def compute_additional_stats(self, pk, kmax=None):
+        """Compute the k-averaged noise-over-diff ratio and its error per z bin.
+
+        Populates ``self.noiseoverdiff`` and ``self.err_noiseoverdiff``.
+
+        Args:
+            pk (Pk): Source power spectrum.
+            kmax (float, optional): Upper wavenumber bound (exclusive).
+        """
         noiseoverdiff, err_noiseoverdiff = {}, {}
         for _, z in enumerate(pk.zbin):
             mask = pk.k[z] < kmax
@@ -986,6 +1257,16 @@ class MeanPkK(object):
 
 
 def posify_variance(variance):
+    """Replace negative variance entries by a linear interpolation of the rest.
+
+    All-NaN or all-negative inputs are returned unchanged.
+
+    Args:
+        variance (numpy.ndarray): Variance values (may contain negatives/NaNs).
+
+    Returns:
+        numpy.ndarray: Variance with negative entries interpolated away.
+    """
     if len(variance) == len(variance[np.isnan(variance)]):
         return variance
     elif len(variance) == len(variance[variance < 0.0]):
@@ -1008,7 +1289,19 @@ def smooth_variance(
     smoothing_window,
     smoothing_polynomial,
 ):
+    """Savitzky-Golay-smooth a variance vector in log space.
 
+    NaN entries are preserved; the window is clamped to the data length and
+    forced odd, and smoothing is skipped when too few valid points remain.
+
+    Args:
+        variance (numpy.ndarray): Variance values (positive; may contain NaNs).
+        smoothing_window (int): Requested Savitzky-Golay window length.
+        smoothing_polynomial (int): Savitzky-Golay polynomial order.
+
+    Returns:
+        numpy.ndarray: The smoothed variance.
+    """
     window_filter = min(
         smoothing_window,
         int(3 * len(variance) / 4),
@@ -1045,6 +1338,21 @@ def smooth_covariance(
     smooth_cov_order,
     remove_diagonal=True,
 ):
+    """2D Savitzky-Golay-smooth a covariance matrix (requires ``sgolay2``).
+
+    When ``remove_diagonal`` is True the diagonal is temporarily replaced by a
+    near-diagonal average during smoothing and restored afterwards, so only the
+    off-diagonal structure is smoothed.
+
+    Args:
+        covariance (numpy.ndarray): Square covariance matrix.
+        smooth_cov_window (int): 2D filter window size.
+        smooth_cov_order (int): 2D polynomial order.
+        remove_diagonal (bool, optional): Preserve the original diagonal.
+
+    Returns:
+        numpy.ndarray: The smoothed covariance matrix.
+    """
     if remove_diagonal:
         diag = np.copy(np.diag(covariance))
         diag_for_smoothing = np.concatenate(
@@ -1073,6 +1381,17 @@ def regularize_covariance(
     covariance,
     eigval_min=1e-10,
 ):
+    """Clip a covariance matrix's negative eigenvalues to a small positive floor.
+
+    Non-finite matrices are returned unchanged.
+
+    Args:
+        covariance (numpy.ndarray): Square covariance matrix.
+        eigval_min (float, optional): Floor applied to negative eigenvalues.
+
+    Returns:
+        numpy.ndarray: The regularised (positive-definite) covariance matrix.
+    """
     if np.isfinite(covariance).all():
         eigval, eigvec = np.linalg.eig(covariance)
         eigval[eigval < 0.0] = eigval_min
@@ -1089,7 +1408,23 @@ def print_infos(
     k_range_high,
     ref=None,
 ):
+    """Print and return P1D summary values in three wavenumber ranges.
 
+    Reports the mean power and error in a small-, medium- and high-k window at a
+    single redshift, optionally as ratios to a reference dictionary.
+
+    Args:
+        mean_pk (Pk): Power spectrum to summarise.
+        z (float): Redshift bin.
+        k_range_small (tuple[float, float]): Small-k ``(min, max)`` window.
+        k_range_med (tuple[float, float]): Medium-k window.
+        k_range_high (tuple[float, float]): High-k window.
+        ref (dict, optional): Reference values to divide by (keys ``pk_small``,
+            ``pk_med``, ``pk_high``, ``err_small``, ``err_med``, ``err_high``).
+
+    Returns:
+        dict: The computed summary values (and their ratios to ``ref`` if given).
+    """
     number_chunks = mean_pk.number_chunks[z]
 
     mask_k_small = (mean_pk.k[z] >= k_range_small[0]) & (
@@ -1184,6 +1519,31 @@ def load_and_apply_correction(
     file_metal,
     use_bootstrap_average_covariance=False,
 ):
+    """Read a picca P1D, clean its covariance and apply all corrections.
+
+    Convenience end-to-end entry point: reads the measurement, optionally
+    subtracts a global missing-noise term, cleans the covariance and adopts it
+    as the error, then applies the DESI mask/continuum and (if a metal file is
+    given) side-band corrections via :func:`corrections.apply_p1d_corections`.
+
+    Args:
+        file_pk (str): picca mean-P1D FITS file.
+        p_noise_miss (float | None): Global missing-noise power to subtract.
+        zmax (float): Maximum redshift processed.
+        correction_to_apply (list[str]): Correction names to apply.
+        file_correction_hcd (str): HCD correction file.
+        file_correction_bal (str): BAL correction file.
+        file_correction_lines (str): Sky-line correction file.
+        file_correction_cont (str): Continuum correction file.
+        file_correction_resolution (str): Resolution correction file.
+        file_metal (str | None): Side-band / metal correction file (None disables
+            the side-band correction).
+        use_bootstrap_average_covariance (bool, optional): Passed through to
+            :meth:`Pk.read_from_picca`.
+
+    Returns:
+        Pk: The corrected power spectrum.
+    """
     mean_pk = Pk.read_from_picca(
         file_pk, use_bootstrap_average_covariance=use_bootstrap_average_covariance
     )

@@ -1,3 +1,36 @@
+"""Metal-absorption contamination modelling for the DESI Lyman-alpha P1D.
+
+This module fits and plots the oscillatory metal-contamination signal seen
+in the "side band" regions of the DESI 1D power spectrum (P1D) measured
+from `picca` outputs. Side band 1 (SB1) and side band 2 (SB2) are pixel
+regions free of Lyman-alpha forest absorption but that still contain
+correlated metal absorption (chiefly the Si IV and C IV doublets), whose
+signature is an oscillation in k with a period set by the doublet velocity
+(or wavelength) separation superimposed on a power-law continuum.
+
+The module provides:
+    - Parametric models (`model_SB1`, `model_SB2` and their per-redshift-bin
+      rescaled variants) describing the side-band power spectrum as a
+      power-law plus one (SB2) or two (SB1) damped cosine oscillations
+      anchored on the C IV / Si IV doublet wavenumbers (`utils.kc4`,
+      `utils.ksi4`, or their velocity-unit equivalents).
+    - Fitting routines (`fit_model_SB1`, `fit_model_SB2`,
+      `fit_model_SB1_indiv`, `fit_mean_side_band_rest`,
+      `fit_indiv_side_band_1`) that use `scipy.optimize.curve_fit` to
+      constrain these models on the mean and per-redshift-bin side-band
+      power spectra.
+    - Helper and plotting routines (`init_side_band_power`,
+      `plot_side_band_fit`, `plot_side_band_fit_bis`) that build the
+      rest-frame-rescaled mean side-band spectra and visualise the fits.
+    - `fit_and_plot_side_band`, an orchestrator that runs the full
+      mean + individual side-band fit and produces the diagnostic figure.
+
+Wavenumbers `k` are expressed either in Angstrom^-1 (observed or rest
+wavelength units) or in s/km (velocity units), matching the `velunits`
+convention used throughout `p1desi`. Redshift `z` refers to the picca
+`Pk1D` redshift bin.
+"""
+
 import pickle
 
 import matplotlib.pyplot as plt
@@ -11,6 +44,28 @@ from p1desi import pk_io, utils
 
 
 def model_SB1(k, A, gamma, B, b, k1, phi1, C, c, k2, phi2):
+    """Power-law-plus-two-oscillations model for side band 1 (SB1).
+
+    SB1 contains two metal-doublet oscillations (e.g. Si IV and C IV), each
+    modelled as an exponentially damped cosine of characteristic wavenumber
+    k1 and k2, superimposed on a power-law continuum.
+
+    Args:
+        k (array-like): Wavenumber(s), in Angstrom^-1 or s/km.
+        A (float): Power-law amplitude.
+        gamma (float): Power-law index (model uses ``k ** (-gamma)``).
+        B (float): Amplitude of the first damped oscillation.
+        b (float): Damping rate of the first oscillation.
+        k1 (float): Characteristic wavenumber of the first oscillation.
+        phi1 (float): Phase offset of the first oscillation.
+        C (float): Amplitude of the second damped oscillation.
+        c (float): Damping rate of the second oscillation.
+        k2 (float): Characteristic wavenumber of the second oscillation.
+        phi2 (float): Phase offset of the second oscillation.
+
+    Returns:
+        numpy.ndarray: Model power spectrum evaluated at ``k``.
+    """
     power_law = (
         A * k ** (-gamma)
         + B * np.exp(-b * k) * np.cos(2 * np.pi * ((k - k1) / k1) + phi1)
@@ -20,6 +75,24 @@ def model_SB1(k, A, gamma, B, b, k1, phi1, C, c, k2, phi2):
 
 
 def model_SB2(k, A, gamma, B, b, k1, phi1):
+    """Power-law-plus-one-oscillation model for side band 2 (SB2).
+
+    SB2 contains a single metal-doublet oscillation, modelled as an
+    exponentially damped cosine of characteristic wavenumber k1,
+    superimposed on a power-law continuum.
+
+    Args:
+        k (array-like): Wavenumber(s), in Angstrom^-1 or s/km.
+        A (float): Power-law amplitude.
+        gamma (float): Power-law index (model uses ``k ** (-gamma)``).
+        B (float): Amplitude of the damped oscillation.
+        b (float): Damping rate of the oscillation.
+        k1 (float): Characteristic wavenumber of the oscillation.
+        phi1 (float): Phase offset of the oscillation.
+
+    Returns:
+        numpy.ndarray: Model power spectrum evaluated at ``k``.
+    """
     power_law = A * k ** (-gamma) + B * np.exp(-b * k) * np.cos(
         2 * np.pi * ((k - k1) / k1) + phi1
     )
@@ -27,16 +100,66 @@ def model_SB2(k, A, gamma, B, b, k1, phi1):
 
 
 def model_SB1_indiv(param_mean, redshift, A, B, k):
+    """Rescale the mean SB1 model to a single redshift bin (wavelength units).
+
+    Evaluates the mean SB1 model (`model_SB1`) at the rest-frame wavenumber
+    ``k * (1 + redshift)`` and applies a per-redshift-bin linear rescaling
+    ``(A * k + B)``.
+
+    Args:
+        param_mean (sequence): Best-fit parameters of the mean `model_SB1`.
+        redshift (float): Redshift of the bin being rescaled.
+        A (float): Slope of the linear rescaling.
+        B (float): Offset of the linear rescaling.
+        k (array-like): Observed-frame wavenumber(s), in Angstrom^-1.
+
+    Returns:
+        numpy.ndarray: Rescaled model power spectrum evaluated at ``k``.
+    """
     mean_p = model_SB1(k * (1 + redshift), *param_mean)
     return (A * k + B) * mean_p
 
 
 def model_SB1_indiv_kms(param_mean, A, B, k):
+    """Rescale the mean SB1 model to a single redshift bin (velocity units).
+
+    Same as `model_SB1_indiv` but for velocity-unit wavenumbers (s/km),
+    where no ``(1 + z)`` rest-frame rescaling of k is required.
+
+    Args:
+        param_mean (sequence): Best-fit parameters of the mean `model_SB1`.
+        A (float): Slope of the linear rescaling.
+        B (float): Offset of the linear rescaling.
+        k (array-like): Wavenumber(s), in s/km.
+
+    Returns:
+        numpy.ndarray: Rescaled model power spectrum evaluated at ``k``.
+    """
     mean_p = model_SB1(k, *param_mean)
     return (A * k + B) * mean_p
 
 
 def fit_model_SB1(x, y, dy, k1, k2, dk, xmin=None, xmax=None):
+    """Fit `model_SB1` to a side-band power spectrum via chi-square minimisation.
+
+    NaN entries are removed and the fit is restricted to ``[xmin, xmax]``
+    (defaulting to the data range). The oscillation wavenumbers are seeded
+    at ``k1``/``k2`` and bounded to within ``+/- dk`` of those values.
+
+    Args:
+        x (numpy.ndarray): Wavenumber values.
+        y (numpy.ndarray): Power spectrum values.
+        dy (numpy.ndarray): Power spectrum uncertainties.
+        k1 (float): Expected characteristic wavenumber of the first oscillation.
+        k2 (float): Expected characteristic wavenumber of the second oscillation.
+        dk (float): Half-width of the bound placed around ``k1`` and ``k2``.
+        xmin (float, optional): Lower fit bound in x. Defaults to ``x.min()``.
+        xmax (float, optional): Upper fit bound in x. Defaults to ``x.max()``.
+
+    Returns:
+        tuple: ``(param, cov)`` — best-fit `model_SB1` parameters and their
+        covariance matrix, as returned by `scipy.optimize.curve_fit`.
+    """
     mask = (~np.isnan(x)) & (~np.isnan(y)) & (~np.isnan(dy))
     x, y, dy = x[mask], y[mask], dy[mask]
     if xmin is None:
@@ -81,6 +204,25 @@ def fit_model_SB1(x, y, dy, k1, k2, dk, xmin=None, xmax=None):
 
 
 def fit_model_SB2(x, y, dy, k1, dk, xmin=None, xmax=None):
+    """Fit `model_SB2` to a side-band power spectrum via chi-square minimisation.
+
+    NaN entries are removed and the fit is restricted to ``[xmin, xmax]``
+    (defaulting to the data range). The oscillation wavenumber is seeded
+    at ``k1`` and bounded to within ``+/- dk`` of that value.
+
+    Args:
+        x (numpy.ndarray): Wavenumber values.
+        y (numpy.ndarray): Power spectrum values.
+        dy (numpy.ndarray): Power spectrum uncertainties.
+        k1 (float): Expected characteristic wavenumber of the oscillation.
+        dk (float): Half-width of the bound placed around ``k1``.
+        xmin (float, optional): Lower fit bound in x. Defaults to ``x.min()``.
+        xmax (float, optional): Upper fit bound in x. Defaults to ``x.max()``.
+
+    Returns:
+        tuple: ``(param, cov)`` — best-fit `model_SB2` parameters and their
+        covariance matrix, as returned by `scipy.optimize.curve_fit`.
+    """
     mask = (~np.isnan(x)) & (~np.isnan(y)) & (~np.isnan(dy))
     x, y, dy = x[mask], y[mask], dy[mask]
     if xmin is None:
@@ -105,6 +247,30 @@ def fit_model_SB2(x, y, dy, k1, dk, xmin=None, xmax=None):
 def fit_model_SB1_indiv(
     param_mean, redshift, x, y, dy, xmin=None, xmax=None, velunits=False
 ):
+    """Fit the per-redshift-bin linear rescaling (A, B) of the mean SB1 model.
+
+    Holds the mean SB1 shape (`param_mean`) fixed and fits only the linear
+    rescaling parameters A and B of `model_SB1_indiv` (or
+    `model_SB1_indiv_kms` if ``velunits`` is True) to the data of a single
+    redshift bin. NaN entries are removed and the fit is restricted to
+    ``[xmin, xmax]`` (defaulting to the data range).
+
+    Args:
+        param_mean (sequence): Best-fit parameters of the mean `model_SB1`.
+        redshift (float): Redshift of the bin being fitted.
+        x (numpy.ndarray): Wavenumber values.
+        y (numpy.ndarray): Power spectrum values.
+        dy (numpy.ndarray): Power spectrum uncertainties.
+        xmin (float, optional): Lower fit bound in x. Defaults to ``x.min()``.
+        xmax (float, optional): Upper fit bound in x. Defaults to ``x.max()``.
+        velunits (bool, optional): If True, fit in velocity units (s/km)
+            using `model_SB1_indiv_kms` instead of `model_SB1_indiv`.
+            Defaults to False.
+
+    Returns:
+        tuple: ``(param, cov)`` — best-fit ``(A, B)`` parameters and their
+        covariance matrix, as returned by `scipy.optimize.curve_fit`.
+    """
     mask = (~np.isnan(x)) & (~np.isnan(y)) & (~np.isnan(dy))
     x, y, dy = x[mask], y[mask], dy[mask]
     if xmin is None:
@@ -114,6 +280,18 @@ def fit_model_SB1_indiv(
     mask = (x >= xmin) & (x <= xmax)
 
     def model_to_fit(k, A, B):
+        """Wrap `model_SB1_indiv`/`model_SB1_indiv_kms` for `curve_fit`.
+
+        Args:
+            k (array-like): Wavenumber(s) at which to evaluate the model.
+            A (float): Slope of the linear rescaling.
+            B (float): Offset of the linear rescaling.
+
+        Returns:
+            numpy.ndarray: Model power spectrum evaluated at ``k``, using
+            `model_SB1_indiv_kms` if ``velunits`` is True, else
+            `model_SB1_indiv`.
+        """
         if velunits:
             return model_SB1_indiv_kms(param_mean, A, B, k)
         else:
@@ -131,6 +309,27 @@ def fit_model_SB1_indiv(
 
 
 def init_side_band_power(pSB1, pSB2, zmax):
+    """Build rest-frame-rescaled mean SB1/SB2 power spectra across redshift bins.
+
+    For each redshift bin below ``zmax``, rescales the SB1 and SB2
+    wavenumbers to the rest frame (``k * (1 + z)``, or left as-is if
+    ``pSB1.velunits`` is True), interpolates each bin's power spectrum and
+    error onto a common rest-frame k grid, and averages over redshift bins.
+
+    Args:
+        pSB1: Side-band-1 `Pk1D`-like power-spectrum object with attributes
+            ``zbin``, ``k`` (dict keyed by z), ``p``, ``err``, ``velunits``.
+        pSB2: Side-band-2 power-spectrum object with the same interface as
+            ``pSB1``.
+        zmax (float): Upper redshift bound (exclusive); only bins with
+            ``z < zmax`` are included.
+
+    Returns:
+        dict: Mapping with keys ``"krescaleSB1"``, ``"krescaleSB2"`` (common
+        rest-frame k grids), ``"pkrestSB1"``, ``"pkrestSB2"`` (redshift-mean
+        power spectra) and ``"errorpkrestSB1"``, ``"errorpkrestSB2"``
+        (standard error on the mean).
+    """
 
     velunits = pSB1.velunits
 
@@ -185,6 +384,33 @@ def init_side_band_power(pSB1, pSB2, zmax):
 def fit_mean_side_band_rest(
     mean_dict, dkrest=1.0, kminrest=None, kmaxrest=8, velunits=False
 ):
+    """Fit the mean rest-frame SB1 and SB2 power spectra.
+
+    Fits `model_SB1` to the mean SB1 spectrum (anchored on the C IV and
+    Si IV doublet wavenumbers) and `model_SB2` to the mean SB2 spectrum
+    (anchored on the C IV doublet wavenumber), using the arrays produced by
+    `init_side_band_power`.
+
+    Args:
+        mean_dict (dict): Output of `init_side_band_power`, containing
+            ``"krescaleSB1"``, ``"pkrestSB1"``, ``"errorpkrestSB1"``,
+            ``"krescaleSB2"``, ``"pkrestSB2"``, ``"errorpkrestSB2"``.
+        dkrest (float, optional): Half-width of the bound placed around the
+            doublet wavenumbers. Defaults to 1.0.
+        kminrest (float, optional): Lower fit bound in rest-frame k.
+            Defaults to None (use the data minimum).
+        kmaxrest (float, optional): Upper fit bound in rest-frame k.
+            Defaults to 8.
+        velunits (bool, optional): If True, use the velocity-unit doublet
+            wavenumbers (`utils.kc4_speed`, `utils.ksi4_speed`); otherwise
+            use the wavelength-unit ones (`utils.kc4`, `utils.ksi4`).
+            Defaults to False.
+
+    Returns:
+        tuple: ``(param_SB1_mean, param_SB2_mean, cov_SB1_mean,
+        cov_SB2_mean)`` — best-fit parameters and covariance matrices for
+        the mean SB1 and SB2 models.
+    """
     if velunits:
         kc4 = utils.kc4_speed
         ksi4 = utils.ksi4_speed
@@ -216,6 +442,32 @@ def fit_mean_side_band_rest(
 
 
 def fit_indiv_side_band_1(pSB1, zmax, param_SB1_mean, kmin=None, kmax=8, save_fit=None):
+    """Fit the per-redshift-bin linear rescaling of SB1 for every bin below zmax.
+
+    Loops over ``pSB1.zbin`` and, for each bin with ``z < zmax``, calls
+    `fit_model_SB1_indiv` to fit the (A, B) rescaling of the mean SB1 model
+    to that bin's observed-frame power spectrum. Optionally pickles the
+    mean and individual fit parameters.
+
+    Args:
+        pSB1: Side-band-1 power-spectrum object with attributes ``zbin``,
+            ``k`` (dict keyed by z), ``p``, ``err``, ``velunits``.
+        zmax (float): Upper redshift bound (exclusive); only bins with
+            ``z < zmax`` are fitted.
+        param_SB1_mean (sequence): Best-fit parameters of the mean SB1
+            model (from `fit_mean_side_band_rest`).
+        kmin (float, optional): Lower fit bound in k. Defaults to None (use
+            the data minimum).
+        kmax (float, optional): Upper fit bound in k. Defaults to 8.
+        save_fit (str, optional): If given, path to pickle
+            ``(param_SB1_mean, param_SB1_indiv)`` to. Defaults to None (no
+            saving).
+
+    Returns:
+        tuple: ``(param_SB1_indiv, cov_SB1_indiv)`` — lists of best-fit
+        (A, B) parameters and covariance matrices, one entry per redshift
+        bin below ``zmax``.
+    """
     param_SB1_indiv = []
     cov_SB1_indiv = []
     for z in pSB1.zbin:
@@ -252,6 +504,47 @@ def plot_side_band_fit(
     save_txt=None,
     **kwargs,
 ):
+    """Plot the mean SB1/SB2 rest-frame fits and the individual SB1 redshift-bin fits.
+
+    Produces a two-panel figure: the top panel shows the mean SB1 and SB2
+    rest-frame power spectra with their `model_SB1`/`model_SB2` fits; the
+    bottom panel shows, for each redshift bin below ``zmax``, the observed
+    SB1 power spectrum with its individually rescaled fit
+    (`model_SB1_indiv`/`model_SB1_indiv_kms`). Saves the figure to
+    ``name_out`` and, if requested, the underlying arrays to text files.
+
+    Args:
+        name_out (str): Output path for the saved figure.
+        plot_P (bool): If True, plot P(k) directly; if False, plot the
+            dimensionless ``k * P(k) / pi`` quantity instead.
+        mean_dict (dict): Output of `init_side_band_power`.
+        pSB1: Side-band-1 power-spectrum object with attributes ``zbin``,
+            ``k``, ``p``, ``err``, ``norm_p``, ``norm_err``,
+            ``number_chunks``, ``velunits``.
+        zmax (float): Upper redshift bound (exclusive) for the bottom panel.
+        param_SB1_mean (sequence): Best-fit mean SB1 model parameters.
+        param_SB2_mean (sequence): Best-fit mean SB2 model parameters.
+        param_SB1_indiv (sequence): Per-redshift-bin (A, B) fit parameters
+            from `fit_indiv_side_band_1`.
+        nb_bins (int): Number of points used to sample the fitted model
+            curves.
+        kmaxrest (float or None): Upper x-limit / fit-curve bound for the
+            top (rest-frame) panel. If None, taken from
+            ``mean_dict["krescaleSB1"]``.
+        kmax (float): Upper x-limit / fit-curve bound for the bottom
+            (observed-frame) panel.
+        save_txt (str, optional): If given, path prefix used to save the
+            mean SB1, mean SB2, and individual SB1 arrays to
+            ``{save_txt}_1.txt``, ``{save_txt}_2.txt``, ``{save_txt}_3.txt``.
+            Defaults to None (no saving).
+        **kwargs: Plot styling overrides, including ``style``, ``figsize``,
+            ``ncol_legend``, ``size_legend``, ``fontsize``, ``size``,
+            ``markersize``, ``ylim``, ``ylabel_1``, ``ylabel_2``,
+            ``xlabel_1``, ``xlabel_2``.
+
+    Returns:
+        None
+    """
     style = utils.return_key(kwargs, "style", None)
     if style is not None:
         plt.style.use(style)
@@ -458,6 +751,39 @@ def plot_side_band_fit_bis(
     save_txt=None,
     **kwargs,
 ):
+    """Plot the individual SB1 redshift-bin fits in a single panel.
+
+    Variant of `plot_side_band_fit` that omits the mean SB1/SB2 rest-frame
+    panel and only plots, for each redshift bin below ``zmax``, the observed
+    SB1 power spectrum with its individually rescaled fit
+    (`model_SB1_indiv`/`model_SB1_indiv_kms`). Saves the figure to
+    ``name_out`` and, if requested, the underlying arrays to a text file.
+
+    Args:
+        name_out (str): Output path for the saved figure.
+        plot_P (bool): If True, plot P(k) directly; if False, plot the
+            dimensionless ``k * P(k) / pi`` quantity instead.
+        pSB1: Side-band-1 power-spectrum object with attributes ``zbin``,
+            ``k``, ``p``, ``err``, ``norm_p``, ``norm_err``,
+            ``number_chunks``, ``velunits``.
+        zmax (float): Upper redshift bound (exclusive) for the bins plotted.
+        param_SB1_mean (sequence): Best-fit mean SB1 model parameters.
+        param_SB1_indiv (sequence): Per-redshift-bin (A, B) fit parameters
+            from `fit_indiv_side_band_1`.
+        nb_bins (int): Number of points used to sample the fitted model
+            curves.
+        kmax (float): Upper x-limit / fit-curve bound.
+        kmin (float): Lower x-limit.
+        save_txt (str, optional): If given, path used to save the redshift,
+            k, power, and error arrays to ``{save_txt}.txt``. Defaults to
+            None (no saving).
+        **kwargs: Plot styling overrides, including ``style``, ``figsize``,
+            ``ncol_legend``, ``size_legend``, ``fontsize``, ``size``,
+            ``markersize``, ``ylim``, ``ylabel_2``, ``xlabel_2``.
+
+    Returns:
+        None
+    """
     style = utils.return_key(kwargs, "style", None)
     if style is not None:
         plt.style.use(style)
@@ -581,6 +907,45 @@ def fit_and_plot_side_band(
     save_txt=None,
     **plt_args,
 ):
+    """Run the full side-band metal-contamination fit and produce the diagnostic plot.
+
+    Orchestrates the complete pipeline: builds the mean rest-frame SB1/SB2
+    spectra (`init_side_band_power`), fits the mean SB1 and SB2 models
+    (`fit_mean_side_band_rest`), fits the per-redshift-bin SB1 rescaling
+    (`fit_indiv_side_band_1`), and plots everything (`plot_side_band_fit`).
+
+    Args:
+        pSB1: Side-band-1 power-spectrum object with attributes ``zbin``,
+            ``k``, ``p``, ``err``, ``norm_p``, ``norm_err``,
+            ``number_chunks``, ``velunits``.
+        pSB2: Side-band-2 power-spectrum object with the same interface as
+            ``pSB1``.
+        name_out (str): Output path for the saved figure.
+        zmax (float): Upper redshift bound (exclusive) for included bins.
+        nb_bins (int): Number of points used to sample the fitted model
+            curves.
+        dkrest (float): Half-width of the bound placed around the doublet
+            wavenumbers in the mean rest-frame fit.
+        kminrest (float or None): Lower rest-frame fit bound.
+        kmaxrest (float): Upper rest-frame fit bound / plot x-limit.
+        kmin (float): Lower observed-frame fit bound for the individual
+            SB1 fits.
+        kmax (float): Upper observed-frame fit bound / plot x-limit.
+        plot_P (bool, optional): If True, plot P(k) directly; if False,
+            plot the dimensionless ``k * P(k) / pi`` quantity. Defaults to
+            True.
+        save_fit (str, optional): If given, path to pickle the mean and
+            individual SB1 fit parameters to. Defaults to None.
+        save_txt (str, optional): If given, path prefix used to save the
+            plotted arrays to text files. Defaults to None.
+        **plt_args: Additional plot styling overrides forwarded to
+            `plot_side_band_fit`.
+
+    Returns:
+        tuple: ``(param_SB1_mean, param_SB2_mean, cov_SB1_mean,
+        cov_SB2_mean, param_SB1_indiv, cov_SB1_indiv)`` — mean and
+        per-redshift-bin best-fit parameters and covariance matrices.
+    """
     mean_dict = init_side_band_power(pSB1, pSB2, zmax)
 
     (

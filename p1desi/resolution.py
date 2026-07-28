@@ -1,3 +1,10 @@
+"""Spectrograph resolution correction for the P1D.
+
+Plots and models the mean resolution correction of the one-dimensional power
+spectrum, fits the effective pixel/resolution width ``dl`` per redshift bin and
+reports the wavenumbers at which the correction reaches the 10% / 5% levels.
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
@@ -13,6 +20,22 @@ def plot_mean_resolution(
     kmax_line=None,
     **kwargs,
 ):
+    """Plot the redshift-averaged resolution correction and its k thresholds.
+
+    Args:
+        file_pk (str): picca mean-P1D file.
+        zmax (float): Only redshift bins below this are averaged.
+        outfig (str | None): Output figure path (skipped if None).
+        outpoints (str | None): Output ``.txt`` points path (skipped if None).
+        kmax_line (float, optional): If set, draw a vertical line at this k.
+        **kwargs: Plot styling (``style``, ``figsize``, ``size``,
+            ``size_legend``, ``size_font_x``, ``size_font_y``,
+            ``plot_pixelization``, ``alpha_indiv_redshift``).
+
+    Returns:
+        tuple[float, float]: ``(pk_cut_90, pk_cut_95)`` — the smallest k where
+        the mean correction drops below 0.1 and 0.05 respectively.
+    """
     pk = pk_io.Pk.read_from_picca(file_pk)
 
     style = utils.return_key(kwargs, "style", None)
@@ -107,11 +130,33 @@ def plot_mean_resolution(
 
 
 def model_resolution(k, dl):
+    """Gaussian-resolution times pixelization window function.
+
+    Args:
+        k (array-like): Wavenumber.
+        dl (float): Effective Gaussian resolution width.
+
+    Returns:
+        array-like: The modelled resolution correction (a Gaussian times the
+        0.4-pixel sinc pixelization window).
+    """
     resolution = np.exp(-0.5 * (k * dl) ** 2) * (np.sin(k * 0.4) / (k * 0.4))
     return resolution
 
 
 def fit_model_resolution(x, y, dy):
+    """Fit the resolution-width ``dl`` of :func:`model_resolution` to data.
+
+    NaN samples are dropped before fitting.
+
+    Args:
+        x (numpy.ndarray): Wavenumbers.
+        y (numpy.ndarray): Measured resolution correction.
+        dy (numpy.ndarray): Uncertainty on ``y``.
+
+    Returns:
+        numpy.ndarray: The best-fit ``[dl]`` parameter array.
+    """
     mask = (~np.isnan(x)) & (~np.isnan(y)) & (~np.isnan(dy))
     x, y, dy = x[mask], y[mask], dy[mask]
     popt, _ = curve_fit(
@@ -126,6 +171,15 @@ def fit_model_resolution(x, y, dy):
 
 
 def fit_resolution_redshift(file_pk, zmax, outfile, kmin=None, kmax=None):
+    """Fit the resolution width per redshift bin and pickle the result.
+
+    Args:
+        file_pk (str): picca mean-P1D file.
+        zmax (float): Only redshift bins below this are fitted.
+        outfile (str): Output pickle path for the list of ``dl`` values.
+        kmin (float, optional): Lower k bound of the fit window.
+        kmax (float, optional): Upper k bound of the fit window.
+    """
     pk = pk_io.Pk.read_from_picca(file_pk)
     delta_l = []
     for i, z in enumerate(pk.zbin):

@@ -1,3 +1,9 @@
+"""QSO / DLA catalog helpers built on FITS and pandas.
+
+Load DESI quasar (or DLA) catalogs from FITS into pandas dataframes, merge
+several of them, write a dataframe back to FITS, and report object counts.
+"""
+
 import fitsio
 import numpy as np
 import pandas as pd
@@ -9,6 +15,20 @@ def return_dataframe(
     colname_drop=None,
     return_unique=False,
 ):
+    """Load a FITS catalog HDU into a pandas dataframe.
+
+    Byte-swaps the FITS records to native order, optionally drops columns and
+    optionally keeps only the first row of each unique ``TARGETID``.
+
+    Args:
+        catalog_name (str): Catalog FITS file path.
+        extname (str, optional): HDU name to read. Defaults to ``"QSO_CAT"``.
+        colname_drop (list[str], optional): Column names to exclude.
+        return_unique (bool, optional): Keep only one row per ``TARGETID``.
+
+    Returns:
+        pandas.DataFrame: The (optionally filtered) catalog.
+    """
     if colname_drop is not None:
         f = fitsio.FITS(catalog_name)[extname].read().byteswap().newbyteorder()
         dtype_new = []
@@ -35,6 +55,14 @@ def return_dataframe(
 def merge_panda_dataframe(
     list_data,
 ):
+    """Concatenate several catalog dataframes into one.
+
+    Args:
+        list_data (list[pandas.DataFrame]): Dataframes to concatenate.
+
+    Returns:
+        pandas.DataFrame: The row-wise concatenation with a fresh index.
+    """
     merged_dataframe = pd.concat(list_data, ignore_index=True)
     return merged_dataframe
 
@@ -79,6 +107,14 @@ def get_number(
     type="QSO",
     extname=None,
 ):
+    """Print the number of rows in a catalog HDU.
+
+    Args:
+        catalog (str): Catalog FITS file path.
+        type (str, optional): ``"QSO"`` or ``"DLA"``, selecting the default HDU
+            name when ``extname`` is not given. Defaults to ``"QSO"``.
+        extname (str, optional): Explicit HDU name (overrides ``type``).
+    """
     if type == "QSO":
         if extname is None:
             extname = "QSO_CAT"

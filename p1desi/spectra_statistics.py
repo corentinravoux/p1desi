@@ -1,3 +1,15 @@
+"""Per-spectrum statistics and diagnostics feeding the DESI Lya forest P1D.
+
+This module extracts individual DESI spectra (flux, pipeline inverse
+variance, target metadata) from ``coadd``/``spectra`` FITS files, and
+provides diagnostic tools to compare the pipeline noise model against
+an empirical noise estimate built from exposure differences (odd/even
+exposures combined with alternating sign). Diagnostics are produced as
+binned profiles and plots (variance vs. observed wavelength [Angstrom],
+RA/Dec target maps) used to validate the noise model that enters the
+P1D estimation.
+"""
+
 import numpy as np
 import glob, os
 import matplotlib.pyplot as plt
@@ -22,6 +34,49 @@ def get_spectra_desi(
     get_fuji_pb_spectra=False,
     nexp_min=None,
 ):
+    """Extract DESI coadd spectra for a target selection, with optional exposure-difference spectra.
+
+    Reads ``coadd-*.fits`` files (and, if ``compute_diff`` is True, the
+    corresponding per-exposure ``spectra-*.fits`` files) below each path in
+    ``spectra_path``, selects fibers matching ``cut_objects`` target bits
+    (checked across the SV1/SV2/SV3/main DESI target masks) and a good
+    ``FIBERSTATUS``, coadds cameras to "brz" if needed, and concatenates the
+    resulting flux, pipeline variance, target id, RA and Dec across all
+    files. If ``compute_diff`` is True, individual exposures are combined
+    with an alternating sign to build a difference spectrum used to
+    estimate the noise empirically.
+
+    Args:
+        spectra_path (list of str): Directories to search (recursively one
+            level, via ``*/coadd-*.fits`` and ``*/spectra-*.fits`` globs)
+            for DESI spectra files.
+        spectro (str or int): Spectrograph number to filter file names on,
+            or ``"all"`` to include every spectrograph.
+        cut_objects (list of str): Names of target mask bits (e.g. "QSO")
+            used to select fibers via the SV1/SV2/SV3/main DESI target
+            masks.
+        compute_diff (bool, optional): If True, also compute an
+            exposure-difference flux array from the individual exposures.
+            Defaults to False.
+        get_fuji_pb_spectra (bool, optional): If True, also accept fibers
+            with FIBERSTATUS 8388608 or 16777216 (Fuji "poor but usable"
+            bits) in addition to FIBERSTATUS == 0. Defaults to False.
+        nexp_min (int, optional): Minimum number of individual exposures
+            required to keep a file when ``compute_diff`` is True; files
+            with fewer (or an odd number of) exposures are skipped.
+            Defaults to None (no minimum).
+
+    Returns:
+        tuple: ``(wavelength, flux, diff_flux, var, target_id, ra, dec)``
+            where ``wavelength`` (numpy.ndarray) is the "brz" wavelength
+            grid [Angstrom]; ``flux`` (numpy.ndarray) has shape
+            ``(n_spectra, n_wave)``; ``diff_flux`` (numpy.ndarray or None)
+            is the exposure-difference flux if ``compute_diff`` is True,
+            else None; ``var`` (numpy.ndarray) is the pipeline flux
+            variance (inverse of ivar where finite and non-negligible);
+            ``target_id`` (numpy.ndarray) holds DESI TARGETIDs; ``ra`` and
+            ``dec`` (numpy.ndarray) are target coordinates [deg].
+    """
 
     mask_desi_target_names = [
         "SV1_DESI_TARGET",
@@ -140,6 +195,26 @@ def get_spectra_desi(
 
 
 def hist_profile(x, y, bins, range_x, range_y, outlier_insensitive=False):
+    """Compute a binned profile (mean +/- standard error) of y vs x.
+
+    Values of y outside ``range_y`` are excluded before binning.
+
+    Args:
+        x (array-like): Independent variable (e.g. wavelength [Angstrom]).
+        y (array-like): Dependent variable to profile.
+        bins (int): Number of bins.
+        range_x (tuple): (min, max) range used for binning x.
+        range_y (tuple): (min, max) range used to reject y outliers.
+        outlier_insensitive (bool, optional): If True, use the median and
+            a robust std estimator (half the 84.135th-15.865th percentile
+            spread) instead of the mean and standard deviation. Defaults
+            to False.
+
+    Returns:
+        tuple: ``(bin_centers, means, errors)`` -- bin centers
+            (numpy.ndarray), per-bin mean/median (numpy.ndarray), and
+            per-bin standard error of the mean (numpy.ndarray).
+    """
     w = (y > range_y[0]) & (y < range_y[1])
     if outlier_insensitive:
         means_result = binned_statistic(
@@ -182,6 +257,24 @@ def hist_profile(x, y, bins, range_x, range_y, outlier_insensitive=False):
 
 
 def var_profile(x, y, bins, range_x, range_y, outlier_insensitive=False):
+    """Compute a binned dispersion (standard deviation) profile of y vs x.
+
+    Values of y outside ``range_y`` are excluded before binning.
+
+    Args:
+        x (array-like): Independent variable (e.g. wavelength [Angstrom]).
+        y (array-like): Dependent variable whose dispersion is profiled.
+        bins (int): Number of bins.
+        range_x (tuple): (min, max) range used for binning x.
+        range_y (tuple): (min, max) range used to reject y outliers.
+        outlier_insensitive (bool, optional): If True, use a robust std
+            estimator (half the 84.135th-15.865th percentile spread)
+            instead of the standard deviation. Defaults to False.
+
+    Returns:
+        tuple: ``(bin_centers, std)`` -- bin centers (numpy.ndarray) and
+            per-bin standard deviation (numpy.ndarray).
+    """
     w = (y > range_y[0]) & (y < range_y[1])
     if outlier_insensitive:
         outlier_insensitive_std = (
@@ -207,6 +300,30 @@ def var_profile(x, y, bins, range_x, range_y, outlier_insensitive=False):
 
 
 def hist_profile_2d_bins(x, y, bins, statistic="mean", outlier_insensitive=False):
+    """Bin a 2D array along its second axis into equal-width bins of x.
+
+    Splits the range [x[0], x[-1]] into ``bins`` equal-width intervals and,
+    for each interval, computes a mean or variance statistic over the
+    corresponding column-selection of ``y`` (transposed so that binning is
+    performed along x).
+
+    Args:
+        x (array-like): 1D coordinate array (e.g. wavelength [Angstrom]),
+            assumed sorted; only the first and last values set the range.
+        y (array-like): 2D array whose columns are indexed the same way as
+            x (i.e. ``np.transpose(y)`` is indexable by the x mask).
+        bins (int): Number of equal-width bins spanning [x[0], x[-1]].
+        statistic (str, optional): "mean" or "var" -- statistic computed
+            per bin. Defaults to "mean".
+        outlier_insensitive (bool, optional): If True, use ``nanmedian``
+            for "mean" or a robust percentile-based variance estimator for
+            "var" instead of ``nanmean``/``nanstd``. Defaults to False.
+
+    Returns:
+        tuple: ``(bin_centers, bin_2d_stat)`` -- bin centers
+            (numpy.ndarray) and the per-bin statistic values
+            (numpy.ndarray).
+    """
 
     bin_edges = np.array(
         [i * ((x[-1] - x[0]) / bins) + x[0] for i in range(bins)] + [x[-1]]
@@ -252,6 +369,40 @@ def plot_variance_histogram(
     plot_ratio=True,
     **kwargs,
 ):
+    """Plot binned diagnostic panels comparing exposure-difference and pipeline variance vs wavelength.
+
+    Produces a 2- or 3-panel figure (variance profiles, their difference,
+    and optionally their ratio) as a function of observed wavelength, and
+    saves it as a PDF. Optionally highlights camera-overlap wavelength
+    regions.
+
+    Args:
+        name_out (str): Output basename (without extension); the figure is
+            saved to "{name_out}.pdf".
+        V_diff (array-like): Per-pixel flux variance estimated from
+            exposure differences.
+        V_pipeline (array-like): Per-pixel pipeline flux variance
+            (from inverse variance).
+        wavelength (array-like): Observed wavelength grid [Angstrom]
+            matching V_diff/V_pipeline.
+        overlap_regions (list of tuple, optional): Wavelength ranges
+            ``[(lo, hi), ...]`` of camera-overlap regions to highlight.
+            Defaults to None.
+        nb_bins (int, optional): Number of wavelength bins for the profile
+            plots. Defaults to 40.
+        outlier_insensitive (bool, optional): If True, use robust
+            (percentile-based) statistics for the binned profiles.
+            Defaults to False.
+        plot_ratio (bool, optional): If True, add a third panel with the
+            (diff - pipeline) / pipeline ratio. Defaults to True.
+        **kwargs: Plot styling options resolved via
+            ``utils.return_key``: style, fontsize, fontsize_legend,
+            labelsize, alpha, figsize, alpha_fill, size_fill, ylim_diff,
+            ylim_ratio.
+
+    Returns:
+        None. Saves the figure to "{name_out}.pdf" and closes it.
+    """
 
     style = utils.return_key(kwargs, "style", None)
     if style is not None:
@@ -473,6 +624,30 @@ def plot_variance(
     points=False,
     **kwargs,
 ):
+    """Plot raw variance, ratio, and difference of exposure-difference vs pipeline variance vs wavelength.
+
+    Produces a 3-panel PDF figure: raw ``V_diff``/``V_pipeline`` overlay,
+    their fractional difference (ratio), and their absolute difference,
+    each as a function of wavelength.
+
+    Args:
+        name_out (str): Output basename; the figure is saved to
+            "{name_out}.pdf".
+        V_diff (array-like): Per-pixel (or per-bin) variance from
+            exposure differences.
+        V_pipeline (array-like): Per-pixel (or per-bin) pipeline variance.
+        wavelength (array-like): Wavelength grid [Angstrom] matching
+            V_diff/V_pipeline.
+        overlap_regions (list of tuple, optional): Wavelength ranges to
+            shade as camera-overlap regions. Defaults to None.
+        points (bool, optional): If True, plot markers instead of
+            connected lines. Defaults to False.
+        **kwargs: figsize, alpha_fill, size_fill resolved via
+            ``utils.return_key``.
+
+    Returns:
+        None. Saves the figure to "{name_out}.pdf" and closes it.
+    """
 
     figsize = utils.return_key(kwargs, "figsize", (8, 10))
     alpha_fill = utils.return_key(kwargs, "alpha_fill", 0.5)
@@ -562,6 +737,28 @@ def plot_variance(
 
 
 def plot_hist(name_out, var_pipeline, diff, wavelength, nb_bins, **kwargs):
+    """Compute raw variances and produce the raw and binned-histogram diagnostic plots.
+
+    Computes the exposure-difference variance (``nanvar`` over spectra)
+    and the mean pipeline variance, then calls :func:`plot_variance` for
+    the raw comparison and :func:`plot_variance_histogram` twice (with
+    ``outlier_insensitive`` False and True) for the binned comparisons.
+
+    Args:
+        name_out (str): Output basename prefix for the generated PDF
+            plots.
+        var_pipeline (array-like): Per-spectrum pipeline flux variance,
+            shape (n_spectra, n_wave).
+        diff (array-like): Per-spectrum exposure-difference flux, shape
+            (n_spectra, n_wave).
+        wavelength (array-like): Wavelength grid [Angstrom].
+        nb_bins (int): Number of bins for the histogram profile plots.
+        **kwargs: Forwarded to :func:`plot_variance` and
+            :func:`plot_variance_histogram`.
+
+    Returns:
+        None.
+    """
 
     V_diff = np.nanvar(diff, axis=0)
     V_pipeline = np.nanmean(var_pipeline, axis=0)
@@ -592,6 +789,29 @@ def plot_hist(name_out, var_pipeline, diff, wavelength, nb_bins, **kwargs):
 def plot_hist_var_outlier_insensitive(
     name_out, var_pipeline, diff, wavelength, nb_bins, **kwargs
 ):
+    """Compute robust variances and produce the raw and binned-histogram diagnostic plots.
+
+    Same as :func:`plot_hist` but using robust (percentile-based)
+    estimators for both the exposure-difference variance (half the
+    84.135th-15.865th percentile spread, squared) and the pipeline
+    variance (``nanmedian``) before calling :func:`plot_variance` and
+    :func:`plot_variance_histogram`.
+
+    Args:
+        name_out (str): Output basename prefix for the generated PDF
+            plots.
+        var_pipeline (array-like): Per-spectrum pipeline flux variance,
+            shape (n_spectra, n_wave).
+        diff (array-like): Per-spectrum exposure-difference flux, shape
+            (n_spectra, n_wave).
+        wavelength (array-like): Wavelength grid [Angstrom].
+        nb_bins (int): Number of bins for the histogram profile plots.
+        **kwargs: Forwarded to :func:`plot_variance` and
+            :func:`plot_variance_histogram`.
+
+    Returns:
+        None.
+    """
 
     V_diff_outliers = (
         (
@@ -632,6 +852,27 @@ def plot_hist_var_outlier_insensitive(
 
 
 def plot_2d_hist(name_out, var_pipeline, diff, wavelength, nb_bins, **kwargs):
+    """Bin pipeline and exposure-difference variances into wavelength bins and plot the comparison.
+
+    Uses :func:`hist_profile_2d_bins` to bin the mean pipeline variance and
+    the exposure-difference variance into ``nb_bins`` wavelength bins (both
+    with standard and outlier-insensitive statistics), then plots each pair
+    via :func:`plot_variance`.
+
+    Args:
+        name_out (str): Output basename prefix for the generated PDF
+            plots.
+        var_pipeline (array-like): Per-spectrum pipeline flux variance,
+            shape (n_spectra, n_wave).
+        diff (array-like): Per-spectrum exposure-difference flux, shape
+            (n_spectra, n_wave).
+        wavelength (array-like): Wavelength grid [Angstrom].
+        nb_bins (int): Number of wavelength bins.
+        **kwargs: Forwarded to :func:`plot_variance`.
+
+    Returns:
+        None.
+    """
 
     bin_wave, V_pipeline = hist_profile_2d_bins(
         wavelength, var_pipeline, nb_bins, statistic="mean", outlier_insensitive=False
@@ -669,6 +910,24 @@ def plot_2d_hist(name_out, var_pipeline, diff, wavelength, nb_bins, **kwargs):
 def plot_noise_fluxvariance_comparison(
     V_coadd, V_pipeline, wavelength, name_out, nb_bins=40
 ):
+    """Plot a raw and rebinned comparison of coadd flux variance vs pipeline variance vs wavelength.
+
+    Obsolete diagnostic plot: overlays the raw ``V_coadd``/``V_pipeline``
+    curves, then their :func:`hist_profile` binned means, as a function of
+    wavelength, and saves a 2-panel PDF.
+
+    Args:
+        V_coadd (array-like): Coadd-estimated flux variance vs wavelength.
+        V_pipeline (array-like): Pipeline flux variance vs wavelength.
+        wavelength (array-like): Wavelength grid [Angstrom].
+        name_out (str): Output basename; saved to
+            "{name_out}_noise_fluxvariance_comparison.pdf".
+        nb_bins (int, optional): Number of bins for the rebinned profile.
+            Defaults to 40.
+
+    Returns:
+        None.
+    """
     fig, ax = plt.subplots(2, 1, figsize=(8, 5), sharex=True)
     ax[0].plot(wavelength, V_coadd, label="diff", color="b")
     ax[0].plot(wavelength, V_pipeline, label="pipeline", color="r")
@@ -715,6 +974,31 @@ def plot_noise_fluxvariance_comparison(
 def plot_noise_fluxvariance_ratio(
     name_out, spectra_array, noise_array, wavelength, nb_bins, outlier_insensitive=False
 ):
+    """Compare, per-spectrum, the binned pipeline noise to the binned flux dispersion, then plot their average and fractional difference.
+
+    Obsolete diagnostic plot: for each spectrum, bins the pipeline noise
+    (mean, via :func:`hist_profile`) and the flux dispersion (std, via
+    :func:`var_profile`) vs wavelength, averages these across spectra, and
+    plots the resulting variance comparison and ``(V_coadd - V_pipeline) /
+    V_pipeline`` ratio as a 2-panel PDF.
+
+    Args:
+        name_out (str): Output basename; saved to
+            "{name_out}_noise_fluxvariance_ratio.pdf".
+        spectra_array (list of array-like): Per-spectrum flux arrays vs
+            wavelength.
+        noise_array (list of array-like): Per-spectrum pipeline noise
+            (variance) arrays vs wavelength.
+        wavelength (array-like): Wavelength grid [Angstrom] shared by all
+            spectra.
+        nb_bins (int): Number of bins for :func:`hist_profile` /
+            :func:`var_profile`.
+        outlier_insensitive (bool, optional): If True, use robust
+            statistics for the binned profiles. Defaults to False.
+
+    Returns:
+        None.
+    """
     mean_noise = []
     var_flux = []
     for i in range(len(spectra_array)):
@@ -774,6 +1058,25 @@ def plot_noise_fluxvariance_ratio(
 
 
 def plot_ra_dec_diagram(name_out, ra, dec, cut_objects):
+    """Plot the sky positions (RA/Dec) of the selected target classes and save as a PDF.
+
+    Concatenates each target class's chunked RA/Dec arrays in place, then
+    scatter-plots RA vs Dec for each class.
+
+    Args:
+        name_out (str): Output basename; figure saved to
+            "radec_diagram_{name_out}.pdf".
+        ra (list of array-like): Per-target-class list of RA chunk arrays
+            [deg]; each element is replaced in place by its concatenation.
+        dec (list of array-like): Per-target-class list of Dec chunk
+            arrays [deg]; each element is replaced in place by its
+            concatenation.
+        cut_objects (list of str): Names of the target classes, used for
+            the legend.
+
+    Returns:
+        None.
+    """
     plt.figure()
     for i in range(len(cut_objects)):
         ra[i] = np.concatenate(ra[i], axis=0)

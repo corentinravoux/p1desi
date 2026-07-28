@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Launcher: strip a cosmic-ray-contaminated line of sight from P1D files.
+
+Edit the path, SNR cuts and offending ``TARGETID`` at the top, then run. For
+each SNR cut it rewrites the affected P1D file without the flagged line of
+sight, keeping the original aside.
+"""
 import fitsio, os, shutil
 
 snr_cuts = [1, 2, 3]
