@@ -1,4 +1,10 @@
 # coding: utf-8
+"""QA plot: joint distribution of quasar vs chunk redshift with sky lines.
+
+Reads the per-chunk mean redshift and quasar redshift from the local
+``Pk1D-*.fits.gz`` files, overlays the analysis redshift-bin boundaries and the
+sky-line centres, and saves the joint distribution figure.
+"""
 import matplotlib.pyplot as plt
 import seaborn as sns
 import seaborn as sns

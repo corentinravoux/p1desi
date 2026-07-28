@@ -1,3 +1,23 @@
+"""Statistical and systematic uncertainty / covariance budget for the DESI Lyman-alpha P1D.
+
+This module builds, stores and plots the error budget of the 1D Lyman-alpha
+forest power spectrum (P1D) measured from picca outputs. It covers:
+
+- Serialization (pickle) and reloading of per-redshift-bin systematic error
+  terms (noise, resolution, resolution correction, side band / metals,
+  line masking, DLA/BAL masking, continuum fitting, DLA/BAL completeness)
+  for the EDR and DESI Y1 analyses.
+- Plotting of statistical uncertainties (`sigma_stat`) as a function of
+  wavenumber `k` (in Angstrom^-1 or s/km) and redshift bin.
+- Plotting of the individual systematic error contributions and their total,
+  combined in quadrature.
+- Plotting of the (bootstrap or analytic) covariance / correlation matrix
+  per redshift bin, optionally inflated with the systematic error terms.
+
+Wavenumbers are expressed either in Angstrom^-1 or in velocity units
+(s/km, `velunits=True`) depending on the `Pk1D`-like object passed in.
+"""
+
 import pickle
 
 import matplotlib.pyplot as plt
@@ -20,6 +40,34 @@ def create_uncertainty_systematics(
     syste_tot,
     name,
 ):
+    """Pickle the EDR per-redshift-bin systematic uncertainty terms to disk.
+
+    Args:
+        wavenumber (dict): Mapping of redshift bin -> wavenumber array
+            (Angstrom^-1 or s/km).
+        syste_noise (dict): Mapping of redshift bin -> noise-estimation
+            systematic error array.
+        syste_reso (dict): Mapping of redshift bin -> resolution systematic
+            error array.
+        syste_resocorrection (dict): Mapping of redshift bin -> resolution
+            correction systematic error array.
+        syste_sb (dict): Mapping of redshift bin -> side band systematic
+            error array.
+        syste_lines (dict): Mapping of redshift bin -> line masking
+            systematic error array.
+        syste_hcd (dict): Mapping of redshift bin -> DLA masking systematic
+            error array.
+        syste_continuum (dict): Mapping of redshift bin -> continuum fitting
+            systematic error array.
+        syste_dla_completeness (dict): Mapping of redshift bin -> DLA
+            completeness systematic error array.
+        syste_tot (dict): Mapping of redshift bin -> total systematic error
+            array (quadrature sum of the terms above).
+        name (str): Output pickle file path.
+
+    Returns:
+        None
+    """
     pickle.dump(
         (
             wavenumber,
@@ -40,6 +88,23 @@ def create_uncertainty_systematics(
 def prepare_uncertainty_systematics(
     file_systematics,
 ):
+    """Load and repackage EDR systematic uncertainty terms from a pickle file.
+
+    Args:
+        file_systematics (str): Path to a pickle file previously written by
+            `create_uncertainty_systematics`.
+
+    Returns:
+        tuple: A 4-tuple of:
+            - wavenumber (dict): Redshift bin -> wavenumber array.
+            - syste_tot (dict): Redshift bin -> total systematic error array.
+            - list_systematics (list): List of dicts (redshift bin ->
+              per-term systematic error array), one per named term, in the
+              order matching `list_systematics_name`.
+            - list_systematics_name (list of str): Human-readable labels for
+              each entry of `list_systematics` (e.g. "Noise", "PSF",
+              "Resolution", ...).
+    """
     (
         wavenumber,
         syste_noise,
@@ -91,6 +156,47 @@ def create_uncertainty_systematics_y1(
     velunits,
     zbins,
 ):
+    """Pickle DESI Y1 per-redshift-bin systematic uncertainty terms and export them to text.
+
+    Same as `create_uncertainty_systematics` but for the DESI Y1 analysis,
+    which adds BAL masking and BAL completeness terms and drops the noise
+    term. In addition to pickling the terms, this also writes a flat,
+    concatenated-over-redshift-bins `.txt` table (space-delimited, with a
+    header) next to the pickle file.
+
+    Args:
+        wavenumber (dict): Mapping of redshift bin -> wavenumber array
+            (Angstrom^-1 or s/km).
+        syste_reso (dict): Mapping of redshift bin -> resolution systematic
+            error array.
+        syste_resocorrection (dict): Mapping of redshift bin -> resolution
+            correction systematic error array.
+        syste_sb (dict): Mapping of redshift bin -> side band / metal power
+            spectrum systematic error array.
+        syste_lines (dict): Mapping of redshift bin -> line masking
+            systematic error array.
+        syste_hcd (dict): Mapping of redshift bin -> DLA masking systematic
+            error array.
+        syste_bal (dict): Mapping of redshift bin -> BAL AI masking
+            systematic error array.
+        syste_continuum (dict): Mapping of redshift bin -> continuum fitting
+            systematic error array.
+        syste_dla_completeness (dict): Mapping of redshift bin -> DLA
+            completeness systematic error array.
+        syste_bal_completeness (dict): Mapping of redshift bin -> BAL
+            completeness systematic error array.
+        syste_tot (dict): Mapping of redshift bin -> total systematic error
+            array (quadrature sum of the terms above).
+        name (str): Output pickle file path (also used, with the
+            `.pickle` suffix stripped, to derive the `.txt` output path).
+        velunits (bool): If True, wavenumber is in s/km and the text header
+            uses those units; otherwise Angstrom^-1 is assumed.
+        zbins (iterable): Redshift bin values to iterate over, in the order
+            used to concatenate the per-bin arrays into the text table.
+
+    Returns:
+        None
+    """
     pickle.dump(
         (
             wavenumber,
@@ -169,6 +275,29 @@ def create_uncertainty_systematics_y1(
 def prepare_uncertainty_systematics_y1(
     file_systematics,
 ):
+    """Load and repackage DESI Y1 systematic uncertainty terms from a pickle file.
+
+    Same as `prepare_uncertainty_systematics` but for the DESI Y1 error
+    budget, which includes BAL masking and BAL completeness terms in
+    addition to resolution, resolution correction, side band, lines, DLA
+    masking, continuum fitting and DLA completeness.
+
+    Args:
+        file_systematics (str): Path to a pickle file previously written by
+            `create_uncertainty_systematics_y1`.
+
+    Returns:
+        tuple: A 4-tuple of:
+            - wavenumber (dict): Redshift bin -> wavenumber array.
+            - syste_tot (dict): Redshift bin -> total systematic error array.
+            - list_systematics (list): List of dicts (redshift bin ->
+              per-term systematic error array), one per named term, in the
+              order matching `list_systematics_name`.
+            - list_systematics_name (list of str): Human-readable labels for
+              each entry of `list_systematics` (e.g. "PSF", "Resolution",
+              "Side band", "Lines", "DLA", "BAL", "Continuum",
+              "DLA completeness", "BAL completeness").
+    """
     (
         wavenumber,
         syste_reso,
@@ -216,6 +345,36 @@ def plot_stat_uncertainties(
     z_change=None,
     **plot_args,
 ):
+    """Plot statistical P1D uncertainties and their relative size vs wavenumber.
+
+    For each redshift bin below `zmax`, plots `sigma_stat(k)` (left panel)
+    and `sigma_stat(k) / P1D(k)` (right panel) restricted to the
+    `[kmin_AA, kmax_AA]` window (converted to s/km if `pk` is in velocity
+    units). Optionally saves the figure and/or a flat text table of the
+    plotted points.
+
+    Args:
+        pk: `Pk1D`-like object exposing `zbin`, `velunits`, `k`, `err` and
+            `p` (all dict-like, keyed by redshift bin).
+        zmax (float): Upper redshift bound (exclusive); only bins with
+            `pk.zbin < zmax` are plotted.
+        outname (str, optional): If given, base path (without extension) to
+            save the figure as both `.pdf` and `.png`.
+        outpoints (str, optional): If given, base path (without extension)
+            to save the underlying plotted points as a `.txt` table.
+        pk_low_z: `Pk1D`-like object to use instead of `pk` for redshift
+            bins below `z_change`. Defaults to None (always use `pk`).
+        z_change (float, optional): Redshift threshold below which
+            `pk_low_z` is used instead of `pk`. Required if `pk_low_z` is
+            given.
+        **plot_args: Optional plotting overrides, e.g. `fontsize_x`,
+            `fontsize_y`, `labelsize`, `fontl`, `kmin_AA`, `kmax_AA`,
+            `ymin`, `ymax`, `ymin2`, `ymax2`, `figsize`, `color_map`
+            (`"default"` or `"rainbow"`).
+
+    Returns:
+        None
+    """
     fontsize_x = utils.return_key(plot_args, "fontsize_x", 16)
     fontsize_y = utils.return_key(plot_args, "fontsize_y", 19)
     labelsize = utils.return_key(plot_args, "labelsize", 14)
@@ -333,6 +492,56 @@ def plot_syst_uncertainties(
     dla_completeness_coef,
     **plot_args,
 ):
+    """Compute, plot and save the EDR systematic error budget vs wavenumber.
+
+    For each redshift bin below `zmax`, computes the individual systematic
+    error terms (noise estimation, resolution, resolution correction, side
+    band, line masking, DLA masking, continuum fitting, DLA completeness)
+    as fractions of the fitted correction models (from `corrections` and
+    `hcd.rogers`) applied to `pk.p`, combines them in quadrature into a
+    total, and plots both the absolute systematic error and its ratio to
+    the statistical error (`pk.err`) in a grid of subplots (one row per
+    term, plus a "Total" row). Saves the figure and pickles the computed
+    terms via `create_uncertainty_systematics`.
+
+    Args:
+        pk: `Pk1D`-like object exposing `zbin`, `velunits`, `k`, `p`,
+            `err`, `p_noise_miss`, `resocor` (all dict-like, keyed by
+            redshift bin).
+        pk_sb: `Pk1D`-like side-band power spectrum object exposing `err`
+            (dict-like, keyed by redshift bin), used for the side-band
+            systematic term.
+        outname (str): Base output path (without extension) for the saved
+            figure (`.pdf`) and the pickled systematics (`.pickle`); a
+            `_kms` suffix is appended if `pk.velunits` is True.
+        zmax (float): Upper redshift bound (exclusive); only bins with
+            `pk.zbin < zmax` are used.
+        kmin (float): Lower x-axis limit for the first subplot row.
+        kmax (float): Upper x-axis limit for the first subplot row.
+        delta_l (sequence): Per-redshift-bin resolution length uncertainty
+            values used in the resolution systematic term.
+        delta_delta_l (sequence): Per-redshift-bin uncertainty on
+            `delta_l`, used in the resolution systematic term.
+        resolution_coeff_fit: Fit coefficients passed to
+            `corrections.prepare_resolution_correction`.
+        lines_coeff_fit: Fit coefficients passed to
+            `corrections.prepare_lines_correction`.
+        hcd_coeff_fit: Fit coefficients passed to
+            `corrections.prepare_hcd_correction`.
+        continuum_coeff_fit: Fit coefficients passed to
+            `corrections.prepare_cont_correction`.
+        dla_completeness_coef (sequence): Per-redshift-bin coefficients
+            passed to `hcd.rogers` for the DLA completeness correction; if
+            a redshift bin index has no entry, the correction defaults to 1
+            (no systematic).
+        **plot_args: Optional plotting overrides, e.g. `fontsize_x`,
+            `fontsize_y`, `fontlegend`, `title_shift`, `title_yshift`,
+            `size`, `title_size`, `figsize`, `ylim_top`, `ylim_bottom`,
+            `n_subplots`, `color_map` (`"default"` or `"rainbow"`).
+
+    Returns:
+        None
+    """
     fontsize_x = utils.return_key(plot_args, "fontsize_x", 16)
     fontsize_y = utils.return_key(plot_args, "fontsize_y", 18)
     fontlegend = utils.return_key(plot_args, "fontlegend", 14)
@@ -538,6 +747,64 @@ def plot_syst_uncertainties_y1(
     z_change=None,
     **plot_args,
 ):
+    """Compute, plot and save the DESI Y1 systematic error budget vs wavenumber.
+
+    Same as `plot_syst_uncertainties` but for the DESI Y1 analysis: adds a
+    BAL AI masking term and a BAL completeness term (both derived the same
+    way as their DLA counterparts), relabels the side-band term as "Metal
+    power spectrum", and supports per-redshift-bin substitution of `pk` by
+    `pk_low_z` below `z_change`. Saves the figure and pickles the computed
+    terms (plus a text table) via `create_uncertainty_systematics_y1`.
+
+    Args:
+        pk: `Pk1D`-like object exposing `zbin`, `velunits`, `k`, `p`, `err`
+            (dict-like, keyed by redshift bin); used for all bins unless
+            overridden by `pk_low_z`.
+        pk_sb: `Pk1D`-like side-band power spectrum object exposing `err`
+            (dict-like, keyed by redshift bin), used for the metal power
+            spectrum systematic term.
+        outname (str): Base output path (without extension) for the saved
+            figure (`.pdf`) and the pickled systematics (`.pickle`); a
+            `_kms` suffix is appended if `pk.velunits` is True.
+        zmax (float): Upper redshift bound (exclusive); only bins with
+            `pk.zbin < zmax` are used.
+        kmin (float): Lower x-axis limit for the first subplot row.
+        kmax (float): Upper x-axis limit for the first subplot row.
+        delta_l (sequence): Per-redshift-bin resolution length uncertainty
+            values used in the resolution systematic term.
+        delta_delta_l (sequence): Per-redshift-bin uncertainty on
+            `delta_l`, used in the resolution systematic term.
+        resolution_coeff_fit: Fit coefficients passed to
+            `corrections.prepare_resolution_correction`.
+        lines_coeff_fit: Fit coefficients passed to
+            `corrections.prepare_lines_correction`.
+        hcd_coeff_fit: Fit coefficients passed to
+            `corrections.prepare_hcd_correction` for the DLA masking term.
+        bal_coeff_fit: Fit coefficients passed to
+            `corrections.prepare_hcd_correction` for the BAL AI masking
+            term.
+        continuum_coeff_fit: Fit coefficients passed to
+            `corrections.prepare_cont_correction`.
+        dla_completeness_coef (sequence): Per-redshift-bin coefficients
+            passed to `hcd.rogers` for the DLA completeness correction; if
+            a redshift bin index has no entry, the correction defaults to 1
+            (no systematic).
+        bal_completeness_coef (sequence): Per-redshift-bin coefficients
+            passed to `hcd.rogers` for the BAL completeness correction; if
+            a redshift bin index has no entry, the correction defaults to 1
+            (no systematic).
+        pk_low_z: `Pk1D`-like object to use instead of `pk` for redshift
+            bins below `z_change`. Defaults to None (always use `pk`).
+        z_change (float, optional): Redshift threshold below which
+            `pk_low_z` is used instead of `pk`.
+        **plot_args: Optional plotting overrides, e.g. `fontsize_x`,
+            `fontsize_y`, `fontlegend`, `title_shift`, `title_yshift`,
+            `size`, `title_size`, `figsize`, `ylim_top`, `ylim_bottom`,
+            `n_subplots`, `color_map` (`"default"` or `"rainbow"`).
+
+    Returns:
+        None
+    """
     fontsize_x = utils.return_key(plot_args, "fontsize_x", 16)
     fontsize_y = utils.return_key(plot_args, "fontsize_y", 18)
     fontlegend = utils.return_key(plot_args, "fontlegend", 14)
@@ -869,6 +1136,60 @@ def plot_covariance(
     z_change=None,
     **plot_args,
 ):
+    """Plot per-redshift-bin P1D covariance/correlation matrices as a grid of heatmaps.
+
+    For each redshift bin below `zmax`, restricts the (bootstrap or
+    analytic) covariance matrix to the `[kmin_AA, kmax_AA]` window
+    (converted to s/km if `pk` is in velocity units), optionally adds
+    systematic-error contributions (outer products of each systematic term
+    loaded from `systematics_file`) to the diagonal-inflated matrix, then
+    plots either the correlation matrix (covariance normalized by
+    `sqrt(diag(cov))` outer product) or the raw covariance matrix as an
+    imshow heatmap in a subplot grid. Optionally saves the figure and/or a
+    flat text table of the plotted (k1, k2, covariance, correlation)
+    points.
+
+    Args:
+        pk: `Pk1D`-like object exposing `zbin`, `velunits`, `k`, `boot_cov`,
+            `cov` (all dict-like, keyed by redshift bin).
+        zmax (float): Upper redshift bound (exclusive); only bins with
+            `pk.zbin < zmax` are plotted.
+        kmax_AA (float): Upper wavenumber bound in Angstrom^-1 (converted to
+            s/km per bin if velocity units are used).
+        kmin_AA (float): Lower wavenumber bound in Angstrom^-1 (converted to
+            s/km per bin if velocity units are used).
+        out_name (str, optional): If given, path (without extension) to
+            save the figure as `.pdf`.
+        out_points (str, optional): If given, base path (without extension)
+            to save the plotted (z, k1, k2, covariance, correlation) points
+            as a `.txt` table.
+        use_boot (bool): If True, use `pk.boot_cov` (bootstrap covariance);
+            otherwise use `pk.cov`. Defaults to True.
+        add_systematics (bool): If True, add the systematic error terms
+            (loaded from `systematics_file`) to the covariance matrix as
+            outer products before computing the correlation. Defaults to
+            True.
+        systematics_file (str, optional): Path to a pickle file readable by
+            `prepare_uncertainty_systematics`, required if
+            `add_systematics` is True.
+        plot_correlation (bool): If True, plot the normalized correlation
+            matrix; otherwise plot the raw covariance matrix. Defaults to
+            True.
+        pk_low_z: `Pk1D`-like object to use instead of `pk` for redshift
+            bins below `z_change`. Defaults to None (always use `pk`).
+        z_change (float, optional): Redshift threshold below which
+            `pk_low_z` is used instead of `pk`.
+        **plot_args: Optional plotting overrides, e.g. `figsize`,
+            `subplot_x`, `subplot_y`, `vmin`, `vmax`, `map_color`,
+            `labelsize`, `titlesize`, `fontsize`, `cbar_prop`.
+
+    Raises:
+        ValueError: If `add_systematics` is True and `systematics_file` is
+            None.
+
+    Returns:
+        None
+    """
     figsize = utils.return_key(plot_args, "figsize", (20, 20))
     subplot_x = utils.return_key(plot_args, "subplot_x", 4)
     subplot_y = utils.return_key(plot_args, "subplot_y", 4)

@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""Script: remove flagged outlier TARGETIDs from per-healpix P1D files.
+
+Scans the P1D files of the configured regions/SNR cuts, and for each file that
+contains one of the target IDs to drop, rewrites it without the offending
+lines of sight (keeping a backup of the original).
+"""
 import glob
 import multiprocessing as mp
 import os
@@ -37,6 +43,15 @@ number_process = 1
 
 
 def contains_targetid(target_id, pk_name):
+    """Return True if a P1D file contains any of the given target IDs.
+
+    Args:
+        target_id (array-like): Target IDs (``LOS_ID``) to look for.
+        pk_name (str): P1D FITS file path.
+
+    Returns:
+        bool: True if at least one line of sight matches ``target_id``.
+    """
     pk = fitsio.FITS(pk_name)
     targetid = np.array([int(pk[j].read_header()["LOS_ID"]) for j in range(1, len(pk))])
     mask = np.in1d(targetid, target_id)

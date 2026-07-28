@@ -1,3 +1,16 @@
+"""Noise estimation and correction diagnostics for the DESI Lyman-alpha 1D power spectrum (P1D).
+
+This module provides plotting and computation utilities to compare the raw
+P1D (``p_raw``), the pipeline noise estimate (``p_noise``) and the
+exposure-difference noise estimate (``p_diff``) of a :class:`p1desi.pk_io.Pk1D`-like
+object, per redshift bin (``pk.zbin``) and as a function of wavenumber
+``k`` (in Angstrom^-1, unless ``pk.velunits`` is set, in which case units are
+s/km). It also exposes helpers to compute the noise asymptote (systematic
+offset ``alpha`` and multiplicative ratio ``beta``) at high-k, using the
+mean-over-redshift (:class:`p1desi.pk_io.MeanPkZ`) and mean-over-wavenumber
+(:class:`p1desi.pk_io.MeanPkK`) helper classes from :mod:`p1desi.pk_io`.
+"""
+
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,6 +30,41 @@ def plot_noise_power_ratio(
     zmax=None,
     **kwargs,
 ):
+    """Plot raw vs. noise power, their difference, and their ratio per redshift bin.
+
+    Builds a 3-panel figure (raw & noise P(k); raw-minus-noise; noise/raw
+    ratio), overlaying one curve per redshift bin of ``pk.zbin``, and
+    optionally annotates the high-k noise asymptote (see
+    :func:`p1desi.pk_io.MeanPkZ.compute_noise_asymptopte`).
+
+    Args:
+        pk: A ``Pk1D``-like object (see :mod:`p1desi.pk_io`) exposing
+            ``zbin``, ``k``, ``p_raw``, ``p_noise`` and ``p_diff`` dicts
+            keyed by redshift.
+        use_diff (bool): If True, use ``pk.p_diff`` (exposure-difference
+            noise estimate) instead of ``pk.p_noise`` (pipeline noise
+            estimate). Defaults to False.
+        out_name (str, optional): If given, base path (without extension)
+            used to save the figure as ``f"{out_name}.pdf"``.
+        out_points (optional): If not None, save the underlying arrays
+            (redshift, k, raw power, noise power) to ``f"{out_name}.txt"``.
+        plot_asymptote (bool): If True, compute and display the noise
+            asymptote coefficients alpha and beta on the difference and
+            ratio panels. Defaults to True.
+        k_asymptote (float): Wavenumber threshold (in the units of
+            ``pk.k``) above which the asymptote is estimated. Defaults to
+            3.10.
+        zmax (float, optional): If given, only redshift bins with
+            ``z <= zmax`` are plotted.
+        **kwargs: Optional style/layout overrides, including ``figsize``,
+            ``ncol_legend``, ``y_min``, ``y_max``, ``diff_y_min``,
+            ``diff_y_max``, ``ratio_y_min``, ``ratio_y_max``,
+            ``legend_size``, ``fontsize``, ``ticks_size``,
+            ``plot_velunits`` and ``cmap``.
+
+    Returns:
+        None
+    """
     figsize = utils.return_key(kwargs, "figsize", (8, 10))
     ncol_legend = utils.return_key(kwargs, "ncol_legend", 2)
     y_min = utils.return_key(kwargs, "y_min", 0.025)
@@ -160,6 +208,40 @@ def plot_noise_power_ratio_bis(
     zmax=None,
     **kwargs,
 ):
+    """Plot raw vs. noise power and their difference per redshift bin, in a 2-panel layout.
+
+    Variant of :func:`plot_noise_power_ratio` restricted to two side-by-side
+    panels (raw & noise P(k); raw-minus-noise), without the ratio panel.
+
+    Args:
+        pk: A ``Pk1D``-like object (see :mod:`p1desi.pk_io`) exposing
+            ``zbin``, ``k``, ``p_raw``, ``p_noise`` and ``p_diff`` dicts
+            keyed by redshift.
+        use_diff (bool): If True, use ``pk.p_diff`` (exposure-difference
+            noise estimate) instead of ``pk.p_noise`` (pipeline noise
+            estimate). Defaults to False.
+        out_name (str, optional): If given, base path (without extension)
+            used to save the figure as ``f"{out_name}.pdf"``.
+        out_points (optional): If not None, save the underlying arrays
+            (redshift, k, raw power, noise power) to ``f"{out_name}.txt"``.
+        plot_asymptote (bool): If True, compute and display the noise
+            asymptote coefficient alpha on the difference panel (see
+            :func:`p1desi.pk_io.MeanPkZ.compute_noise_asymptopte`).
+            Defaults to True.
+        k_asymptote (float): Wavenumber threshold (in the units of
+            ``pk.k``) above which the asymptote is estimated. Defaults to
+            3.10.
+        zmax (float, optional): If given, only redshift bins with
+            ``z <= zmax`` are plotted.
+        **kwargs: Optional style/layout overrides, including ``figsize``,
+            ``ncol_legend``, ``y_min``, ``y_max``, ``diff_y_min``,
+            ``diff_y_max``, ``legend_size``, ``fontsize``, ``ticks_size``,
+            ``cmap`` and ``force_label`` (override the noise-curve legend
+            label).
+
+    Returns:
+        None
+    """
     figsize = utils.return_key(kwargs, "figsize", (11, 5))
     ncol_legend = utils.return_key(kwargs, "ncol_legend", 2)
     y_min = utils.return_key(kwargs, "y_min", 0.025)
@@ -285,6 +367,31 @@ def plot_noise_comparison(
     out_points=None,
     **kwargs,
 ):
+    """Plot pipeline vs. exposure-difference noise power, per redshift bin.
+
+    Builds a 3-panel figure comparing ``pk.p_noise`` (pipeline noise
+    estimate) and ``pk.p_diff`` (exposure-difference noise estimate)
+    directly: their curves, their difference, and their ratio, one curve
+    per redshift bin of ``pk.zbin``.
+
+    Args:
+        pk: A ``Pk1D``-like object (see :mod:`p1desi.pk_io`) exposing
+            ``zbin``, ``k``, ``p_noise`` and ``p_diff`` dicts keyed by
+            redshift.
+        out_name (str, optional): If given, base path (without extension)
+            used to save the figure as ``f"{out_name}.pdf"``.
+        out_points (optional): If not None, save the underlying arrays
+            (redshift, k, pipeline noise power, diff noise power) to
+            ``f"{out_name}.txt"``.
+        **kwargs: Optional style/layout overrides, including ``figsize``,
+            ``ncol_legend``, ``y_min``, ``y_max``, ``diff_y_min``,
+            ``diff_y_max``, ``ratio_y_min``, ``ratio_y_max``,
+            ``legend_size``, ``fontsize``, ``ticks_size``,
+            ``plot_velunits`` and ``cmap``.
+
+    Returns:
+        None
+    """
     figsize = utils.return_key(kwargs, "figsize", (8, 10))
     ncol_legend = utils.return_key(kwargs, "ncol_legend", 2)
     y_min = utils.return_key(kwargs, "y_min", 0.025)
@@ -411,6 +518,42 @@ def plot_noise_power_ratio_meanz(
     zmax=None,
     **kwargs,
 ):
+    """Plot the redshift-averaged raw vs. noise power, difference, and ratio.
+
+    Same purpose as :func:`plot_noise_power_ratio` but operating on the
+    redshift-mean power spectrum computed via
+    :meth:`p1desi.pk_io.MeanPkZ.init_from_pk`, producing a single averaged
+    curve per panel instead of one curve per redshift bin.
+
+    Args:
+        pk: A ``Pk1D``-like object (see :mod:`p1desi.pk_io`) passed to
+            :meth:`p1desi.pk_io.MeanPkZ.init_from_pk` to compute the
+            redshift-averaged raw and noise power spectra.
+        use_diff (bool): If True, use the averaged ``p_diff``
+            (exposure-difference noise estimate) instead of the averaged
+            ``p_noise`` (pipeline noise estimate). Defaults to False.
+        out_name (str, optional): If given, base path (without extension)
+            used to save the figure as ``f"{out_name}.pdf"``.
+        out_points (optional): If not None, save the underlying arrays
+            (k, raw power, noise power) to ``f"{out_name}.txt"``.
+        plot_asymptote (bool): If True, compute and display the noise
+            asymptote coefficients alpha and beta on the difference and
+            ratio panels (see
+            :meth:`p1desi.pk_io.MeanPkZ.compute_noise_asymptopte`).
+            Defaults to True.
+        k_asymptote (float): Wavenumber threshold (in the units of
+            ``mean_pk_z.k``) above which the asymptote is estimated.
+            Defaults to 3.10.
+        zmax (float, optional): If given, only redshift bins with
+            ``z <= zmax`` are averaged over.
+        **kwargs: Optional style/layout overrides, including ``figsize``,
+            ``y_min``, ``y_max``, ``diff_y_min``, ``diff_y_max``,
+            ``ratio_y_min``, ``ratio_y_max``, ``legend_size``,
+            ``fontsize``, ``ticks_size`` and ``plot_velunits``.
+
+    Returns:
+        None
+    """
     figsize = utils.return_key(kwargs, "figsize", (8, 10))
     y_min = utils.return_key(kwargs, "y_min", 0.025)
     y_max = utils.return_key(kwargs, "y_max", 0.05)
@@ -503,6 +646,31 @@ def compute_asymptote(
     k_asymptote,
     zmax=None,
 ):
+    """Compute the high-k noise asymptote coefficients for both noise estimators.
+
+    Builds the redshift-averaged power spectrum via
+    :meth:`p1desi.pk_io.MeanPkZ.init_from_pk`, then estimates the additive
+    offset (alpha) and multiplicative ratio (beta) between the raw power
+    and each of the pipeline-noise and diff-noise estimates above
+    ``k_asymptote``, using
+    :meth:`p1desi.pk_io.MeanPkZ.compute_noise_asymptopte`.
+
+    Args:
+        pk: A ``Pk1D``-like object (see :mod:`p1desi.pk_io`) exposing
+            ``zbin``, ``k``, ``p_raw``, ``p_noise`` and ``p_diff``.
+        k_asymptote (float): Wavenumber threshold (in the units of
+            ``pk.k``, i.e. Angstrom^-1 or s/km depending on
+            ``pk.velunits``) above which the asymptote is estimated.
+        zmax (float, optional): If given, only redshift bins with
+            ``z <= zmax`` are averaged over.
+
+    Returns:
+        tuple: ``(alpha_pipeline, beta_pipeline, alpha_diff, beta_diff)``,
+        the additive offset and multiplicative ratio computed with the
+        pipeline noise estimate (``use_diff=False``) and with the
+        exposure-difference noise estimate (``use_diff=True``)
+        respectively.
+    """
     mean_pk_z = pk_io.MeanPkZ.init_from_pk(pk, zmax=zmax)
     alpha_pipeline, beta_pipeline = mean_pk_z.compute_noise_asymptopte(
         k_asymptote, use_diff=False
@@ -523,6 +691,35 @@ def plot_noise_power_meank(
     out_points=None,
     **kwargs,
 ):
+    """Plot the wavenumber-averaged noise power and noise ratio vs. redshift.
+
+    Builds a 2-panel figure showing, as a function of redshift ``z``: the
+    k-averaged pipeline noise (``p_noise``) and diff noise (``p_diff``)
+    power with their standard errors, and their ratio
+    (``p_noise / p_diff``), using
+    :meth:`p1desi.pk_io.MeanPkK.init_from_pk` and
+    :meth:`p1desi.pk_io.MeanPkK.compute_additional_stats`.
+
+    Args:
+        pk: A ``Pk1D``-like object (see :mod:`p1desi.pk_io`) exposing
+            ``zbin``, ``k``, ``p_noise`` and ``p_diff`` dicts keyed by
+            redshift.
+        kmax (float, optional): If given, only wavenumbers ``k < kmax``
+            (units of ``pk.k``) are included in the per-redshift average.
+        out_name (str, optional): If given, base path (without extension)
+            used to save the figure as ``f"{out_name}.pdf"``.
+        out_points (optional): If not None, save the underlying arrays
+            (redshift, noise power & its error, diff power & its error,
+            ratio & its error) to ``f"{out_name}.txt"``.
+        **kwargs: Optional style/layout overrides, including ``figsize``,
+            ``ax`` (reuse an existing pair of axes instead of creating a
+            new figure), ``color``, ``marker``, ``y_min``, ``y_max``,
+            ``ratio_y_min``, ``ratio_y_max``, ``legend_size``,
+            ``fontsize`` and ``ticks_size``.
+
+    Returns:
+        None
+    """
     figsize = utils.return_key(kwargs, "figsize", (8, 6))
     ax = utils.return_key(kwargs, "ax", None)
     if ax is None:

@@ -1,3 +1,11 @@
+"""Mock-based chi-squared diagnostics for the P1D.
+
+Compares measured P1D realisations (e.g. mocks) against a reference using the
+full or diagonal covariance, and plots the resulting chi-squared distribution
+against the expected chi-squared PDF (with optional Gaussian fits and per-
+redshift breakdowns) to validate the error model.
+"""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
@@ -17,7 +25,31 @@ def compute_chi2(
     use_only_diag=False,
     return_redshift_chi2=False,
 ):
+    """Compute the chi-squared of each P1D realisation against a reference.
 
+    For every mean-P1D in ``mean_pk_list`` and every redshift bin in the window,
+    forms the residual to ``mean_pk_ref`` and contracts it with the inverse
+    covariance (bootstrap, analytic, or diagonal-only), optionally rescaling the
+    covariance or adding extra diagonal errors.
+
+    Args:
+        mean_pk_list (list): P1D objects to test.
+        mean_pk_ref: Reference P1D object.
+        kmin, kmax (float, optional): Wavenumber window.
+        zmin, zmax (float, optional): Redshift window.
+        use_boot (bool, optional): Use the bootstrap covariance (else analytic).
+        extra_diag_errors (dict | tuple, optional): Extra per-bin diagonal
+            errors to add in quadrature (dict per z, or interpolation tuple).
+        extra_cov_factor (float | dict, optional): Multiplicative covariance
+            rescaling (scalar or per-z).
+        use_only_diag (bool, optional): Use only the diagonal errors.
+        return_redshift_chi2 (bool, optional): Return per-redshift lists instead
+            of summed values.
+
+    Returns:
+        tuple: ``(chi2_list, ndof_list, zbin)`` — chi-squared and degrees of
+        freedom (summed, or per-redshift lists) and the redshift bins used.
+    """
     zbin = mean_pk_ref.zbin[(mean_pk_ref.zbin > zmin) & (mean_pk_ref.zbin < zmax)]
 
     if return_redshift_chi2:
@@ -88,6 +120,16 @@ def compute_chi2(
 
 
 def getChi2Pdf(dof, sigma=3):
+    """Sample the chi-squared PDF around its mean for a given number of dof.
+
+    Args:
+        dof (int): Degrees of freedom.
+        sigma (float, optional): Half-width of the sampled window in units of
+            the chi-squared standard deviation. Defaults to 3.
+
+    Returns:
+        tuple[numpy.ndarray, numpy.ndarray]: ``(x, pdf(x))``.
+    """
     s = np.sqrt(2 * dof)
     x = np.linspace(dof - sigma * s, dof + sigma * s, 100)
     from scipy.stats import chi2 as chi2_stats
@@ -98,6 +140,21 @@ def getChi2Pdf(dof, sigma=3):
 
 
 def plot_chi2(ndofs, chi2s, chi2s_ref=None, save=None, fit_gausian=False, nbins=5):
+    """Histogram chi-squared values against the expected distribution.
+
+    Runs one- and two-sided KS tests, overlays the expected chi-squared PDF and
+    optionally a fitted Gaussian, and saves the figure and points.
+
+    Args:
+        ndofs (array-like): Degrees of freedom (first entry sets the expected
+            distribution).
+        chi2s (array-like): Chi-squared values (e.g. one per mock).
+        chi2s_ref (array-like, optional): Reference (uncorrected) chi-squared
+            values to overlay.
+        save (str, optional): Output base path (``.pdf``/``.png``/``.txt``).
+        fit_gausian (bool, optional): Also fit and plot a Gaussian.
+        nbins (int, optional): Number of histogram bins.
+    """
     kstest = scipy.stats.ks_1samp(
         chi2s, scipy.stats.chi2(ndofs[0]).cdf, alternative="less"
     )
@@ -174,6 +231,16 @@ def plot_chi2(ndofs, chi2s, chi2s_ref=None, save=None, fit_gausian=False, nbins=
 
 
 def plot_chi2_z(ndofs, chi2s, zbin, figsize=(10, 10), nbins=5):
+    """Plot per-redshift chi-squared histograms against the expected PDF.
+
+    Args:
+        ndofs (list): Per-redshift degrees of freedom (each entry a list whose
+            first element sets that bin's expected distribution).
+        chi2s (list): Per-redshift chi-squared value lists.
+        zbin (array-like): Redshift bins (one subplot each).
+        figsize (tuple, optional): Figure size. Defaults to ``(10, 10)``.
+        nbins (int, optional): Number of histogram bins.
+    """
     fig = plt.figure(figsize=figsize)
 
     for i, z in enumerate(zbin):

@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+"""CLI: print the bookkeeping folder name for a given P1D analysis variant.
+
+Wraps :func:`p1desi.bookkeeping.return_folder_name`, taking the region, line
+list, catalog, DLA, BAL and noise-estimate identifiers as command-line options.
+"""
 from p1desi import bookkeeping
 import sys
 import argparse

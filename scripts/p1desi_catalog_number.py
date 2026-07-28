@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+"""CLI: print the number of objects in a QSO/DLA catalog HDU.
+
+Wraps :func:`p1desi.catalogs.get_number`.
+"""
 import argparse
 from p1desi import catalogs
 

@@ -1,3 +1,15 @@
+"""Assembly and application of P1D corrections for DESI Lyman-alpha analysis.
+
+This module builds and applies the corrections needed to turn a raw picca
+1D power spectrum estimate into a corrected P1D: masking/continuum
+corrections (HCD, sky lines, continuum fitting, BAL, CCD resolution), noise
+corrections, and side-band (metal) subtraction corrections. Corrections are
+fit and evaluated as a function of wavenumber ``k`` (in Angstrom^-1, or in
+s/km when ``pk.velunits`` is True) over a set of redshift bins, and can be
+built either from DESI-derived power-spectrum ratios/fits or from legacy
+eBOSS ASCII correction tables.
+"""
+
 import glob
 import os
 import pickle
@@ -215,6 +227,16 @@ def plot_and_compute_ratio_power(
             if model == "poly":
 
                 def poly_func(x, *coefficients):
+                    """Evaluate a polynomial with highest-degree coefficient first.
+
+                    Args:
+                        x (array_like): Wavenumber(s) at which to evaluate the polynomial.
+                        *coefficients (float): Polynomial coefficients, ordered from the
+                            highest degree term to the constant term.
+
+                    Returns:
+                        array_like: Polynomial value(s) evaluated at ``x``.
+                    """
                     return np.sum(
                         coeff * (x ** (len(coefficients) - 1 - i))
                         for i, coeff in enumerate(coefficients)
@@ -388,6 +410,43 @@ def plot_and_compute_average_ratio_power_resolution(
     zmax_velcor=None,
     **plt_args,
 ):
+    """Plot and fit the redshift-averaged ratio of two power spectra (resolution correction).
+
+    For each redshift bin below ``zmax``, computes the ratio of the
+    normalized power spectra ``pk.norm_p / pk2.norm_p`` (e.g. RAW over CCD
+    resolution-degraded P1D) over the k-range ``[kmin_AA, kmax_AA]``
+    (converted to s/km if ``pk.velunits`` is True), averages the ratio
+    across redshift bins, fits it with :func:`model_resolution_desi`, plots
+    the individual and averaged ratios with the best-fit curve, and saves
+    the figure, fit parameters (pickle) and averaged data (txt) to
+    ``path_out``.
+
+    Args:
+        pk: Power spectrum object with attributes ``zbin``, ``k``, ``norm_p``,
+            ``norm_err``, ``velunits`` (numerator of the ratio).
+        pk2: Power spectrum object with the same attributes as ``pk`` (denominator
+            of the ratio).
+        path_out (str): Output directory for the figure, pickle and txt files.
+        name_correction (str): Name used as prefix of the saved file names.
+        suffix (str): Suffix used in the saved file names.
+        zmax (float): Maximum redshift (exclusive) of the bins to include.
+        kmin_AA (float): Minimum wavenumber in Angstrom^-1 used to mask the data.
+        kmax_AA (float): Maximum wavenumber in Angstrom^-1 used to mask the data.
+        derive_velcor (bool, optional): If True, also derive per-redshift
+            fit parameters converted to velocity units (s/km) for the
+            redshift bins below ``zmax_velcor``. Defaults to False.
+        zmax_velcor (float, optional): Maximum redshift (exclusive) used when
+            ``derive_velcor`` is True. Required in that case.
+        **plt_args: Additional plotting options, including:
+            labelsize: tick label size.
+            fontsize_x: x-axis label font size.
+            fontsize_y: y-axis label font size.
+            ymin: minimum y value for the plot.
+            ymax: maximum y value for the plot.
+
+    Returns:
+        None
+    """
     k_tot, ratio_tot, err_tot = [], [], []
     labelsize = utils.return_key(plt_args, "labelsize", 18)
     fontsize_x = utils.return_key(plt_args, "fontsize_x", 21)
@@ -521,21 +580,76 @@ def plot_and_compute_average_ratio_power_resolution(
 
 
 def model_skylines_desi(k, a, b, c, d):
+    """Rational function model used to fit the DESI sky-line masking correction.
+
+    Args:
+        k (array_like): Wavenumber, in Angstrom^-1 or s/km.
+        a (float): Numerator constant term.
+        b (float): Numerator linear coefficient.
+        c (float): Denominator constant term.
+        d (float): Denominator linear coefficient.
+
+    Returns:
+        array_like: Correction ratio ``(a + b * k) / (c + d * k)``.
+    """
     return (a + b * k) / (c + d * k)
 
 
 def model_resolution_desi(k, a, b):
+    """Gaussian-type model used to fit the DESI CCD resolution correction.
+
+    Args:
+        k (array_like): Wavenumber, in Angstrom^-1 or s/km.
+        a (float): Amplitude.
+        b (float): Damping (Gaussian) coefficient.
+
+    Returns:
+        array_like: Correction ratio ``a * exp(-b * k**2)``.
+    """
     return a * np.exp(-b * k**2)
 
 
 def load_model_resolution_desi(a, b):
+    """Build a resolution-correction callable with fixed best-fit parameters.
+
+    Args:
+        a (float): Amplitude parameter passed to :func:`model_resolution_desi`.
+        b (float): Damping coefficient passed to :func:`model_resolution_desi`.
+
+    Returns:
+        callable: Function ``func(k)`` evaluating
+        :func:`model_resolution_desi` at wavenumber ``k`` with ``a`` and ``b``
+        fixed.
+    """
     def func(k):
+        """Evaluate the resolution correction model at fixed (a, b).
+
+        Args:
+            k (array_like): Wavenumber, in Angstrom^-1 or s/km.
+
+        Returns:
+            array_like: Correction ratio at ``k``.
+        """
         return model_resolution_desi(k, a, b)
 
     return func
 
 
 def prepare_bal_correction(zbins, file_correction_bal):
+    """Load per-redshift-bin BAL masking correction polynomials.
+
+    Args:
+        zbins (array_like): Redshift bin centers to build corrections for.
+        file_correction_bal (str): Path to a pickle file containing a list
+            of polynomial coefficient arrays (one per redshift bin, in
+            ``numpy.poly1d`` order), as produced by
+            :func:`plot_and_compute_ratio_power` with ``model="poly"``.
+
+    Returns:
+        dict: Mapping from redshift bin value to a ``numpy.poly1d`` giving
+        the BAL correction as a function of ``k``. Redshift bins without a
+        stored correction get the identity polynomial ``poly1d(1)``.
+    """
     param_bal = pickle.load(open(file_correction_bal, "rb"))
     A_bal = {}
     for iz, z in enumerate(zbins):
@@ -548,6 +662,19 @@ def prepare_bal_correction(zbins, file_correction_bal):
 
 
 def prepare_hcd_correction(zbins, file_correction_hcd):
+    """Load per-redshift-bin HCD (high column density absorber) correction polynomials.
+
+    Args:
+        zbins (array_like): Redshift bin centers to build corrections for.
+        file_correction_hcd (str): Path to a pickle file containing a list
+            of polynomial coefficient arrays (one per redshift bin, in
+            ``numpy.poly1d`` order).
+
+    Returns:
+        dict: Mapping from redshift bin value to a ``numpy.poly1d`` giving
+        the HCD correction as a function of ``k``. Redshift bins without a
+        stored correction get the identity polynomial ``poly1d(1)``.
+    """
     param_hcd = pickle.load(open(file_correction_hcd, "rb"))
     A_hcd = {}
     for iz, z in enumerate(zbins):
@@ -560,6 +687,20 @@ def prepare_hcd_correction(zbins, file_correction_hcd):
 
 
 def prepare_lines_correction(zbins, file_correction_lines):
+    """Load per-redshift-bin sky-line masking correction polynomials.
+
+    Args:
+        zbins (array_like): Redshift bin centers to build corrections for.
+        file_correction_lines (str): Path to a pickle file containing a
+            list of polynomial coefficient arrays (one per redshift bin, in
+            ``numpy.poly1d`` order).
+
+    Returns:
+        dict: Mapping from redshift bin value to a ``numpy.poly1d`` giving
+        the line-masking correction as a function of ``k``. Redshift bins
+        without a stored correction get the identity polynomial
+        ``poly1d(1)``.
+    """
     param_lines = pickle.load(open(file_correction_lines, "rb"))
     A_lines = {}
     for iz, z in enumerate(zbins):
@@ -572,6 +713,20 @@ def prepare_lines_correction(zbins, file_correction_lines):
 
 
 def prepare_cont_correction(zbins, file_correction_cont):
+    """Load per-redshift-bin continuum-fitting correction polynomials.
+
+    Args:
+        zbins (array_like): Redshift bin centers to build corrections for.
+        file_correction_cont (str): Path to a pickle file containing a
+            list of polynomial coefficient arrays (one per redshift bin, in
+            ``numpy.poly1d`` order).
+
+    Returns:
+        dict: Mapping from redshift bin value to a ``numpy.poly1d`` giving
+        the continuum correction as a function of ``k``. Redshift bins
+        without a stored correction get the identity polynomial
+        ``poly1d(1)``.
+    """
     param_cont = pickle.load(open(file_correction_cont, "rb"))
     A_cont = {}
     for iz, z in enumerate(zbins):
@@ -584,6 +739,22 @@ def prepare_cont_correction(zbins, file_correction_cont):
 
 
 def prepare_resolution_correction(zbins, file_correction_resolution):
+    """Load the CCD resolution correction model for each redshift bin.
+
+    Args:
+        zbins (array_like): Redshift bin centers to build corrections for.
+        file_correction_resolution (str): Path to a pickle file containing
+            either a single ``(a, b)`` parameter pair (applied to every
+            redshift bin) or a list of ``(a, b)`` pairs, one per redshift
+            bin, as produced by
+            :func:`plot_and_compute_average_ratio_power_resolution`.
+
+    Returns:
+        dict: Mapping from redshift bin value to a callable (from
+        :func:`load_model_resolution_desi`) giving the resolution
+        correction as a function of ``k``. Redshift bins without a stored
+        correction get the identity polynomial ``poly1d(1)``.
+    """
     param_res = pickle.load(open(file_correction_resolution, "rb"))
     A_resolution = {}
     if np.array(param_res).ndim == 1:
@@ -600,6 +771,30 @@ def prepare_resolution_correction(zbins, file_correction_resolution):
 
 
 def apply_correction(pk, zmax, file_correction, type_correction):
+    """Apply a DESI-derived multiplicative correction to a power spectrum, in place.
+
+    Dispatches to ``prepare_{type_correction}_correction`` (e.g.
+    :func:`prepare_hcd_correction`, :func:`prepare_lines_correction`,
+    :func:`prepare_cont_correction`, :func:`prepare_resolution_correction`,
+    :func:`prepare_bal_correction`) to build the per-redshift-bin correction
+    model, then multiplies ``pk.p``, ``pk.norm_p``, ``pk.err`` and
+    ``pk.norm_err`` by the correction evaluated at ``pk.k[z]`` for every
+    redshift bin below ``zmax``.
+
+    Args:
+        pk: Power spectrum object with attributes ``zbin``, ``k``, ``p``,
+            ``norm_p``, ``err``, ``norm_err``, modified in place.
+        zmax (float): Maximum redshift (exclusive) of the bins to correct.
+        file_correction (str): Path to the pickle file holding the
+            correction parameters, passed to the corresponding
+            ``prepare_*_correction`` function.
+        type_correction (str): Correction type, one of ``"hcd"``,
+            ``"lines"``, ``"cont"``, ``"resolution"``, ``"bal"`` (must match
+            an existing ``prepare_{type_correction}_correction`` function).
+
+    Returns:
+        None
+    """
     zbins = pk.zbin[pk.zbin < zmax]
     A_corr = eval(f"prepare_{type_correction}_correction")(zbins, file_correction)
     for z in zbins:
@@ -610,6 +805,18 @@ def apply_correction(pk, zmax, file_correction, type_correction):
 
 
 def prepare_hcd_correction_eboss(zbins, hcd_eboss_name):
+    """Load per-redshift-bin eBOSS HCD correction polynomials from an ASCII table.
+
+    Args:
+        zbins (array_like): Redshift bin centers to build corrections for.
+        hcd_eboss_name (str): Path to a whitespace-separated text file with
+            one row of ``numpy.poly1d``-ordered polynomial coefficients per
+            redshift bin, readable by ``numpy.loadtxt``.
+
+    Returns:
+        dict: Mapping from redshift bin value to a ``numpy.poly1d`` giving
+        the eBOSS HCD correction as a function of ``k``.
+    """
     param_hcd_eboss = np.loadtxt(hcd_eboss_name)
     A_hcd = {}
     for iz, z in enumerate(zbins):
@@ -618,6 +825,18 @@ def prepare_hcd_correction_eboss(zbins, hcd_eboss_name):
 
 
 def prepare_lines_correction_eboss(zbins, lines_eboss_name):
+    """Load per-redshift-bin eBOSS sky-line correction polynomials from an ASCII table.
+
+    Args:
+        zbins (array_like): Redshift bin centers to build corrections for.
+        lines_eboss_name (str): Path to a whitespace-separated text file
+            with one row of ``numpy.poly1d``-ordered polynomial
+            coefficients per redshift bin, readable by ``numpy.loadtxt``.
+
+    Returns:
+        dict: Mapping from redshift bin value to a ``numpy.poly1d`` giving
+        the eBOSS line-masking correction as a function of ``k``.
+    """
     param_lines_eboss = np.loadtxt(lines_eboss_name)
     A_lines = {}
     for iz, z in enumerate(zbins):
@@ -626,10 +845,37 @@ def prepare_lines_correction_eboss(zbins, lines_eboss_name):
 
 
 def model_cont_correction_eboss(a0, a1, k):
+    """eBOSS continuum-fitting correction model (inverse-k plus offset).
+
+    Args:
+        a0 (float): Coefficient of the ``1/k`` term.
+        a1 (float): Constant offset term.
+        k (array_like): Wavenumber, in Angstrom^-1 or s/km.
+
+    Returns:
+        array_like: Correction value ``(a0 / k) + a1``.
+    """
     return (a0 / k) + a1
 
 
 def prepare_cont_correction_eboss(zbins, cont_eboss_name):
+    """Load per-redshift-bin eBOSS continuum correction models from an ASCII table.
+
+    For the first 6 redshift bins the correction uses the
+    :func:`model_cont_correction_eboss` functional form (fit with
+    parameters ``a0``, ``a1``); for the remaining bins it uses a
+    ``numpy.poly1d`` built from the row of stored coefficients.
+
+    Args:
+        zbins (array_like): Redshift bin centers to build corrections for.
+        cont_eboss_name (str): Path to a whitespace-separated text file
+            with one row of coefficients per redshift bin, readable by
+            ``numpy.loadtxt``.
+
+    Returns:
+        dict: Mapping from redshift bin value to a callable giving the
+        eBOSS continuum correction as a function of ``k``.
+    """
     param_cont_eboss = np.loadtxt(cont_eboss_name)
     A_cont = {}
     for iz, z in enumerate(zbins):
@@ -645,6 +891,30 @@ def prepare_cont_correction_eboss(zbins, cont_eboss_name):
 
 
 def apply_correction_eboss(pk, zmax, file_correction, type_correction):
+    """Apply an eBOSS-derived multiplicative correction to a power spectrum, in place.
+
+    Dispatches to ``prepare_{type_correction}_correction_eboss`` (e.g.
+    :func:`prepare_hcd_correction_eboss`,
+    :func:`prepare_lines_correction_eboss`,
+    :func:`prepare_cont_correction_eboss`) to build the per-redshift-bin
+    correction model, then divides ``pk.p``, ``pk.norm_p``, ``pk.err`` and
+    ``pk.norm_err`` by the correction evaluated at ``pk.k[z]`` for every
+    redshift bin below ``zmax``.
+
+    Args:
+        pk: Power spectrum object with attributes ``zbin``, ``k``, ``p``,
+            ``norm_p``, ``err``, ``norm_err``, modified in place.
+        zmax (float): Maximum redshift (exclusive) of the bins to correct.
+        file_correction (str): Path to the ASCII file holding the
+            correction parameters, passed to the corresponding
+            ``prepare_*_correction_eboss`` function.
+        type_correction (str): Correction type, one of ``"hcd"``,
+            ``"lines"``, ``"cont"`` (must match an existing
+            ``prepare_{type_correction}_correction_eboss`` function).
+
+    Returns:
+        None
+    """
     zbins = pk.zbin[pk.zbin < zmax]
     A_corr = eval(f"prepare_{type_correction}_correction_eboss")(zbins, file_correction)
     for z in zbins:
@@ -658,6 +928,32 @@ def apply_correction_eboss(pk, zmax, file_correction, type_correction):
 
 
 def prepare_metal_subtraction(zbins, file_metal, velunits=False):
+    """Build the per-redshift-bin metal side-band power spectrum model.
+
+    If ``file_metal`` is a path to a pickle file, it is expected to contain
+    a ``(param_SB1_mean, param_SB1_indiv)`` tuple, and the metal power
+    spectrum model for each redshift bin is built from
+    :func:`p1desi.metals.model_SB1_indiv_kms` (if ``velunits`` is True) or
+    :func:`p1desi.metals.model_SB1_indiv` (otherwise), bound to the mean
+    parameters and the individual redshift-bin parameters. Otherwise,
+    ``file_metal`` is treated as a power spectrum object (with ``k`` and
+    ``p`` attributes indexed by redshift) and the model is a linear
+    interpolation of its measured power spectrum.
+
+    Args:
+        zbins (array_like): Redshift bin centers to build the model for.
+        file_metal (str or object): Path to a pickle file with SB1 fit
+            parameters, or a power-spectrum-like object with ``k`` and
+            ``p`` dict attributes keyed by redshift.
+        velunits (bool, optional): If True, use the velocity-unit (s/km)
+            metal model instead of the wavelength-unit (Angstrom^-1) one.
+            Only used when ``file_metal`` is a pickle path. Defaults to
+            False.
+
+    Returns:
+        dict: Mapping from redshift bin value to a callable giving the
+        metal side-band power spectrum as a function of ``k``.
+    """
     P_metal_m = {}
     if type(file_metal) == str:
         (param_SB1_mean, param_SB1_indiv) = pickle.load(open(file_metal, "rb"))
@@ -689,6 +985,23 @@ def prepare_metal_subtraction(zbins, file_metal, velunits=False):
 
 
 def subtract_metal(pk, zmax, file_metal):
+    """Subtract the metal side-band contamination from a power spectrum, in place.
+
+    Builds the per-redshift-bin metal model via
+    :func:`prepare_metal_subtraction` and subtracts it from ``pk.p``
+    (directly) and from ``pk.norm_p`` (weighted by ``k / pi``, matching the
+    usual P1D normalization) for every redshift bin below ``zmax``.
+
+    Args:
+        pk: Power spectrum object with attributes ``zbin``, ``k``, ``p``,
+            ``norm_p``, ``velunits``, modified in place.
+        zmax (float): Maximum redshift (exclusive) of the bins to correct.
+        file_metal (str or object): Metal correction source, forwarded to
+            :func:`prepare_metal_subtraction`.
+
+    Returns:
+        None
+    """
     zbins = pk.zbin[pk.zbin < zmax]
     P_metal_m = prepare_metal_subtraction(zbins, file_metal, velunits=pk.velunits)
     for z in zbins:
@@ -697,11 +1010,42 @@ def subtract_metal(pk, zmax, file_metal):
 
 
 def prepare_metal_correction_eboss(file_metal_eboss):
+    """Load the raw eBOSS metal side-band correction table.
+
+    Args:
+        file_metal_eboss (str): Path to a whitespace-separated text file
+            with columns ``[redshift, wavenumber, side-band power]``,
+            readable by ``numpy.loadtxt``.
+
+    Returns:
+        numpy.ndarray: Array of shape ``(n_rows, 3)`` with columns
+        ``[z, k, sideband]``.
+    """
     param_sb_eboss = np.loadtxt(file_metal_eboss)
     return param_sb_eboss
 
 
 def subtract_metal_eboss(pk, zmax, file_metal_eboss):
+    """Subtract the eBOSS metal side-band correction from a power spectrum, in place.
+
+    Loads the raw eBOSS side-band table via
+    :func:`prepare_metal_correction_eboss`, and for each redshift bin below
+    ``zmax`` linearly interpolates/extrapolates the tabulated side-band
+    power (defined on a fixed eBOSS k-grid of ``nbin_eboss`` bins between
+    ``klimInf_eboss`` and ``klimSup_eboss``) onto the bin centers of that
+    grid, then subtracts it from ``pk.p`` (directly) and from ``pk.norm_p``
+    (weighted by ``k / pi``).
+
+    Args:
+        pk: Power spectrum object with attributes ``zbin``, ``k``, ``p``,
+            ``norm_p``, modified in place.
+        zmax (float): Maximum redshift (exclusive) of the bins to correct.
+        file_metal_eboss (str): Path to the eBOSS side-band ASCII table,
+            forwarded to :func:`prepare_metal_correction_eboss`.
+
+    Returns:
+        None
+    """
     zbins = pk.zbin[pk.zbin < zmax]
     param_sb_eboss = prepare_metal_correction_eboss(file_metal_eboss)
     nbin_eboss = 35
@@ -750,6 +1094,18 @@ def subtract_metal_eboss(pk, zmax, file_metal_eboss):
 
 
 def model_noise_correction(SNR, A, g, B):
+    """Power-law model for the missing pipeline noise power as a function of forest SNR.
+
+    Args:
+        SNR (array_like or float): Per-forest mean signal-to-noise ratio
+            (``MEANSNR``).
+        A (float): Power-law amplitude.
+        g (float): Power-law index (exponent applied to ``SNR ** (-g)``).
+        B (float): Constant offset (asymptotic noise power at high SNR).
+
+    Returns:
+        array_like or float: Missing noise power, ``A * SNR ** (-g) + B``.
+    """
     power_law = A * SNR ** (-g) + B
     return power_law
 
@@ -758,6 +1114,31 @@ def model_noise_correction(SNR, A, g, B):
 
 
 def correct_individual_pk_noise(pk_in, pk_out, qsocat, correction):
+    """Apply a per-survey missing-noise-power correction to individual picca Pk1D files.
+
+    Reads every ``Pk1D-*`` FITS file in ``pk_in``; for each per-forest HDU,
+    looks up the line-of-sight's survey from ``qsocat`` (matching
+    ``LOS_ID``/``TARGETID``), computes the missing noise power with
+    :func:`model_noise_correction` using the forest's ``MEANSNR`` header
+    keyword and the survey-specific ``correction`` parameters, adds it to
+    the existing ``PK_NOISE`` column, stores it in a new ``PK_NOISE_MISS``
+    column, and writes the corrected HDUs to a new file of the same name in
+    ``pk_out``.
+
+    Args:
+        pk_in (str): Directory containing the input ``Pk1D-*`` FITS files.
+        pk_out (str): Output directory for the corrected FITS files
+            (created if it does not exist).
+        qsocat (str): Path to the QSO catalog FITS file (``QSO_CAT`` HDU
+            with ``TARGETID`` and ``SURVEY`` columns) used to map each
+            line of sight to its survey.
+        correction (dict): Mapping from survey name to the
+            ``(A, g, B)`` parameter tuple passed to
+            :func:`model_noise_correction`.
+
+    Returns:
+        None
+    """
     os.makedirs(pk_out, exist_ok=True)
     pk_files = glob.glob(os.path.join(pk_in, "Pk1D-*"))
 
@@ -808,6 +1189,67 @@ def apply_p1d_corections(
     file_metal=None,
     file_metal_eboss=None,
 ):
+    """Orchestrate application of the masking/continuum and side-band corrections to a P1D.
+
+    Depending on the boolean flags, applies either the DESI or the eBOSS
+    masking/continuum corrections (for each correction type listed in
+    ``correction_to_apply``, via :func:`apply_correction` or
+    :func:`apply_correction_eboss`), and either the DESI or the eBOSS
+    side-band metal correction (via :func:`subtract_metal` or
+    :func:`subtract_metal_eboss`).
+
+    Args:
+        pk: Power spectrum object to correct, modified in place (see
+            :func:`apply_correction` / :func:`apply_correction_eboss` /
+            :func:`subtract_metal` / :func:`subtract_metal_eboss` for the
+            attributes involved).
+        zmax (float): Maximum redshift (exclusive) of the bins to correct.
+        apply_DESI_maskcont_corr (bool): If True, apply the DESI
+            masking/continuum corrections listed in ``correction_to_apply``.
+        apply_eBOSS_maskcont_corr (bool): If True, apply the eBOSS
+            masking/continuum corrections listed in ``correction_to_apply``.
+        apply_DESI_sb_corr (bool): If True, apply the DESI metal side-band
+            subtraction.
+        apply_eBOSS_sb_corr (bool): If True, apply the eBOSS metal
+            side-band subtraction.
+        correction_to_apply (iterable of str): Correction type names (e.g.
+            ``"hcd"``, ``"lines"``, ``"cont"``, ``"resolution"``, ``"bal"``)
+            to apply via the masking/continuum branch.
+        file_correction_hcd (str, optional): Pickle path for the DESI HCD
+            correction, used when ``"hcd"`` is in ``correction_to_apply``
+            and ``apply_DESI_maskcont_corr`` is True.
+        file_correction_hcd_eboss (str, optional): ASCII table path for the
+            eBOSS HCD correction, used when ``"hcd"`` is in
+            ``correction_to_apply`` and ``apply_eBOSS_maskcont_corr`` is
+            True.
+        file_correction_lines (str, optional): Pickle path for the DESI
+            line-masking correction.
+        file_correction_lines_eboss (str, optional): ASCII table path for
+            the eBOSS line-masking correction.
+        file_correction_cont (str, optional): Pickle path for the DESI
+            continuum correction.
+        file_correction_cont_eboss (str, optional): ASCII table path for
+            the eBOSS continuum correction.
+        file_correction_resolution (str, optional): Pickle path for the
+            DESI resolution correction.
+        file_correction_bal (str, optional): Pickle path for the DESI BAL
+            correction.
+        file_metal (str or object, optional): Metal side-band source for
+            the DESI correction, forwarded to :func:`subtract_metal`.
+        file_metal_eboss (str, optional): ASCII table path for the eBOSS
+            metal side-band correction, forwarded to
+            :func:`subtract_metal_eboss`.
+
+    Returns:
+        The corrected ``pk`` object (same instance, modified in place).
+
+    Raises:
+        KeyError: Conceptually raised (the value is returned rather than
+            raised, matching the current implementation) if both
+            ``apply_DESI_maskcont_corr`` and ``apply_eBOSS_maskcont_corr``
+            are True, or if both ``apply_DESI_sb_corr`` and
+            ``apply_eBOSS_sb_corr`` are True.
+    """
     if apply_DESI_maskcont_corr & apply_eBOSS_maskcont_corr:
         return KeyError("Same type of correction is applied two times")
 

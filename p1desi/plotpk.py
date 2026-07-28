@@ -32,6 +32,40 @@ def plot(
     analysis_type="y1",
     **plot_args,
 ):
+    """Plot the DESI Lyman-alpha 1D power spectrum (or its dimensionless form) vs k per redshift bin.
+
+    For each redshift bin below `zmax`, draws an errorbar series of P(k) (if `plot_P` is True) or
+    of `k*P(k)/pi` (otherwise), optionally adding systematics uncertainty in quadrature to the
+    statistical error. Supports switching to a separate low-redshift `Pk` object (`pk_low_z`)
+    below `z_change`, converting the AA^-1 k-cuts to s/km when `pk.velunits` is True, and writing
+    the plotted points to disk.
+
+    Args:
+        pk (p1desi.pk_io.Pk): Power spectrum object exposing `.zbin`, `.k`, `.p`, `.err`,
+            `.norm_p`, `.norm_err`, `.number_chunks`, `.velunits` indexed/keyed by redshift.
+        zmax (float): Maximum redshift (exclusive) of the bins to plot.
+        outname (str, optional): If given, path to save the figure (passed to `fig.savefig`).
+        outpoints (str, optional): If given, base path (without extension) to write the plotted
+            k, P(k), error columns via `return_outpoints`.
+        plot_P (bool, optional): If True plot raw P(k); otherwise plot k*P(k)/pi. Defaults to
+            False.
+        systematics_file (str, optional): Path to a systematics uncertainty file. If given,
+            systematic errors are combined in quadrature with the statistical error and included
+            in the output.
+        pk_low_z (p1desi.pk_io.Pk, optional): Alternate `Pk` object used for redshift bins below
+            `z_change`.
+        z_change (float, optional): Redshift threshold below which `pk_low_z` replaces `pk`.
+        analysis_type (str, optional): Selects the systematics-preparation function: "edr" uses
+            `uncertainty.prepare_uncertainty_systematics`, "y1" (default) uses
+            `uncertainty.prepare_uncertainty_systematics_y1`.
+        **plot_args: Matplotlib/styling overrides read via `utils.return_key`, including
+            `marker_size`, `marker_style`, `fontsize_x`, `fontsize_y`, `labelsize`, `fontl`
+            (legend fontsize), `kmin_AA`, `kmax_AA`, `ymin`, `ymax`, `figsize`, `place_velaxis`
+            (add a secondary s/km k-axis), and `color_map` ("default" or "rainbow").
+
+    Returns:
+        tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]: The created figure and axis.
+    """
     zbins = pk.zbin[pk.zbin < zmax]
 
     marker_size = utils.return_key(plot_args, "marker_size", 7)
@@ -195,6 +229,47 @@ def plot_comparison(
     analysis_type="y1",
     **plot_args,
 ):
+    """Plot two P1D measurements on a shared axis together with their ratio in a lower panel.
+
+    Draws `pk` as errorbars and `pk2` as a shaded band (or with markers/lines depending on
+    `marker_comp`/`linestyle_comp`), then computes and plots the ratio `pk/pk2` (interpolated
+    onto the `pk` k-grid) per redshift bin. Optionally rebins `pk`/`pk2` onto a common k-grid
+    before computing the ratio, adds systematics in quadrature, and can highlight the ratio
+    uncertainty band for a single chosen redshift.
+
+    Args:
+        pk (p1desi.pk_io.Pk): Primary power spectrum object.
+        pk2 (p1desi.pk_io.Pk): Comparison power spectrum object; must share `.velunits` with
+            `pk`.
+        zmax (float): Maximum redshift (exclusive) of the bins to plot.
+        outname (str, optional): If given, base path (".pdf"/".png" appended) to save the
+            figure.
+        outpoints (str, optional): If given, base path to write out the plotted points for both
+            `pk` and `pk2` via `return_outpoints`.
+        pk_low_z (p1desi.pk_io.Pk, optional): Alternate `Pk` object used for redshift bins below
+            `z_change`.
+        z_change (float, optional): Redshift threshold below which `pk_low_z` replaces `pk`.
+        plot_P (bool, optional): If True plot raw P(k); otherwise plot k*P(k)/pi. Defaults to
+            False.
+        systematics_file (str, optional): Path to a systematics uncertainty file; if given,
+            systematic errors are added in quadrature to the statistical error for `pk`.
+        analysis_type (str, optional): Selects the systematics-preparation function ("edr" or
+            "y1", default "y1").
+        **plot_args: Matplotlib/styling overrides read via `utils.return_key`, including
+            `zmin`, `marker_size`, `marker_style`, `fontsize_x`, `fontsize_y`, `labelsize`,
+            `fontl`, `kmin_AA`, `kmax_AA`, `kmax_plot`, `ymin`, `ymax`, `figsize`,
+            `place_velaxis`, `label`, `label2`, `alpha_comp`, `marker_comp`, `linestyle_comp`,
+            `extrapolate_ratio`, `plot_error_ratio`, `plot_middle_error_ratio`,
+            `z_plot_middle_ratio_error`, `ymin_ratio`, `ymax_ratio`, `apply_mask_comp`,
+            `zmax_comp`, `resample_pk`, `height_ratios`, and `color_map`.
+
+    Returns:
+        tuple[matplotlib.figure.Figure, numpy.ndarray]: The created figure and the 2-element
+            array of axes (top: spectra, bottom: ratio).
+
+    Raises:
+        ValueError: If `pk.velunits` and `pk2.velunits` differ.
+    """
     if pk.velunits != pk2.velunits:
         raise ValueError(
             "The power spectrum you want to compare are expressed in different units"
@@ -643,6 +718,33 @@ def return_outpoints(
     systindivarr=None,
     systindivname=None,
 ):
+    """Concatenate per-redshift-bin arrays and write them to a whitespace-delimited text file.
+
+    Stacks the per-bin `zarr`/`karr`/`pkarr`/`errarr` lists into flat columns (and, if
+    provided, the statistical/systematic/individual-systematic breakdown columns) and writes
+    them with `numpy.savetxt` to `<outpoints>.txt`.
+
+    Args:
+        outpoints (str): Output path prefix; the file is written to `outpoints + ".txt"`.
+        zarr (list[numpy.ndarray]): Per-redshift-bin arrays of the redshift value repeated for
+            each k.
+        karr (list[numpy.ndarray]): Per-redshift-bin arrays of k values.
+        pkarr (list[numpy.ndarray]): Per-redshift-bin arrays of P(k) or k*P(k)/pi values.
+        errarr (list[numpy.ndarray]): Per-redshift-bin arrays of the total (stat [+ syst])
+            error.
+        plot_P (bool, optional): If True, header labels columns as "PK"/"ERR"; otherwise as
+            "K*PK/PI"/"K*ERR/PI". Defaults to False.
+        statarr (list[numpy.ndarray], optional): Per-bin statistical-only error arrays; if
+            given, written alongside `systarr` and `systindivarr`.
+        systarr (list[numpy.ndarray], optional): Per-bin total systematic error arrays.
+        systindivarr (list[list[numpy.ndarray]], optional): Per-systematic, per-bin error
+            arrays, one outer entry per systematic named in `systindivname`.
+        systindivname (list[str], optional): Names of the individual systematics in
+            `systindivarr`, used to build header column labels.
+
+    Returns:
+        None
+    """
     stack = []
     header = "Z & K & "
     if plot_P:
@@ -681,6 +783,40 @@ def save_p1d(
     pk_low_z=None,
     z_change=None,
 ):
+    """Write a mean P1D measurement, its covariance, and systematics breakdown to a FITS file.
+
+    Builds the P1D binning (k edges/centers from `mean_pk.kmin`/`kmax`, z edges from
+    `zedge_bin`), concatenates per-redshift-bin power, statistical error, raw/noise power and
+    covariance blocks (block-diagonal in redshift), computes the systematics covariance from
+    the requested uncertainty budget, and writes FITS extensions "P1D"/"P1D_BLIND",
+    "SYSTEMATICS", "COVARIANCE", "COVARIANCE_STAT", and "COVARIANCE_SYST" to `output_name`.
+
+    Args:
+        mean_pk (p1desi.pk_io.Pk): Mean power spectrum object exposing `.zbin`, `.kmin`,
+            `.kmax`, `.k`, `.p`, `.err`, `.p_raw`, `.p_noise`, `.cov`/`.boot_cov`, `.velunits`.
+        systematics_file (str): Path to the systematics uncertainty file passed to the
+            `uncertainty` module.
+        zmax (float): Maximum redshift (exclusive) of the bins to save.
+        output_name (str): Destination FITS file path (overwritten if it exists).
+        zedge_bin (float, optional): Full width of each redshift bin used to compute Z1/Z2
+            edges. Defaults to 0.2.
+        blinding (str, optional): Blinding label written to the header; if not None, data are
+            written to the "P1D_BLIND" extension instead of "P1D". Defaults to "desi_y1".
+        analysis_type (str, optional): Selects the systematics-preparation function ("edr" uses
+            `uncertainty.prepare_uncertainty_systematics`, "y1" uses
+            `uncertainty.prepare_uncertainty_systematics_y1`). Defaults to "y1".
+        use_boot (bool, optional): If True use `mean_pk.boot_cov` for the statistical
+            covariance, otherwise use `mean_pk.cov`. Defaults to True.
+        verify_cov (bool, optional): If True, checks the full/statistical/systematic covariance
+            matrices for negative eigenvalues and NaNs and prints warnings. Defaults to False.
+        pk_low_z (p1desi.pk_io.Pk, optional): Alternate `Pk` object used for redshift bins below
+            `z_change`.
+        z_change (float, optional): Redshift threshold below which `pk_low_z` replaces
+            `mean_pk`.
+
+    Returns:
+        None
+    """
 
     velunits = mean_pk.velunits
 
@@ -967,6 +1103,44 @@ def plot_three_comparison(
     analysis_type="y1",
     **plot_args,
 ):
+    """Plot three P1D measurements with two stacked ratio panels (pk/pk2 and pk2/pk3).
+
+    Similar to `plot_comparison` but compares three `Pk` objects on one main panel (`pk` as
+    errorbars, `pk2` as a shaded band/markers/line, `pk3` as a dashed line) and shows two
+    ratio subpanels: `pk/pk2` and `pk2/pk3` (each interpolated onto a shared k-grid).
+    Optionally rebins onto `pk2`'s grid and can highlight the ratio-error band at a chosen
+    redshift.
+
+    Args:
+        pk (p1desi.pk_io.Pk): Primary power spectrum object.
+        pk2 (p1desi.pk_io.Pk): Second power spectrum object; must share `.velunits` with `pk`.
+        pk3 (p1desi.pk_io.Pk): Third power spectrum object, plotted as a dashed comparison
+            line.
+        zmax (float): Maximum redshift (exclusive) of the bins to plot.
+        outname (str, optional): If given, base path (".pdf"/".png" appended) to save the
+            figure.
+        outpoints (str, optional): If given, base path to write out the plotted points for
+            `pk`, `pk2`, and `pk3` via `return_outpoints`.
+        plot_P (bool, optional): If True plot raw P(k); otherwise plot k*P(k)/pi. Defaults to
+            False.
+        systematics_file (str, optional): Path to a systematics uncertainty file for `pk`.
+        analysis_type (str, optional): Selects the systematics-preparation function ("edr" or
+            "y1", default "y1").
+        **plot_args: Matplotlib/styling overrides read via `utils.return_key`, including
+            `marker_size`, `marker_style`, `fontsize_x`, `fontsize_y`, `labelsize`, `fontl`,
+            `kmin_AA`, `kmax_AA`, `ymin`, `ymax`, `figsize`, `place_velaxis`, `label`,
+            `label2`, `label3`, `alpha_comp`, `marker_comp`, `linestyle_comp`,
+            `extrapolate_ratio`, `plot_error_ratio`, `plot_middle_error_ratio`,
+            `z_plot_middle_ratio_error`, `ymin_ratio`, `ymax_ratio`, `apply_mask_comp`,
+            `zmax_comp`, `resample_pk`, and `color_map`.
+
+    Returns:
+        tuple[matplotlib.figure.Figure, numpy.ndarray]: The created figure and the 3-element
+            array of axes (spectra, pk/pk2 ratio, pk2/pk3 ratio).
+
+    Raises:
+        ValueError: If `pk.velunits` and `pk2.velunits` differ.
+    """
     if pk.velunits != pk2.velunits:
         raise ValueError(
             "The power spectrum you want to compare are expressed in different units"
@@ -1455,6 +1629,42 @@ def plot_variations(
     no_legend=False,
     **plot_args,
 ):
+    """Plot, for each variation power spectrum, the ratio to a reference P1D across redshift bins.
+
+    Creates one ratio subplot per entry in `mean_pk_list_variation` (ref/variation), each
+    overlaying all redshift bins in `zbins`. Optionally computes goodness-of-fit diagnostics
+    comparing the ratio to unity: a diagonal chi-square p-value, a covariance-weighted
+    chi-square p-value (using `mean_pk_ref.boot_cov`), the fraction of points above/below 1
+    (sign-test p-value), and a Pearson correlation p-value between the ratio residual and k.
+
+    Args:
+        mean_pk_ref (p1desi.pk_io.Pk): Reference power spectrum object.
+        mean_pk_list_variation (list[p1desi.pk_io.Pk]): Power spectrum objects to compare
+            against the reference; one subplot is created per entry.
+        label_variations (list[str]): Legend/axis labels for each variation, used for ylabels
+            and the output file header.
+        plot_P (bool): If True use raw P(k) for the ratio; otherwise use k*P(k)/pi.
+        zmax (float): Maximum redshift (exclusive) of the bins to plot.
+        outname (str, optional): If given, base path (".pdf"/".png" appended) to save the
+            figure.
+        outpoints (str, optional): If given, path (".txt" appended) to save the stacked
+            redshift/k/ratio/error columns for every variation.
+        data_split (bool, optional): If True, plot ratio points with errorbars (accounting for
+            the shared-data covariance term between ref and variation) instead of connected
+            lines. Defaults to False.
+        compute_p_values (bool, optional): If True, compute and print the chi-square/
+            distribution/Pearson p-value diagnostics described above and annotate the
+            corresponding subplot. Defaults to False.
+        no_legend (bool, optional): If True, suppress the redshift-bin legend on the first
+            subplot. Defaults to False.
+        **plot_args: Matplotlib/styling overrides read via `utils.return_key`, including
+            `zmin`, `marker_size`, `marker_style`, `fontsize_x`, `fontsize_y`, `labelsize`,
+            `label_base`, `fontl`, `kmin_AA`, `kmax_AA`, `ymin`, `ymax` (scalars or
+            per-subplot lists), `figsize`, `extrapolate_ratio`, and `color_map`.
+
+    Returns:
+        None
+    """
     zmin = utils.return_key(plot_args, "zmin", None)
 
     zbins = mean_pk_ref.zbin[mean_pk_ref.zbin < zmax]
@@ -1724,6 +1934,41 @@ def plot_three_comparison_bis(
     analysis_type="y1",
     **plot_args,
 ):
+    """Plot two stacked ratio panels, pk/pk2 and pk/pk3, without a shared spectrum panel.
+
+    A leaner variant of `plot_three_comparison`/`plot_comparison` that only shows the ratios
+    `pk/pk2` (top panel) and `pk/pk3` (bottom panel, optionally with `pk`/`pk2` first rebinned
+    onto `pk3`'s k-grid via `resample_pk`), across the requested redshift bins. Supports
+    switching to a low-redshift `Pk` object below `z_change` and highlighting the ratio-error
+    band at a chosen redshift.
+
+    Args:
+        pk (p1desi.pk_io.Pk): Primary power spectrum object.
+        pk2 (p1desi.pk_io.Pk): Second power spectrum object, compared as `pk/pk2` in the top
+            panel.
+        pk3 (p1desi.pk_io.Pk): Third power spectrum object, compared as `pk/pk3` in the bottom
+            panel.
+        zmax (float): Maximum redshift (exclusive) of the bins to plot.
+        outname (str, optional): If given, base path (".pdf"/".png" appended) to save the
+            figure.
+        outpoints (str, optional): If given, base path to write the `pk/pk2` and `pk/pk3`
+            ratio points (as `<outpoints>.txt` and `<outpoints>_2.txt`).
+        pk_low_z (p1desi.pk_io.Pk, optional): Alternate `Pk` object used for redshift bins
+            below `z_change`.
+        z_change (float, optional): Redshift threshold below which `pk_low_z` replaces `pk`.
+        systematics_file (str, optional): Path to a systematics uncertainty file for `pk`.
+        analysis_type (str, optional): Selects the systematics-preparation function ("edr" or
+            "y1", default "y1").
+        **plot_args: Matplotlib/styling overrides read via `utils.return_key`, including
+            `marker_size`, `marker_style`, `fontsize_x`, `fontsize_y`, `labelsize`, `fontl`,
+            `kmin_AA`, `kmax_AA`, `ymin`, `ymax`, `figsize`, `label`, `label2`, `label3`,
+            `extrapolate_ratio`, `plot_error_ratio`, `plot_middle_error_ratio`,
+            `z_plot_middle_ratio_error`, `apply_mask_comp`, `resample_pk`, and `color_map`.
+
+    Returns:
+        tuple[matplotlib.figure.Figure, numpy.ndarray]: The created figure and the 2-element
+            array of axes (pk/pk2 ratio, pk/pk3 ratio).
+    """
 
     zbins = pk.zbin[pk.zbin < zmax]
 
@@ -2042,6 +2287,22 @@ def print_data_numbers(
     mean_pk_list_variation,
     zmax,
 ):
+    """Print, per redshift bin, the chunk counts of a reference P1D and each variation.
+
+    For every redshift bin below `zmax`, prints the reference `number_chunks`, then for each
+    `Pk` in `mean_pk_list_variation` prints its `number_chunks`, the per-bin ratio to the
+    reference, and the mean ratio across bins.
+
+    Args:
+        mean_pk_ref (p1desi.pk_io.Pk): Reference power spectrum object exposing `.zbin` and
+            `.number_chunks`.
+        mean_pk_list_variation (list[p1desi.pk_io.Pk]): Power spectrum objects to compare
+            against the reference.
+        zmax (float): Maximum redshift (exclusive) of the bins considered.
+
+    Returns:
+        None
+    """
     zbins = mean_pk_ref.zbin[mean_pk_ref.zbin < zmax]
     N_ref = [mean_pk_ref.number_chunks[z] for z in zbins]
     print("Nref = ", N_ref)
