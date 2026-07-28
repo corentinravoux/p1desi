@@ -1,0 +1,76 @@
+site_name: p1desi
+site_description: DESI one-dimensional Lyman-alpha forest power spectrum (P1D) analysis
+site_url: https://corentinravoux.github.io/p1desi/
+repo_url: https://github.com/corentinravoux/p1desi
+repo_name: corentinravoux/p1desi
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.instant
+    - content.code.copy
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - toc:
+      permalink: true
+  - tables
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_source: true
+            show_signature_annotations: true
+            separate_signature: true
+            filters: ["!^_"]
+            members_order: source
+            group_by_category: true
+            heading_level: 2
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Analysis pipeline: pipeline.md
+  - API reference:
+      - Overview: api/index.md
+      - pk_io: api/pk_io.md
+      - corrections: api/corrections.md
+      - uncertainty: api/uncertainty.md
+      - metals: api/metals.md
+      - noise: api/noise.md
+      - resolution: api/resolution.md
+      - skylines: api/skylines.md
+      - hcd: api/hcd.md
+      - spectra_statistics: api/spectra_statistics.md
+      - mocks: api/mocks.md
+      - plotpk: api/plotpk.md
+      - bookkeeping: api/bookkeeping.md
+      - catalogs: api/catalogs.md
+      - utils: api/utils.md
