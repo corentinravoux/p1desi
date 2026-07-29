@@ -1,5 +1,7 @@
 # p1desi
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21646083.svg)](https://doi.org/10.5281/zenodo.21646083)
+
 Suite of tools to analyse the **one-dimensional Lyman-alpha forest power
 spectrum (P1D)** measured by [picca](https://github.com/igmhub/picca) on DESI
 data. Developed for the first DESI P1D measurements (Early Data Release and
