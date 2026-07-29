@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using these metadata."
+title: p1desi
+abstract: >-
+  Analysis tools for the one-dimensional Lyman-alpha forest power spectrum
+  (P1D) measured by picca on DESI data, including noise, resolution, sky-line,
+  metal and high-column-density corrections and the associated error budget.
+type: software
+authors:
+  - given-names: Corentin
+    family-names: Ravoux
+    email: corentin.ravoux.research@gmail.com
+version: "1.0"
+date-released: 2026-07-29
+license: MIT
+repository-code: "https://github.com/corentinravoux/p1desi"
+url: "https://corentinravoux.github.io/p1desi/"
+doi: 10.5281/zenodo.21646083
+keywords:
+  - cosmology
+  - Lyman-alpha forest
+  - power spectrum
+  - DESI
+  - P1D
